@@ -19,29 +19,32 @@ label{display:block;font-weight:bold;margin:12px 0 4px}
 input,select,textarea{width:100%;padding:12px;border:1px solid #ccd8cd;border-radius:9px;background:white;font:inherit;color:#24372b}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 button{border:0;border-radius:9px;padding:12px 17px;font:inherit;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.55}
 .primary{background:#174d32;color:white;width:100%;margin-top:18px}
 .secondary{background:#e8f2e9;color:#174d32;margin:5px}
 #report{display:none}
-.result{background:#edf5ed;border-radius:10px;padding:13px;margin:10px 0;overflow-wrap:anywhere}
+.result,.history-item{background:#edf5ed;border-radius:10px;padding:13px;margin:10px 0;overflow-wrap:anywhere}
 .muted{font-size:13px}
 #status{padding:10px;border-radius:8px;background:#edf5ed;overflow-wrap:anywhere}
 @media(max-width:520px){.grid{grid-template-columns:1fr}.panel{padding:15px}}
-@media print{header,form,.no-print,footer,.intro{display:none!important}body{background:white}main{width:100%;margin:0}.panel{border:0;box-shadow:none}#report{display:block!important}}
+@media print{
+header,form,.no-print,footer,.intro,#entryPanel,#historyPanel{display:none!important}
+body{background:white}main{width:100%;margin:0}
+.panel{border:0;box-shadow:none}#report{display:block!important}
+}
 </style>
 </head>
 <body>
 <header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية</a></header>
 <main>
 <h1>نموذج بيانات الحقل</h1>
-<p class="intro">اختر حقلًا محفوظًا أو أدخل بيانات حقل جديد لإنشاء تقرير أولي.</p>
+<p class="intro">اختر حقلًا محفوظًا أو أدخل بيانات حقل لإنشاء تقرير زراعي أولي.</p>
 
-<section class="panel">
+<section class="panel" id="entryPanel">
 <div id="status">جارٍ الاتصال بقاعدة البيانات...</div>
 
 <label for="savedField">اختيار حقل محفوظ في السحابة</label>
-<select id="savedField">
-<option value="">تحميل الحقول...</option>
-</select>
+<select id="savedField"><option value="">جارٍ تحميل الحقول...</option></select>
 <p class="muted">اختيار حقل يعبّئ الاسم والمحصول والمساحة تلقائيًا.</p>
 
 <form id="fieldForm">
@@ -91,7 +94,7 @@ button{border:0;border-radius:9px;padding:12px 17px;font:inherit;font-weight:bol
 <label for="notes">ملاحظات عن حالة المحصول</label>
 <textarea id="notes" rows="4" maxlength="1500" placeholder="مثال: تفاوت النمو أو مشكلة في الري"></textarea>
 
-<button class="primary" type="submit">إنشاء تقرير الحقل</button>
+<button class="primary" id="createButton" type="submit">إنشاء التقرير وحفظه في السحابة</button>
 </form>
 </section>
 
@@ -105,8 +108,15 @@ button{border:0;border-radius:9px;padding:12px 17px;font:inherit;font-weight:bol
 </div>
 </section>
 
-<p class="muted">يمكن استخدام النموذج يدويًا إذا تعذر الاتصال بالسحابة.</p>
+<section class="panel" id="historyPanel">
+<h2>تقاريري السابقة</h2>
+<p class="muted">التقارير المحفوظة في حسابك على Supabase.</p>
+<div id="history">جارٍ تحميل التقارير...</div>
+</section>
+
+<p class="muted">حفظ التقارير في السحابة يتطلب تسجيل الدخول. إذا تعذر الحفظ فستظهر رسالة توضح السبب.</p>
 </main>
+
 <footer class="muted" style="text-align:center;padding:20px">© 2026 UR Smart — أور الزراعية الذكية</footer>
 
 <script type="module">
@@ -123,21 +133,29 @@ const savedField=$('savedField');
 const form=$('fieldForm');
 const report=$('report');
 const reportContent=$('reportContent');
-let fields=[];
 
-function setStatus(message){status.textContent=message;}
+let fields=[];
+let session=null;
+let farm=null;
+
+function setStatus(message){
+ status.textContent=message;
+}
 
 function setCrop(value){
- const crop=$('crop');
+ const select=$('crop');
  const aliases={'قمح':'الحنطة','حنطة':'الحنطة'};
  const wanted=aliases[value]||value||'';
- const option=[...crop.options].find(o=>o.value===wanted||o.textContent===wanted);
- crop.value=option?option.value:'';
+ const option=[...select.options].find(
+  o=>o.value===wanted||o.textContent===wanted
+ );
+ select.value=option?option.value:'';
 }
 
 function loadSelectedField(){
  const field=fields.find(f=>f.id===savedField.value);
  if(!field)return;
+
  $('farm').value=field.name||'';
  setCrop(field.crop);
  $('area').value=field.area_donum??'';
@@ -148,37 +166,47 @@ savedField.addEventListener('change',loadSelectedField);
 
 async function loadFields(){
  const {data:authData,error:authError}=await supabase.auth.getSession();
+
  if(authError){
   setStatus('تعذر التحقق من الحساب: '+authError.message);
   savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
+  $('history').textContent='تعذر التحقق من الحساب.';
   return;
  }
- const session=authData.session;
+
+ session=authData.session;
+
  if(!session){
-  setStatus('لم تسجل الدخول. يمكنك إدخال بيانات الحقل يدويًا، أو تسجيل الدخول لتحميل الحقول المحفوظة.');
+  setStatus('يرجى تسجيل الدخول لتحميل الحقول وحفظ التقارير.');
   savedField.innerHTML='<option value="">سجّل الدخول لتحميل الحقول</option>';
+  $('history').textContent='سجّل الدخول لعرض تقاريرك السابقة.';
   return;
  }
 
  const {data:farms,error:farmError}=await supabase
-  .from('farms').select('id,name')
-  .eq('owner_id',session.user.id).limit(1);
+  .from('farms')
+  .select('id,name')
+  .eq('owner_id',session.user.id)
+  .limit(1);
 
  if(farmError){
   setStatus('تعذر تحميل المزرعة: '+farmError.message);
   savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
   return;
  }
+
  if(!farms||farms.length===0){
   setStatus('لم يتم العثور على مزرعة مرتبطة بالحساب.');
   savedField.innerHTML='<option value="">لا توجد مزرعة</option>';
   return;
  }
 
+ farm=farms[0];
+
  const {data,error}=await supabase
   .from('fields')
   .select('id,name,crop,area_donum,farm_id')
-  .eq('farm_id',farms[0].id)
+  .eq('farm_id',farm.id)
   .order('created_at',{ascending:false});
 
  if(error){
@@ -189,6 +217,7 @@ async function loadFields(){
 
  fields=data||[];
  savedField.replaceChildren();
+
  const first=document.createElement('option');
  first.value='';
  first.textContent=fields.length?'اختر حقلًا محفوظًا':'لا توجد حقول محفوظة';
@@ -197,45 +226,154 @@ async function loadFields(){
  fields.forEach(field=>{
   const option=document.createElement('option');
   option.value=field.id;
-  option.textContent=field.name+' — '+field.area_donum+' دونم — '+(field.crop||'محصول غير محدد');
+  option.textContent=field.name+' — '+field.area_donum+
+   ' دونم — '+(field.crop||'محصول غير محدد');
   savedField.appendChild(option);
  });
- setStatus('تم الاتصال بالسحابة. المزرعة: '+farms[0].name);
+
+ setStatus('تم الاتصال بالسحابة. المزرعة: '+farm.name);
+ await loadHistory();
 }
 
 function addRow(label,value){
  const row=document.createElement('div');
  row.className='result';
+
  const title=document.createElement('strong');
  title.textContent=label;
+
  const content=document.createElement('div');
  content.textContent=value||'لم يتم الإدخال';
+
  row.append(title,content);
  reportContent.appendChild(row);
 }
 
-form.addEventListener('submit',event=>{
- event.preventDefault();
- if(!form.reportValidity())return;
+function showReport(data){
  reportContent.replaceChildren();
 
- const area=Number($('area').value);
- const data=[
- ['اسم الحقل',$('farm').value.trim()],
- ['المحصول',$('crop').value],
- ['المساحة',area.toLocaleString('ar-IQ')+' دونم عراقي'],
- ['طريقة الري',$('irrigation').value],
- ['نوع التربة',$('soil').value],
- ['الموقع',$('location').value.trim()],
- ['ملاحظات المزارع',$('notes').value.trim()]
+ const rows=[
+  ['اسم الحقل',data.field_name],
+  ['المحصول',data.crop],
+  ['المساحة',Number(data.area_donum).toLocaleString('ar-IQ')+' دونم عراقي'],
+  ['طريقة الري',data.irrigation],
+  ['نوع التربة',data.soil],
+  ['الموقع',data.location],
+  ['ملاحظات المزارع',data.notes],
+  ['الخطوة المقترحة',
+   'استكمال المعاينة بتسجيل موعد الري، ومصدر المياه، ومرحلة نمو المحصول، ونتائج فحص التربة والمياه إن توفرت.']
  ];
- data.forEach(([label,value])=>addRow(label,value));
- addRow('الخطوة المقترحة','استكمال المعاينة بتسجيل موعد الري، ومصدر المياه، ومرحلة نمو المحصول، ونتائج فحص التربة والمياه إن توفرت.');
+
+ rows.forEach(([label,value])=>addRow(label,value));
+
  report.style.display='block';
  report.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function loadHistory(){
+ const box=$('history');
+ box.textContent='جارٍ تحميل التقارير...';
+
+ const {data,error}=await supabase
+  .from('field_reports')
+  .select('id,field_id,field_name,crop,area_donum,irrigation,soil,location,notes,created_at')
+  .eq('owner_id',session.user.id)
+  .order('created_at',{ascending:false})
+  .limit(50);
+
+ if(error){
+  box.textContent='تعذر تحميل التقارير: '+error.message;
+  return;
+ }
+
+ box.replaceChildren();
+
+ if(!data||data.length===0){
+  box.textContent='لا توجد تقارير محفوظة بعد.';
+  return;
+ }
+
+ data.forEach(item=>{
+  const card=document.createElement('div');
+  card.className='history-item';
+
+  const info=document.createElement('div');
+  info.textContent=item.field_name+' — '+item.area_donum+
+   ' دونم — '+(item.crop||'محصول غير محدد')+
+   ' — '+new Date(item.created_at).toLocaleString('ar-IQ');
+
+  const button=document.createElement('button');
+  button.type='button';
+  button.className='secondary';
+  button.textContent='فتح التقرير';
+  button.addEventListener('click',()=>showReport(item));
+
+  card.append(info,button);
+  box.appendChild(card);
+ });
+}
+
+form.addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(!form.reportValidity())return;
+
+ if(!Number.isFinite(Number($('area').value))||Number($('area').value)<=0){
+  setStatus('أدخل مساحة صحيحة أكبر من صفر.');
+  return;
+ }
+
+ const selected=fields.find(f=>f.id===savedField.value);
+
+ const payload={
+  field_name:$('farm').value.trim(),
+  crop:$('crop').value,
+  area_donum:Number($('area').value),
+  irrigation:$('irrigation').value,
+  soil:$('soil').value,
+  location:$('location').value.trim()||null,
+  notes:$('notes').value.trim()||null
+ };
+
+ const button=$('createButton');
+ button.disabled=true;
+ button.textContent='جارٍ حفظ التقرير...';
+
+ try{
+  if(!session||!farm){
+   setStatus('لم يتم حفظ التقرير: سجّل الدخول أولًا.');
+   return;
+  }
+
+  const record={
+   owner_id:session.user.id,
+   farm_id:farm.id,
+   field_id:selected?selected.id:null,
+   ...payload
+  };
+
+  const {error}=await supabase
+   .from('field_reports')
+   .insert(record);
+
+  if(error){
+   setStatus('لم يتم حفظ التقرير: '+error.message);
+   return;
+  }
+
+  showReport(payload);
+  setStatus('تم إنشاء التقرير وحفظه في Supabase بنجاح.');
+  await loadHistory();
+
+ }catch(error){
+  setStatus('حدث خطأ أثناء حفظ التقرير: '+error.message);
+ }finally{
+  button.disabled=false;
+  button.textContent='إنشاء التقرير وحفظه في السحابة';
+ }
 });
 
 $('printButton').addEventListener('click',()=>window.print());
+
 $('newButton').addEventListener('click',()=>{
  form.reset();
  savedField.value='';
