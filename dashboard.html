@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة المزارع | UR Smart</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f1f7f2;color:#23412e;margin:0}
+header{background:#176b45;color:white;padding:18px}
+main{max-width:700px;margin:24px auto;padding:15px}
+.card{background:white;padding:22px;border-radius:14px;margin-bottom:18px}
+h1,h2{color:#176b45}
+input,select,button{box-sizing:border-box;width:100%;padding:12px;margin:8px 0;border-radius:8px;font-size:16px}
+input,select{border:1px solid #ccc}
+button{background:#176b45;color:white;border:0;cursor:pointer}
+a{color:#176b45}
+#status{padding:12px;background:#e8f3e9;border-radius:8px;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header><strong>🌱 UR Smart — أور الزراعية الذكية</strong></header>
+<main>
+<section class="card">
+<h1>لوحة المزارع</h1>
+<p id="welcome">جارٍ التحقق من تسجيل الدخول...</p>
+<div id="status">جارٍ الاتصال...</div>
+<button id="logout">تسجيل الخروج</button>
+</section>
+
+<section class="card">
+<h2>إضافة حقل زراعي</h2>
+<form id="fieldForm">
+<label for="fieldName">اسم الحقل</label>
+<input id="fieldName" required placeholder="مثال: حقل القمح">
+
+<label for="area">المساحة بالدونم</label>
+<input id="area" type="number" min="0.1" step="0.1" required>
+
+<label for="crop">المحصول</label>
+<select id="crop" required>
+<option value="">اختر المحصول</option>
+<option>قمح</option>
+<option>شعير</option>
+<option>ذرة</option>
+<option>طماطم</option>
+<option>نخيل</option>
+<option>أخرى</option>
+</select>
+<button type="submit">حفظ الحقل على هذا الجهاز</button>
+</form>
+<div id="fields"></div>
+<p><a href="./field-analysis.html">الانتقال إلى تحليل الحقول الزراعية</a></p>
+</section>
+</main>
+
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const supabase=createClient(
+'https://ynsmhtsktbubxfhsekjq.supabase.co',
+'sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc'
+);
+
+const status=document.getElementById('status');
+const {data,error}=await supabase.auth.getSession();
+const session=data?.session;
+
+if(error){
+ status.textContent='خطأ في التحقق: '+error.message;
+}else if(!session){
+ status.textContent='يرجى تسجيل الدخول أولاً.';
+ document.getElementById('welcome').textContent='لم يتم تسجيل الدخول.';
+ document.getElementById('logout').textContent='الذهاب إلى تسجيل الدخول';
+ document.getElementById('logout').onclick=()=>location.href='./auth.html';
+}else{
+ document.getElementById('welcome').textContent='مرحباً بك في منصة أور الزراعية.';
+ status.textContent='تم تسجيل الدخول: '+(session.user.email||'المزارع');
+}
+
+document.getElementById('logout').addEventListener('click',async()=>{
+ await supabase.auth.signOut();
+ location.href='./auth.html';
+});
+
+const storageKey='ur-smart-fields';
+function renderFields(){
+ const box=document.getElementById('fields');
+ box.replaceChildren();
+ let items=[];
+ try{items=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{}
+ if(!items.length){box.textContent='لم تتم إضافة حقول بعد.';return;}
+ items.forEach(item=>{
+  const p=document.createElement('p');
+  p.textContent=item.name+' — '+item.area+' دونم — '+item.crop;
+  box.appendChild(p);
+ });
+}
+document.getElementById('fieldForm').addEventListener('submit',event=>{
+ event.preventDefault();
+ const item={
+  name:document.getElementById('fieldName').value.trim(),
+  area:Number(document.getElementById('area').value),
+  crop:document.getElementById('crop').value
+ };
+ let items=[];
+ try{items=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{}
+ items.push(item);
+ localStorage.setItem(storageKey,JSON.stringify(items));
+ event.target.reset();
+ renderFields();
+});
+renderFields();
+</script>
+</body>
+</html>
