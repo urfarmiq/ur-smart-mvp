@@ -1,0 +1,87 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حساب المزارع | UR Smart</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f1f7f2;margin:0;padding:20px;color:#173b2b}
+main{max-width:420px;margin:35px auto;background:white;padding:24px;border-radius:16px}
+h1{color:#187044}
+input,button{box-sizing:border-box;width:100%;padding:13px;margin:8px 0;border-radius:8px;font-size:16px}
+input{border:1px solid #bbb}
+button{background:#187044;color:white;border:0;cursor:pointer}
+.secondary{background:#e6efe8;color:#187044}
+#msg{line-height:1.8;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main>
+<a href="./index.html">العودة إلى UR Smart</a>
+<h1>حساب المزارع</h1>
+<p>أنشئ حسابك أو سجّل الدخول إلى المنصة.</p>
+
+<form id="loginForm">
+<label>البريد الإلكتروني</label>
+<input id="email" type="email" required placeholder="البريد الإلكتروني">
+<label>كلمة المرور</label>
+<input id="password" type="password" minlength="6" required placeholder="6 أحرف على الأقل">
+<button type="submit">تسجيل الدخول</button>
+</form>
+
+<button class="secondary" id="signup" type="button">إنشاء حساب جديد</button>
+<button class="secondary" id="logout" type="button">تسجيل الخروج</button>
+<p id="msg">جارٍ الاتصال...</p>
+</main>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const supabase = createClient(
+'https://ynsmhtsktbubxfhsekjq.supabase.co',
+'sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc'
+);
+
+const email = document.getElementById('email');
+const password = document.getElementById('password');
+const msg = document.getElementById('msg');
+const say = text => msg.textContent = text;
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+ e.preventDefault();
+ say('جارٍ تسجيل الدخول...');
+ const {error} = await supabase.auth.signInWithPassword({
+  email: email.value.trim(),
+  password: password.value
+ });
+ say(error ? 'تعذر الدخول: ' + error.message : 'تم تسجيل الدخول بنجاح.');
+});
+
+document.getElementById('signup').addEventListener('click', async () => {
+ if (!email.value.trim() || !password.value) {
+  say('أدخل البريد الإلكتروني وكلمة المرور أولاً.');
+  return;
+ }
+ say('جارٍ إنشاء الحساب...');
+ const {data,error} = await supabase.auth.signUp({
+  email: email.value.trim(),
+  password: password.value
+ });
+ if (error) say('تعذر التسجيل: ' + error.message);
+ else if (data.session) say('تم إنشاء الحساب وتسجيل الدخول.');
+ else say('تم إرسال طلب التسجيل. افحص بريدك الإلكتروني لتأكيد الحساب.');
+});
+
+document.getElementById('logout').addEventListener('click', async () => {
+ const {error} = await supabase.auth.signOut();
+ say(error ? error.message : 'تم تسجيل الخروج.');
+});
+
+supabase.auth.getSession().then(({data,error}) => {
+ if (error) say('تعذر الاتصال: ' + error.message);
+ else say(data.session ? 'أنت مسجل الدخول.' : 'أدخل بياناتك لتسجيل الدخول أو إنشاء حساب.');
+});
+</script>
+</body>
+</html>
