@@ -299,7 +299,23 @@ async function loadHistory(){
   return;
  }
 
- data.forEach(item=>{
+ 
+const query = ($('reportSearch').value || '').trim().toLocaleLowerCase();
+const filtered = data.filter(item =>
+  `${item.field_name || ''} ${item.crop || ''}`
+    .toLocaleLowerCase()
+    .includes(query)
+);
+
+if (filtered.length === 0) {
+  box.textContent = query
+    ? 'لا توجد تقارير تطابق البحث.'
+    : 'لا توجد تقارير محفوظة بعد.';
+  return;
+}
+
+filtered.forEach(item=>{
+
   const card=document.createElement('div');
   card.className='history-item';
 
@@ -318,6 +334,8 @@ async function loadHistory(){
   box.appendChild(card);
  });
 }
+
+$('reportSearch').addEventListener('input', () => loadHistory());
 
 form.addEventListener('submit',async event=>{
  event.preventDefault();
