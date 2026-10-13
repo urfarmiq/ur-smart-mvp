@@ -2,227 +2,249 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#174d32">
-  <title>تحليل الحقل | UR Smart</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-      background: #f4f7f2;
-      color: #24372b;
-      line-height: 1.8;
-    }
-    header {
-      background: #174d32;
-      color: white;
-      padding: 18px 5%;
-    }
-    header a { color: white; text-decoration: none; }
-    .brand { font-size: 23px; font-weight: 800; }
-    main { width: min(760px, 92%); margin: 28px auto 50px; }
-    h1 { color: #174d32; margin-bottom: 5px; }
-    .intro { color: #607166; margin-top: 0; }
-    .panel {
-      background: white;
-      border: 1px solid #e0e9df;
-      border-radius: 16px;
-      padding: 22px;
-      margin-top: 20px;
-      box-shadow: 0 5px 20px #173d1710;
-    }
-    label { display: block; font-weight: 650; margin: 13px 0 5px; }
-    input, select, textarea {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ccd8cd;
-      border-radius: 9px;
-      background: white;
-      color: #24372b;
-      font: inherit;
-    }
-    input:focus, select:focus, textarea:focus {
-      outline: 2px solid #75a987;
-      outline-offset: 1px;
-    }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    button {
-      border: 0;
-      border-radius: 9px;
-      padding: 12px 18px;
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .primary { background: #174d32; color: white; width: 100%; margin-top: 20px; }
-    .secondary { background: #e8f2e9; color: #174d32; margin: 5px 5px 0 0; }
-    #report { display: none; }
-    .result {
-      background: #edf5ed;
-      border-radius: 10px;
-      padding: 15px;
-      margin: 12px 0;
-      overflow-wrap: anywhere;
-    }
-    .muted { color: #637369; font-size: 13px; }
-    footer { text-align: center; color: #637369; padding: 20px; font-size: 13px; }
-    @media (max-width: 520px) {
-      .grid { grid-template-columns: 1fr; }
-      .panel { padding: 16px; }
-    }
-    @media print {
-      header, form, .no-print, footer { display: none !important; }
-      body { background: white; }
-      main { width: 100%; margin: 0; }
-      .panel { border: 0; box-shadow: none; }
-      #report { display: block !important; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#174d32">
+<title>تحليل الحقول | UR Smart</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f7f2;color:#24372b;line-height:1.8}
+header{background:#174d32;color:white;padding:18px 5%}
+header a{color:white;text-decoration:none;font-weight:bold;font-size:22px}
+main{width:min(760px,92%);margin:25px auto 45px}
+h1,h2{color:#174d32}
+.intro,.muted{color:#637369}
+.panel{background:white;border:1px solid #e0e9df;border-radius:15px;padding:20px;margin:18px 0;box-shadow:0 4px 15px #173d1710}
+label{display:block;font-weight:bold;margin:12px 0 4px}
+input,select,textarea{width:100%;padding:12px;border:1px solid #ccd8cd;border-radius:9px;background:white;font:inherit;color:#24372b}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{border:0;border-radius:9px;padding:12px 17px;font:inherit;font-weight:bold;cursor:pointer}
+.primary{background:#174d32;color:white;width:100%;margin-top:18px}
+.secondary{background:#e8f2e9;color:#174d32;margin:5px}
+#report{display:none}
+.result{background:#edf5ed;border-radius:10px;padding:13px;margin:10px 0;overflow-wrap:anywhere}
+.muted{font-size:13px}
+#status{padding:10px;border-radius:8px;background:#edf5ed;overflow-wrap:anywhere}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.panel{padding:15px}}
+@media print{header,form,.no-print,footer,.intro{display:none!important}body{background:white}main{width:100%;margin:0}.panel{border:0;box-shadow:none}#report{display:block!important}}
+</style>
 </head>
 <body>
-  <header>
-    <a class="brand" href="index.html">UR Smart | أور الزراعية</a>
-  </header>
+<header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية</a></header>
+<main>
+<h1>نموذج بيانات الحقل</h1>
+<p class="intro">اختر حقلًا محفوظًا أو أدخل بيانات حقل جديد لإنشاء تقرير أولي.</p>
 
-  <main>
-    <h1>🌱 نموذج بيانات الحقل</h1>
-    <p class="intro">
-      أدخل المعلومات الأساسية لمزرعتك لإنشاء تقرير أولي منظم.
-    </p>
+<section class="panel">
+<div id="status">جارٍ الاتصال بقاعدة البيانات...</div>
 
-    <section class="panel">
-      <form id="fieldForm">
-        <label for="farm">اسم المزرعة أو الحقل</label>
-        <input id="farm" maxlength="100" placeholder="مثال: حقل الحنطة">
+<label for="savedField">اختيار حقل محفوظ في السحابة</label>
+<select id="savedField">
+<option value="">تحميل الحقول...</option>
+</select>
+<p class="muted">اختيار حقل يعبّئ الاسم والمحصول والمساحة تلقائيًا.</p>
 
-        <div class="grid">
-          <div>
-            <label for="crop">المحصول</label>
-            <select id="crop" required>
-              <option value="">اختر المحصول</option>
-              <option>الحنطة</option>
-              <option>الشعير</option>
-              <option>الذرة</option>
-              <option>البرسيم</option>
-              <option>الطماطم</option>
-              <option>البطاطا</option>
-              <option>النخيل</option>
-              <option>الزيتون</option>
-              <option>محصول آخر</option>
-            </select>
-          </div>
-          <div>
-            <label for="area">المساحة بالدونم العراقي</label>
-            <input id="area" type="number" min="0.01" max="1000000" step="any" required placeholder="مثال: 5">
-          </div>
-        </div>
+<form id="fieldForm">
+<label for="farm">اسم المزرعة أو الحقل</label>
+<input id="farm" maxlength="100" required placeholder="مثال: حقل الحنطة">
 
-        <div class="grid">
-          <div>
-            <label for="irrigation">طريقة الري</label>
-            <select id="irrigation" required>
-              <option value="">اختر الطريقة</option>
-              <option>الري بالتنقيط</option>
-              <option>الري بالرش</option>
-              <option>الري السيحي</option>
-              <option>طريقة أخرى</option>
-            </select>
-          </div>
-          <div>
-            <label for="soil">نوع التربة</label>
-            <select id="soil" required>
-              <option value="">اختر التربة</option>
-              <option>طينية</option>
-              <option>مزيجية</option>
-              <option>رملية</option>
-              <option>غير معروف</option>
-            </select>
-          </div>
-        </div>
+<div class="grid">
+<div>
+<label for="crop">المحصول</label>
+<select id="crop" required>
+<option value="">اختر المحصول</option>
+<option>الحنطة</option><option>القمح</option>
+<option>الشعير</option><option>الذرة</option>
+<option>البرسيم</option><option>الطماطم</option>
+<option>البطاطا</option><option>النخيل</option>
+<option>الزيتون</option><option>محصول آخر</option>
+</select>
+</div>
+<div>
+<label for="area">المساحة بالدونم العراقي</label>
+<input id="area" type="number" min="0.01" step="any" required>
+</div>
+</div>
 
-        <label for="location">الموقع أو الإحداثيات (اختياري)</label>
-        <input id="location" maxlength="180" placeholder="المحافظة أو إحداثيات الحقل">
+<div class="grid">
+<div>
+<label for="irrigation">طريقة الري</label>
+<select id="irrigation" required>
+<option value="">اختر الطريقة</option>
+<option>الري بالتنقيط</option><option>الري بالرش</option>
+<option>الري السيحي</option><option>طريقة أخرى</option>
+</select>
+</div>
+<div>
+<label for="soil">نوع التربة</label>
+<select id="soil" required>
+<option value="">اختر التربة</option>
+<option>طينية</option><option>مزيجية</option>
+<option>رملية</option><option>غير معروف</option>
+</select>
+</div>
+</div>
 
-        <label for="notes">ملاحظات عن حالة المحصول</label>
-        <textarea id="notes" rows="4" maxlength="1500" placeholder="مثال: اصفرار الأوراق، تفاوت النمو، مشكلة في الري..."></textarea>
+<label for="location">الموقع أو الإحداثيات (اختياري)</label>
+<input id="location" maxlength="180" placeholder="المحافظة أو إحداثيات الحقل">
 
-        <button class="primary" type="submit">إنشاء تقرير الحقل</button>
-      </form>
-    </section>
+<label for="notes">ملاحظات عن حالة المحصول</label>
+<textarea id="notes" rows="4" maxlength="1500" placeholder="مثال: تفاوت النمو أو مشكلة في الري"></textarea>
 
-    <section class="panel" id="report" aria-live="polite">
-      <h2>تقرير الحقل الزراعي</h2>
-      <div id="reportContent"></div>
-      <p class="muted">
-        هذا تقرير أولي مبني على البيانات التي أدخلها المستخدم، وليس
-        تحليلًا مخبريًا أو فضائيًا أو توصية زراعية مؤكدة.
-      </p>
-      <div class="no-print">
-        <button class="secondary" type="button" onclick="window.print()">طباعة / حفظ PDF</button>
-        <button class="secondary" type="button" onclick="resetReport()">تقرير جديد</button>
-      </div>
-    </section>
+<button class="primary" type="submit">إنشاء تقرير الحقل</button>
+</form>
+</section>
 
-    <p class="muted">
-      الخصوصية: يعالج هذا النموذج بياناتك داخل المتصفح ولا يرسلها إلى خادم.
-      لا تغلق الصفحة قبل طباعة التقرير إذا كنت تريد الاحتفاظ به.
-    </p>
-  </main>
+<section class="panel" id="report" aria-live="polite">
+<h2>تقرير الحقل الزراعي</h2>
+<div id="reportContent"></div>
+<p class="muted">هذا تقرير أولي مبني على البيانات المدخلة، وليس تحليلًا مخبريًا أو فضائيًا أو توصية زراعية مؤكدة.</p>
+<div class="no-print">
+<button class="secondary" id="printButton" type="button">طباعة / حفظ PDF</button>
+<button class="secondary" id="newButton" type="button">تقرير جديد</button>
+</div>
+</section>
 
-  <footer>© 2026 UR Smart — أور الزراعية الذكية</footer>
+<p class="muted">يمكن استخدام النموذج يدويًا إذا تعذر الاتصال بالسحابة.</p>
+</main>
+<footer class="muted" style="text-align:center;padding:20px">© 2026 UR Smart — أور الزراعية الذكية</footer>
 
-  <script>
-    const form = document.getElementById("fieldForm");
-    const report = document.getElementById("report");
-    const reportContent = document.getElementById("reportContent");
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    function addRow(label, value) {
-      const row = document.createElement("div");
-      row.className = "result";
-      const title = document.createElement("strong");
-      title.textContent = label;
-      const content = document.createElement("div");
-      content.textContent = value || "لم يتم الإدخال";
-      row.append(title, content);
-      reportContent.appendChild(row);
-    }
+const supabase=createClient(
+'https://ynsmhtsktbubxfhsekjq.supabase.co',
+'sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc'
+);
 
-    form.addEventListener("submit", function(event) {
-      event.preventDefault();
-      if (!form.reportValidity()) return;
+const $=id=>document.getElementById(id);
+const status=$('status');
+const savedField=$('savedField');
+const form=$('fieldForm');
+const report=$('report');
+const reportContent=$('reportContent');
+let fields=[];
 
-      reportContent.replaceChildren();
+function setStatus(message){status.textContent=message;}
 
-      const area = Number(document.getElementById("area").value);
-      const data = [
-        ["اسم الحقل", document.getElementById("farm").value.trim()],
-        ["المحصول", document.getElementById("crop").value],
-        ["المساحة", area.toLocaleString("ar-IQ") + " دونم عراقي"],
-        ["طريقة الري", document.getElementById("irrigation").value],
-        ["نوع التربة", document.getElementById("soil").value],
-        ["الموقع", document.getElementById("location").value.trim()],
-        ["ملاحظات المزارع", document.getElementById("notes").value.trim()]
-      ];
+function setCrop(value){
+ const crop=$('crop');
+ const aliases={'قمح':'الحنطة','حنطة':'الحنطة'};
+ const wanted=aliases[value]||value||'';
+ const option=[...crop.options].find(o=>o.value===wanted||o.textContent===wanted);
+ crop.value=option?option.value:'';
+}
 
-      data.forEach(([label, value]) => addRow(label, value));
+function loadSelectedField(){
+ const field=fields.find(f=>f.id===savedField.value);
+ if(!field)return;
+ $('farm').value=field.name||'';
+ setCrop(field.crop);
+ $('area').value=field.area_donum??'';
+ setStatus('تم تعبئة بيانات الحقل من Supabase. أكمل بيانات المعاينة.');
+}
 
-      addRow(
-        "الخطوة المقترحة",
-        "استكمال المعاينة بتسجيل موعد الري، ومصدر المياه، ومرحلة نمو المحصول، ونتائج فحص التربة والمياه إن توفرت."
-      );
+savedField.addEventListener('change',loadSelectedField);
 
-      report.style.display = "block";
-      report.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+async function loadFields(){
+ const {data:authData,error:authError}=await supabase.auth.getSession();
+ if(authError){
+  setStatus('تعذر التحقق من الحساب: '+authError.message);
+  savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
+  return;
+ }
+ const session=authData.session;
+ if(!session){
+  setStatus('لم تسجل الدخول. يمكنك إدخال بيانات الحقل يدويًا، أو تسجيل الدخول لتحميل الحقول المحفوظة.');
+  savedField.innerHTML='<option value="">سجّل الدخول لتحميل الحقول</option>';
+  return;
+ }
 
-    function resetReport() {
-      form.reset();
-      report.style.display = "none";
-      reportContent.replaceChildren();
-      form.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  </script>
+ const {data:farms,error:farmError}=await supabase
+  .from('farms').select('id,name')
+  .eq('owner_id',session.user.id).limit(1);
+
+ if(farmError){
+  setStatus('تعذر تحميل المزرعة: '+farmError.message);
+  savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
+  return;
+ }
+ if(!farms||farms.length===0){
+  setStatus('لم يتم العثور على مزرعة مرتبطة بالحساب.');
+  savedField.innerHTML='<option value="">لا توجد مزرعة</option>';
+  return;
+ }
+
+ const {data,error}=await supabase
+  .from('fields')
+  .select('id,name,crop,area_donum,farm_id')
+  .eq('farm_id',farms[0].id)
+  .order('created_at',{ascending:false});
+
+ if(error){
+  setStatus('تعذر تحميل الحقول: '+error.message);
+  savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
+  return;
+ }
+
+ fields=data||[];
+ savedField.replaceChildren();
+ const first=document.createElement('option');
+ first.value='';
+ first.textContent=fields.length?'اختر حقلًا محفوظًا':'لا توجد حقول محفوظة';
+ savedField.appendChild(first);
+
+ fields.forEach(field=>{
+  const option=document.createElement('option');
+  option.value=field.id;
+  option.textContent=field.name+' — '+field.area_donum+' دونم — '+(field.crop||'محصول غير محدد');
+  savedField.appendChild(option);
+ });
+ setStatus('تم الاتصال بالسحابة. المزرعة: '+farms[0].name);
+}
+
+function addRow(label,value){
+ const row=document.createElement('div');
+ row.className='result';
+ const title=document.createElement('strong');
+ title.textContent=label;
+ const content=document.createElement('div');
+ content.textContent=value||'لم يتم الإدخال';
+ row.append(title,content);
+ reportContent.appendChild(row);
+}
+
+form.addEventListener('submit',event=>{
+ event.preventDefault();
+ if(!form.reportValidity())return;
+ reportContent.replaceChildren();
+
+ const area=Number($('area').value);
+ const data=[
+ ['اسم الحقل',$('farm').value.trim()],
+ ['المحصول',$('crop').value],
+ ['المساحة',area.toLocaleString('ar-IQ')+' دونم عراقي'],
+ ['طريقة الري',$('irrigation').value],
+ ['نوع التربة',$('soil').value],
+ ['الموقع',$('location').value.trim()],
+ ['ملاحظات المزارع',$('notes').value.trim()]
+ ];
+ data.forEach(([label,value])=>addRow(label,value));
+ addRow('الخطوة المقترحة','استكمال المعاينة بتسجيل موعد الري، ومصدر المياه، ومرحلة نمو المحصول، ونتائج فحص التربة والمياه إن توفرت.');
+ report.style.display='block';
+ report.scrollIntoView({behavior:'smooth',block:'start'});
+});
+
+$('printButton').addEventListener('click',()=>window.print());
+$('newButton').addEventListener('click',()=>{
+ form.reset();
+ savedField.value='';
+ report.style.display='none';
+ reportContent.replaceChildren();
+ form.scrollIntoView({behavior:'smooth',block:'start'});
+});
+
+await loadFields();
+</script>
 </body>
 </html>
