@@ -14,8 +14,10 @@ h1,h2{color:#176b45}
 input,select,button{box-sizing:border-box;width:100%;padding:12px;margin:8px 0;border-radius:8px;font-size:16px}
 input,select{border:1px solid #ccc}
 button{background:#176b45;color:white;border:0;cursor:pointer}
+button:disabled{opacity:.55}
 a{color:#176b45}
 #status{padding:12px;background:#e8f3e9;border-radius:8px;overflow-wrap:anywhere}
+.field{padding:10px;margin:8px 0;background:#f1f7f2;border-radius:8px}
 </style>
 </head>
 <body>
@@ -47,10 +49,19 @@ a{color:#176b45}
 <option>نخيل</option>
 <option>أخرى</option>
 </select>
-<button type="submit">حفظ الحقل على هذا الجهاز</button>
+<button id="saveButton" type="submit">حفظ الحقل في السحابة</button>
 </form>
-<div id="fields"></div>
+
+<h2>حقولي المحفوظة في Supabase</h2>
+<div id="cloudFields">جارٍ تحميل الحقول...</div>
+
 <p><a href="./field-analysis.html">الانتقال إلى تحليل الحقول الزراعية</a></p>
+</section>
+
+<section class="card">
+<h2>الحقول القديمة على هذا الجهاز</h2>
+<p>هذه الحقول محفوظة محليًا على جهازك، ولن يحذفها هذا التحديث أو ينقلها تلقائيًا.</p>
+<div id="localFields"></div>
 </section>
 </main>
 
@@ -63,54 +74,160 @@ const supabase=createClient(
 );
 
 const status=document.getElementById('status');
-const {data,error}=await supabase.auth.getSession();
-const session=data?.session;
+const welcome=document.getElementById('welcome');
+const saveButton=document.getElementById('saveButton');
+const cloudFields=document.getElementById('cloudFields');
+const storageKey='ur-smart-fields';
 
-if(error){
- status.textContent='خطأ في التحقق: '+error.message;
-}else if(!session){
- status.textContent='يرجى تسجيل الدخول أولاً.';
- document.getElementById('welcome').textContent='لم يتم تسجيل الدخول.';
- document.getElementById('logout').textContent='الذهاب إلى تسجيل الدخول';
- document.getElementById('logout').onclick=()=>location.href='./auth.html';
-}else{
- document.getElementById('welcome').textContent='مرحباً بك في منصة أور الزراعية.';
- status.textContent='تم تسجيل الدخول: '+(session.user.email||'المزارع');
+let session=null;
+let farmId=null;
+
+function showError(prefix,error){
+ status.textContent=prefix+(error?.message||'حدث خطأ غير معروف.');
 }
 
-document.getElementById('logout').addEventListener('click',async()=>{
- await supabase.auth.signOut();
- location.href='./auth.html';
-});
-
-const storageKey='ur-smart-fields';
-function renderFields(){
- const box=document.getElementById('fields');
+function renderLocalFields(){
+ const box=document.getElementById('localFields');
  box.replaceChildren();
  let items=[];
  try{items=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{}
- if(!items.length){box.textContent='لم تتم إضافة حقول بعد.';return;}
+ if(!items.length){
+  box.textContent='لا توجد حقول قديمة محفوظة على هذا الجهاز.';
+  return;
+ }
  items.forEach(item=>{
   const p=document.createElement('p');
+  p.className='field';
   p.textContent=item.name+' — '+item.area+' دونم — '+item.crop;
   box.appendChild(p);
  });
 }
-document.getElementById('fieldForm').addEventListener('submit',event=>{
+
+async function loadCloudFields(){
+ if(!session||!farmId){
+  cloudFields.textContent='سجّل الدخول وتأكد من وجود مزرعة لعرض الحقول.';
+  return;
+ }
+ cloudFields.textContent='جارٍ تحميل الحقول...';
+ const {data,error}=await supabase
+  .from('fields')
+  .select('id,name,crop,area_donum,created_at')
+  .eq('farm_id',farmId)
+  .order('created_at',{ascending:false});
+
+ if(error){
+  cloudFields.textContent='تعذر تحميل الحقول.';
+  showError('خطأ في تحميل الحقول: ',error);
+  return;
+ }
+ cloudFields.replaceChildren();
+ if(!data||data.length===0){
+  cloudFields.textContent='لم تتم إضافة حقول سحابية بعد.';
+  return;
+ }
+ data.forEach(item=>{
+  const p=document.createElement('p');
+  p.className='field';
+  p.textContent=item.name+' — '+item.area_donum+' دونم — '+(item.crop||'غير محدد');
+  cloudFields.appendChild(p);
+ });
+}
+
+async function initialize(){
+ saveButton.disabled=true;
+ const {data,error}=await supabase.auth.getSession();
+ if(error){
+  showError('خطأ في التحقق من تسجيل الدخول: ',error);
+  welcome.textContent='تعذر التحقق من الحساب.';
+  return;
+ }
+ session=data.session;
+ if(!session){
+  status.textContent='يرجى تسجيل الدخول أولًا.';
+  welcome.textContent='لم يتم تسجيل الدخول.';
+  document.getElementById('logout').textContent='الذهاب إلى تسجيل الدخول';
+  cloudFields.textContent='سجّل الدخول لعرض حقولك.';
+  return;
+ }
+
+ welcome.textContent='مرحبًا بك في منصة أور الزراعية.';
+ status.textContent='تم تسجيل الدخول: '+(session.user.email||'المزارع');
+
+ const {data:farms,error:farmError}=await supabase
+  .from('farms')
+  .select('id,name')
+  .eq('owner_id',session.user.id)
+  .limit(1);
+
+ if(farmError){
+  showError('تعذر تحميل المزرعة: ',farmError);
+  cloudFields.textContent='تعذر تحديد مزرعتك.';
+  return;
+ }
+ if(!farms||farms.length===0){
+  status.textContent='لا توجد مزرعة مرتبطة بحسابك. يرجى مراجعة إعدادات قاعدة البيانات.';
+  cloudFields.textContent='لا يمكن حفظ الحقول قبل ربط مزرعة بحسابك.';
+  return;
+ }
+ farmId=farms[0].id;
+ status.textContent='تم الاتصال بنجاح. المزرعة: '+farms[0].name;
+ saveButton.disabled=false;
+ await loadCloudFields();
+}
+
+document.getElementById('fieldForm').addEventListener('submit',async event=>{
  event.preventDefault();
- const item={
-  name:document.getElementById('fieldName').value.trim(),
-  area:Number(document.getElementById('area').value),
-  crop:document.getElementById('crop').value
- };
- let items=[];
- try{items=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{}
- items.push(item);
- localStorage.setItem(storageKey,JSON.stringify(items));
- event.target.reset();
- renderFields();
+ if(!session||!farmId){
+  status.textContent='يرجى تسجيل الدخول والتأكد من وجود مزرعة أولًا.';
+  return;
+ }
+
+ const name=document.getElementById('fieldName').value.trim();
+ const area=Number(document.getElementById('area').value);
+ const crop=document.getElementById('crop').value;
+
+ if(!name||!Number.isFinite(area)||area<=0||!crop){
+  status.textContent='يرجى إدخال اسم الحقل والمساحة والمحصول بصورة صحيحة.';
+  return;
+ }
+
+ saveButton.disabled=true;
+ saveButton.textContent='جارٍ الحفظ...';
+
+ const {error}=await supabase.from('fields').insert({
+  farm_id:farmId,
+  name:name,
+  crop:crop,
+  area_donum:area
+ });
+
+ if(error){
+  showError('لم يتم حفظ الحقل. التفاصيل: ',error);
+ }else{
+  status.textContent='تم حفظ الحقل في Supabase بنجاح.';
+  event.target.reset();
+  await loadCloudFields();
+ }
+
+ saveButton.disabled=false;
+ saveButton.textContent='حفظ الحقل في السحابة';
 });
-renderFields();
+
+document.getElementById('logout').addEventListener('click',async()=>{
+ if(!session){
+  location.href='./auth.html';
+  return;
+ }
+ const {error}=await supabase.auth.signOut();
+ if(error){
+  showError('تعذر تسجيل الخروج: ',error);
+  return;
+ }
+ location.href='./auth.html';
+});
+
+renderLocalFields();
+await initialize();
 </script>
 </body>
 </html>
