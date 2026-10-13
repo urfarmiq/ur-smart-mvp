@@ -330,6 +330,34 @@ filtered.forEach(item=>{
   button.textContent='فتح التقرير';
   button.addEventListener('click',()=>showReport(item));
 
+const deleteButton = document.createElement('button');
+deleteButton.type = 'button';
+deleteButton.className = 'secondary';
+deleteButton.textContent = 'حذف التقرير';
+
+deleteButton.addEventListener('click', async () => {
+  if (!confirm('هل أنت متأكد من حذف هذا التقرير؟ لا يمكن التراجع عن الحذف.')) return;
+
+  deleteButton.disabled = true;
+  deleteButton.textContent = 'جارٍ الحذف...';
+
+  const { error } = await supabase
+    .from('field_reports')
+    .delete()
+    .eq('id', item.id)
+    .eq('owner_id', session.user.id);
+
+  if (error) {
+    setStatus('تعذر حذف التقرير: ' + error.message);
+    deleteButton.disabled = false;
+    deleteButton.textContent = 'حذف التقرير';
+    return;
+  }
+
+  setStatus('تم حذف التقرير.');
+  await loadHistory();
+});
+card.appendChild(deleteButton);
   card.append(info,button);
   box.appendChild(card);
  });
