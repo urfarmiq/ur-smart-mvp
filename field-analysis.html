@@ -531,9 +531,49 @@ $('getAdviceButton').addEventListener('click', () => {
     'هذه إرشادات أولية مبنية على قواعد عامة، وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تعتمد عليها وحدها لتحديد جرعات الأسمدة أو المبيدات.';
   result.appendChild(disclaimer);
 
+
   result.style.display = 'block';
+
+  const saveStatus = document.createElement('p');
+  saveStatus.className = 'muted';
+  result.appendChild(saveStatus);
+
+  if (!session || !farm) {
+    saveStatus.textContent =
+      'ظهرت التوصية، لكن لم تُحفظ. سجّل الدخول ثم أعد إنشاء التوصية.';
+  } else {
+    const selectedField = fields.find(
+      field => field.id === savedField.value
+    );
+
+    saveStatus.textContent = 'جارٍ حفظ التوصية في حسابك...';
+
+    const { error: saveError } = await supabase
+      .from('field_recommendations')
+      .insert({
+        owner_id: session.user.id,
+        farm_id: farm.id,
+        field_id: selectedField ? selectedField.id : null,
+        crop,
+        growth_stage: stage,
+        plant_symptoms: symptoms,
+        soil_moisture: moisture,
+        recommendation: advice.join('\n\n'),
+        confidence
+      });
+
+    if (saveError) {
+      saveStatus.textContent =
+        'ظهرت التوصية، لكن تعذر حفظها: ' + saveError.message;
+    } else {
+      saveStatus.textContent =
+        '✓ تم حفظ التوصية في سجل توصياتك بنجاح.';
+    }
+  }
+
   result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
+
 
 form.addEventListener('submit',async event=>{
  event.preventDefault();
