@@ -548,7 +548,8 @@ $('getAdviceButton').addEventListener('click', () => {
 
     saveStatus.textContent = 'جارٍ حفظ التوصية في حسابك...';
 
-    const { error: saveError } = await supabase
+    
+    const { data: savedRecord, error: saveError } = await supabase
       .from('field_recommendations')
       .insert({
         owner_id: session.user.id,
@@ -560,15 +561,21 @@ $('getAdviceButton').addEventListener('click', () => {
         soil_moisture: moisture,
         recommendation: advice.join('\n\n'),
         confidence
-      });
+      })
+      .select('id')
+      .single();
 
     if (saveError) {
       saveStatus.textContent =
-        'ظهرت التوصية، لكن تعذر حفظها: ' + saveError.message;
+        'تعذر حفظ التوصية: ' + saveError.message;
+    } else if (savedRecord && savedRecord.id) {
+      saveStatus.textContent =
+        '✓ تم حفظ التوصية. رقم السجل: ' + savedRecord.id;
     } else {
       saveStatus.textContent =
-        '✓ تم حفظ التوصية في سجل توصياتك بنجاح.';
+        'لم نتأكد من حفظ التوصية. أعد الفحص من قاعدة البيانات.';
     }
+
   }
 
   result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
