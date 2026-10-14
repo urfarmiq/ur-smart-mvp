@@ -108,6 +108,46 @@ body{background:white}main{width:100%;margin:0}
 </div>
 </section>
 
+<section class="panel" id="smartAdvisor">
+  <h2>🌱 المساعد الزراعي الذكي</h2>
+  <p class="muted">توصيات إرشادية أولية حسب بيانات الحقل.</p>
+
+  <label for="growthStage">مرحلة نمو المحصول</label>
+  <select id="growthStage">
+    <option value="">اختر مرحلة النمو</option>
+    <option value="بداية النمو">بداية النمو</option>
+    <option value="النمو الخضري">النمو الخضري</option>
+    <option value="الإزهار">الإزهار</option>
+    <option value="تكوين الحبوب أو الثمار">تكوين الحبوب أو الثمار</option>
+    <option value="النضج">النضج</option>
+  </select>
+
+  <label for="plantSymptoms">حالة النبات</label>
+  <select id="plantSymptoms">
+    <option value="">اختر الحالة</option>
+    <option value="نمو طبيعي">نمو طبيعي</option>
+    <option value="اصفرار الأوراق">اصفرار الأوراق</option>
+    <option value="ذبول">ذبول</option>
+    <option value="ضعف النمو">ضعف النمو</option>
+    <option value="بقع أو آفات ظاهرة">بقع أو آفات ظاهرة</option>
+  </select>
+
+  <label for="soilMoisture">حالة رطوبة التربة</label>
+  <select id="soilMoisture">
+    <option value="">اختر الحالة</option>
+    <option value="جافة">جافة</option>
+    <option value="رطبة باعتدال">رطبة باعتدال</option>
+    <option value="مشبعة بالماء">مشبعة بالماء</option>
+    <option value="غير معروفة">غير معروفة</option>
+  </select>
+
+  <button class="primary" id="getAdviceButton" type="button">
+    احصل على توصية زراعية
+  </button>
+
+  <div id="adviceResult" class="result" style="display:none" aria-live="polite"></div>
+</section>
+
 <section class="panel" id="historyPanel">
 <h2>تقاريري السابقة</h2>
 <p class="muted">التقارير المحفوظة في حسابك على Supabase.</p>
@@ -365,6 +405,136 @@ card.appendChild(deleteButton);
 
 $('reportSearch').addEventListener('input', () => loadHistory());
 
+$('getAdviceButton').addEventListener('click', () => {
+  const crop = $('crop').value;
+  const soil = $('soil').value;
+  const irrigation = $('irrigation').value;
+  const stage = $('growthStage').value;
+  const symptoms = $('plantSymptoms').value;
+  const moisture = $('soilMoisture').value;
+  const notes = $('notes').value.trim();
+  const result = $('adviceResult');
+
+  const advice = [];
+  let confidence = 'محدودة';
+
+  if (!crop) {
+    advice.push('اختر المحصول أولًا لتخصيص الإرشادات.');
+  }
+
+  if (!stage) {
+    advice.push('حدد مرحلة نمو المحصول؛ فهي تؤثر في احتياجات الماء والتغذية.');
+  }
+
+  if (moisture === 'جافة') {
+    advice.push(
+      'التربة تبدو جافة حسب ملاحظتك. افحص الرطوبة في منطقة الجذور قبل تحديد موعد الري، وتجنب الري اعتمادًا على مظهر السطح وحده.'
+    );
+  } else if (moisture === 'مشبعة بالماء') {
+    advice.push(
+      'التربة مشبعة بالماء. افحص الصرف واحتمال تجمع المياه، وتجنب إضافة مياه أخرى قبل التحقق من حاجة النبات.'
+    );
+  } else if (moisture === 'رطبة باعتدال') {
+    advice.push(
+      'الرطوبة تبدو معتدلة. راقب منطقة الجذور والطقس ومرحلة النمو قبل تحديد موعد الري التالي.'
+    );
+  } else {
+    advice.push(
+      'تحقق من رطوبة التربة قرب الجذور قبل اتخاذ قرار الري.'
+    );
+  }
+
+  if (symptoms === 'اصفرار الأوراق') {
+    advice.push(
+      'افحص موضع الاصفرار وعمر الأوراق، والجذور والرطوبة والصرف. قد تكون الأسباب متعددة؛ لا تضف سمادًا قبل تحديد السبب.'
+    );
+  } else if (symptoms === 'ذبول') {
+    advice.push(
+      'افحص رطوبة التربة والجذور وحرارة الجو. قد ينتج الذبول عن نقص الماء أو زيادة الرطوبة أو مشكلة في الجذور.'
+    );
+  } else if (symptoms === 'ضعف النمو') {
+    advice.push(
+      'راجع انتظام الري والصرف، وكثافة النباتات، ووجود الآفات. يُفضّل تحليل التربة قبل تعديل برنامج التسميد.'
+    );
+  } else if (symptoms === 'بقع أو آفات ظاهرة') {
+    advice.push(
+      'صوّر الأعراض بوضوح على الأوراق من الجهتين، وسجّل مكان ظهورها وانتشارها. لا تستخدم مبيدًا قبل تشخيص السبب.'
+    );
+  } else if (symptoms === 'نمو طبيعي') {
+    advice.push(
+      'استمر في المراقبة الدورية وسجّل الري ومراحل النمو، وتحقق من ظهور أي تغيرات جديدة.'
+    );
+  } else {
+    advice.push(
+      'حدد الأعراض بدقة، ويفضل إرفاق صورة للنبات لتسهيل التشخيص الأولي.'
+    );
+  }
+
+  if (irrigation === 'الري بالرش') {
+    advice.push(
+      'راقب انتظام توزيع الرش والتسربات، وراعِ سرعة الرياح ووقت الري لتقليل الفواقد.'
+    );
+  } else if (irrigation === 'الري بالتنقيط') {
+    advice.push(
+      'تحقق من نظافة المرشحات وانتظام تصريف النقاطات ورطوبة التربة حول الجذور.'
+    );
+  } else if (irrigation === 'الري السيحي') {
+    advice.push(
+      'راقب تجانس وصول الماء إلى أجزاء الحقل وتجنب تجمع المياه أو جريانها خارج منطقة الجذور.'
+    );
+  }
+
+  if (soil === 'طينية') {
+    advice.push(
+      'التربة الطينية قد تحتفظ بالماء مدة أطول؛ راقب الصرف والرطوبة قبل تكرار الري.'
+    );
+  } else if (soil === 'رملية') {
+    advice.push(
+      'التربة الرملية غالبًا أسرع تصريفًا للماء؛ راقب الرطوبة بانتظام ولا تحدد عدد الريات دون معرفة المحصول والطقس.'
+    );
+  }
+
+  if (notes) {
+    advice.push(
+      'ملاحظات المزارع المسجلة: ' + notes +
+      '. ينبغي مراجعة هذه الملاحظات ميدانيًا قبل اعتماد أي إجراء.'
+    );
+  }
+
+  if (crop && stage && symptoms && moisture !== 'غير معروفة' && moisture) {
+    confidence = 'أولية — تعتمد على الملاحظات المدخلة فقط';
+  }
+
+  result.replaceChildren();
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'التوصية الزراعية الأولية';
+  result.appendChild(heading);
+
+  const confidenceText = document.createElement('p');
+  confidenceText.textContent = 'مستوى التقييم: ' + confidence;
+  result.appendChild(confidenceText);
+
+  const list = document.createElement('ol');
+
+  advice.forEach(text => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    list.appendChild(item);
+  });
+
+  result.appendChild(list);
+
+  const disclaimer = document.createElement('p');
+  disclaimer.className = 'muted';
+  disclaimer.textContent =
+    'هذه إرشادات أولية مبنية على قواعد عامة، وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تعتمد عليها وحدها لتحديد جرعات الأسمدة أو المبيدات.';
+  result.appendChild(disclaimer);
+
+  result.style.display = 'block';
+  result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
 form.addEventListener('submit',async event=>{
  event.preventDefault();
  if(!form.reportValidity())return;
@@ -435,6 +605,120 @@ $('newButton').addEventListener('click',()=>{
 });
 
 await loadFields();
+
+$('getAdviceButton').addEventListener('click', () => {
+  const crop = $('crop').value;
+  const irrigation = $('irrigation').value;
+  const soil = $('soil').value;
+  const stage = $('growthStage').value;
+  const symptoms = $('plantSymptoms').value;
+  const moisture = $('soilMoisture').value;
+  const result = $('adviceResult');
+
+  const advice = [];
+  let confidence = 'منخفضة — بيانات الحقل غير مكتملة';
+
+  if (!crop || !irrigation || !soil || !stage ||
+      !symptoms || !moisture) {
+    result.style.display = 'block';
+    result.textContent =
+      'يرجى إكمال بيانات المحصول والري والتربة ومرحلة النمو والأعراض ورطوبة التربة قبل إعداد التوصية.';
+    return;
+  }
+
+  if (moisture === 'جافة') {
+    advice.push(
+      'تحقق من رطوبة منطقة الجذور قبل الري. إذا تأكد الجفاف، فحدّد موعد الري وفق احتياج المحصول ومرحلة نموه.'
+    );
+  } else if (moisture === 'مشبعة بالماء') {
+    advice.push(
+      'افحص الصرف واحتمال تجمع المياه. لا تضف ريًا جديدًا قبل التحقق من حالة منطقة الجذور.'
+    );
+  } else if (moisture === 'رطبة باعتدال') {
+    advice.push(
+      'راقب رطوبة التربة دوريًا، ولا تزد الري لمجرد اتباع جدول ثابت.'
+    );
+  } else {
+    advice.push(
+      'تحقق من رطوبة التربة في منطقة الجذور قبل اتخاذ قرار الري.'
+    );
+  }
+
+  if (symptoms === 'اصفرار الأوراق') {
+    advice.push(
+      'افحص نمط الاصفرار وعمر الأوراق والجذور، وتحقق من الصرف والملوحة قبل افتراض نقص عنصر غذائي.'
+    );
+  } else if (symptoms === 'ذبول') {
+    advice.push(
+      'افحص رطوبة التربة والجذور وسلامة نظام الري. قد ينتج الذبول عن الجفاف أو تشبع التربة أو مشكلة مرضية.'
+    );
+  } else if (symptoms === 'ضعف النمو') {
+    advice.push(
+      'راجع انتظام الري ومكافحة الأعشاب ومرحلة النمو، واطلب تحليل التربة عند استمرار ضعف النمو.'
+    );
+  } else if (symptoms === 'بقع أو آفات ظاهرة') {
+    advice.push(
+      'صوّر الأعراض من قرب وافحص جانبي الأوراق. لا تستخدم مبيدًا قبل تحديد الآفة أو المرض.'
+    );
+  } else {
+    advice.push(
+      'واصل متابعة نمو النبات وتسجيل أي تغير في اللون أو الكثافة أو النمو.'
+    );
+  }
+
+  if (stage === 'الإزهار' ||
+      stage === 'تكوين الحبوب أو الثمار') {
+    advice.push(
+      'راقب انتظام توفر الماء خلال هذه المرحلة الحساسة، وتجنب الإجهاد المائي دون الإفراط في الري.'
+    );
+  }
+
+  if (soil === 'طينية' && irrigation === 'الري بالرش') {
+    advice.push(
+      'راقب تشكل البرك وجريان المياه، واضبط مدة الري وفق معدل تسرب التربة وتجانس توزيع الرش.'
+    );
+  }
+
+  confidence =
+    symptoms === 'نمو طبيعي' && moisture === 'رطبة باعتدال'
+      ? 'متوسطة للإرشادات العامة فقط'
+      : 'منخفضة إلى متوسطة؛ يلزم فحص ميداني للتشخيص';
+
+  result.replaceChildren();
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'التوصية الزراعية الأولية';
+  result.appendChild(heading);
+
+  const cropInfo = document.createElement('p');
+  cropInfo.textContent =
+    'المحصول: ' + crop + ' | مرحلة النمو: ' + stage;
+  result.appendChild(cropInfo);
+
+  const list = document.createElement('ul');
+
+  advice.forEach(text => {
+    const item = document.createElement('li');
+    item.textContent = text;
+    list.appendChild(item);
+  });
+
+  result.appendChild(list);
+
+  const confidenceText = document.createElement('p');
+  confidenceText.textContent = 'مستوى الثقة: ' + confidence;
+  result.appendChild(confidenceText);
+
+  const disclaimer = document.createElement('p');
+  disclaimer.className = 'muted';
+  disclaimer.textContent =
+    'هذه إرشادات مبنية على قواعد أولية وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تحدد جرعات الأسمدة أو المبيدات دون معلومات وفحوص مناسبة.';
+  result.appendChild(disclaimer);
+
+  result.style.display = 'block';
+  result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
 </script>
 </body>
 </html>
