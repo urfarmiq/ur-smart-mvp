@@ -606,7 +606,7 @@ $('newButton').addEventListener('click',()=>{
 
 await loadFields();
 
-$('getAdviceButton').addEventListener('click', () => {
+$('getAdviceButton').addEventListener('click', async () => {
   const crop = $('crop').value;
   const irrigation = $('irrigation').value;
   const soil = $('soil').value;
