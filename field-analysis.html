@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -38,14 +37,13 @@ body{background:white}main{width:100%;margin:0}
 <header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية</a></header>
 <main>
 <h1>نموذج بيانات الحقل</h1>
-<p class="intro">اختر حقلًا محفوظًا أو أدخل بيانات حقل لإنشاء تقرير زراعي أولي.</p>
+<p class="intro">أدخل بيانات الحقل لإنشاء تقرير زراعي أولي.</p>
 
 <section class="panel" id="entryPanel">
-<div id="status">جارٍ الاتصال بقاعدة البيانات...</div>
+<div id="status">جارٍ تهيئة الاتصال...</div>
 
-<label for="savedField">اختيار حقل محفوظ في السحابة</label>
+<label for="savedField">اختيار حقل محفوظ</label>
 <select id="savedField"><option value="">جارٍ تحميل الحقول...</option></select>
-<p class="muted">اختيار حقل يعبّئ الاسم والمحصول والمساحة تلقائيًا.</p>
 
 <form id="fieldForm">
 <label for="farm">اسم المزرعة أو الحقل</label>
@@ -88,20 +86,20 @@ body{background:white}main{width:100%;margin:0}
 </div>
 </div>
 
-<label for="location">الموقع أو الإحداثيات (اختياري)</label>
+<label for="location">الموقع أو الإحداثيات</label>
 <input id="location" maxlength="180" placeholder="المحافظة أو إحداثيات الحقل">
 
-<label for="notes">ملاحظات عن حالة المحصول</label>
-<textarea id="notes" rows="4" maxlength="1500" placeholder="مثال: تفاوت النمو أو مشكلة في الري"></textarea>
+<label for="notes">ملاحظات عن المحصول</label>
+<textarea id="notes" rows="4" maxlength="1500"></textarea>
 
-<button class="primary" id="createButton" type="submit">إنشاء التقرير وحفظه في السحابة</button>
+<button class="primary" id="createButton" type="submit">إنشاء التقرير وحفظه</button>
 </form>
 </section>
 
-<section class="panel" id="report" aria-live="polite">
+<section class="panel" id="report">
 <h2>تقرير الحقل الزراعي</h2>
 <div id="reportContent"></div>
-<p class="muted">هذا تقرير أولي مبني على البيانات المدخلة، وليس تحليلًا مخبريًا أو فضائيًا أو توصية زراعية مؤكدة.</p>
+<p class="muted">تقرير أولي وليس تحليلًا مخبريًا أو تشخيصًا مؤكدًا.</p>
 <div class="no-print">
 <button class="secondary" id="printButton" type="button">طباعة / حفظ PDF</button>
 <button class="secondary" id="newButton" type="button">تقرير جديد</button>
@@ -109,64 +107,55 @@ body{background:white}main{width:100%;margin:0}
 </section>
 
 <section class="panel" id="smartAdvisor">
-  <h2>🌱 المساعد الزراعي الذكي</h2>
-  <p class="muted">توصيات إرشادية أولية حسب بيانات الحقل.</p>
+<h2>🌱 المساعد الزراعي الذكي</h2>
+<p class="muted">توصيات أولية مجانية تعتمد على قواعد إرشادية، دون API مدفوع.</p>
 
-  <label for="growthStage">مرحلة نمو المحصول</label>
-  <select id="growthStage">
-    <option value="">اختر مرحلة النمو</option>
-    <option value="بداية النمو">بداية النمو</option>
-    <option value="النمو الخضري">النمو الخضري</option>
-    <option value="الإزهار">الإزهار</option>
-    <option value="تكوين الحبوب أو الثمار">تكوين الحبوب أو الثمار</option>
-    <option value="النضج">النضج</option>
-  </select>
+<label for="growthStage">مرحلة نمو المحصول</label>
+<select id="growthStage">
+<option value="">اختر مرحلة النمو</option>
+<option>بداية النمو</option>
+<option>النمو الخضري</option>
+<option>الإزهار</option>
+<option>تكوين الحبوب أو الثمار</option>
+<option>النضج</option>
+</select>
 
-  <label for="plantSymptoms">حالة النبات</label>
-  <select id="plantSymptoms">
-    <option value="">اختر الحالة</option>
-    <option value="نمو طبيعي">نمو طبيعي</option>
-    <option value="اصفرار الأوراق">اصفرار الأوراق</option>
-    <option value="ذبول">ذبول</option>
-    <option value="ضعف النمو">ضعف النمو</option>
-    <option value="بقع أو آفات ظاهرة">بقع أو آفات ظاهرة</option>
-  </select>
+<label for="plantSymptoms">حالة النبات</label>
+<select id="plantSymptoms">
+<option value="">اختر الحالة</option>
+<option>نمو طبيعي</option>
+<option>اصفرار الأوراق</option>
+<option>ذبول</option>
+<option>ضعف النمو</option>
+<option>بقع أو آفات ظاهرة</option>
+</select>
 
-  <label for="soilMoisture">حالة رطوبة التربة</label>
-  <select id="soilMoisture">
-    <option value="">اختر الحالة</option>
-    <option value="جافة">جافة</option>
-    <option value="رطبة باعتدال">رطبة باعتدال</option>
-    <option value="مشبعة بالماء">مشبعة بالماء</option>
-    <option value="غير معروفة">غير معروفة</option>
-  </select>
+<label for="soilMoisture">رطوبة التربة</label>
+<select id="soilMoisture">
+<option value="">اختر الحالة</option>
+<option>جافة</option>
+<option>رطبة باعتدال</option>
+<option>مشبعة بالماء</option>
+<option>غير معروفة</option>
+</select>
 
-  <button class="primary" id="getAdviceButton" type="button">
-    احصل على توصية زراعية
-  </button>
-
-  <div id="adviceResult" class="result" style="display:none" aria-live="polite"></div>
+<button class="primary" id="getAdviceButton" type="button">احصل على توصية زراعية</button>
+<div id="adviceResult" class="result" style="display:none" aria-live="polite"></div>
 </section>
 
 <section class="panel" id="historyPanel">
 <h2>تقاريري السابقة</h2>
-<p class="muted">التقارير المحفوظة في حسابك على Supabase.</p>
-
-<input id="reportSearch" type="search"
-placeholder="ابحث باسم الحقل أو المحصول..."
-aria-label="البحث في التقارير السابقة"
-style="width:100%;padding:12px;border:1px solid #ccd8cd;border-radius:9px;margin:10px 0;font:inherit;">
-
+<input id="reportSearch" type="search" placeholder="ابحث باسم الحقل أو المحصول..." style="margin:10px 0">
 <div id="history">جارٍ تحميل التقارير...</div>
 </section>
-
-<p class="muted">حفظ التقارير في السحابة يتطلب تسجيل الدخول. إذا تعذر الحفظ فستظهر رسالة توضح السبب.</p>
 </main>
 
 <footer class="muted" style="text-align:center;padding:20px">© 2026 UR Smart — أور الزراعية الذكية</footer>
 
 <script type="module">
-import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+(async()=>{
+try{
+const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
 
 const supabase=createClient(
 'https://ynsmhtsktbubxfhsekjq.supabase.co',
@@ -175,425 +164,149 @@ const supabase=createClient(
 
 const $=id=>document.getElementById(id);
 const status=$('status');
-const savedField=$('savedField');
-const form=$('fieldForm');
-const report=$('report');
-const reportContent=$('reportContent');
-
-let fields=[];
 let session=null;
 let farm=null;
+let fields=[];
 
 function setStatus(message){
  status.textContent=message;
 }
 
-function setCrop(value){
- const select=$('crop');
- const aliases={'قمح':'الحنطة','حنطة':'الحنطة'};
- const wanted=aliases[value]||value||'';
- const option=[...select.options].find(
-  o=>o.value===wanted||o.textContent===wanted
- );
- select.value=option?option.value:'';
-}
-
-function loadSelectedField(){
- const field=fields.find(f=>f.id===savedField.value);
- if(!field)return;
-
- $('farm').value=field.name||'';
- setCrop(field.crop);
- $('area').value=field.area_donum??'';
- setStatus('تم تعبئة بيانات الحقل من Supabase. أكمل بيانات المعاينة.');
-}
-
-savedField.addEventListener('change',loadSelectedField);
-
-async function loadFields(){
- const {data:authData,error:authError}=await supabase.auth.getSession();
-
- if(authError){
-  setStatus('تعذر التحقق من الحساب: '+authError.message);
-  savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
-  $('history').textContent='تعذر التحقق من الحساب.';
-  return;
- }
-
- session=authData.session;
-
- if(!session){
-  setStatus('يرجى تسجيل الدخول لتحميل الحقول وحفظ التقارير.');
-  savedField.innerHTML='<option value="">سجّل الدخول لتحميل الحقول</option>';
-  $('history').textContent='سجّل الدخول لعرض تقاريرك السابقة.';
-  return;
- }
-
- const {data:farms,error:farmError}=await supabase
-  .from('farms')
-  .select('id,name')
-  .eq('owner_id',session.user.id)
-  .limit(1);
-
- if(farmError){
-  setStatus('تعذر تحميل المزرعة: '+farmError.message);
-  savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
-  return;
- }
-
- if(!farms||farms.length===0){
-  setStatus('لم يتم العثور على مزرعة مرتبطة بالحساب.');
-  savedField.innerHTML='<option value="">لا توجد مزرعة</option>';
-  return;
- }
-
- farm=farms[0];
-
- const {data,error}=await supabase
-  .from('fields')
-  .select('id,name,crop,area_donum,farm_id')
-  .eq('farm_id',farm.id)
-  .order('created_at',{ascending:false});
-
- if(error){
-  setStatus('تعذر تحميل الحقول: '+error.message);
-  savedField.innerHTML='<option value="">تعذر تحميل الحقول</option>';
-  return;
- }
-
- fields=data||[];
- savedField.replaceChildren();
-
- const first=document.createElement('option');
- first.value='';
- first.textContent=fields.length?'اختر حقلًا محفوظًا':'لا توجد حقول محفوظة';
- savedField.appendChild(first);
-
- fields.forEach(field=>{
-  const option=document.createElement('option');
-  option.value=field.id;
-  option.textContent=field.name+' — '+field.area_donum+
-   ' دونم — '+(field.crop||'محصول غير محدد');
-  savedField.appendChild(option);
- });
-
- setStatus('تم الاتصال بالسحابة. المزرعة: '+farm.name);
- await loadHistory();
-}
-
-function addRow(label,value){
- const row=document.createElement('div');
- row.className='result';
-
- const title=document.createElement('strong');
- title.textContent=label;
-
- const content=document.createElement('div');
- content.textContent=value||'لم يتم الإدخال';
-
- row.append(title,content);
- reportContent.appendChild(row);
-}
-
 function showReport(data){
- reportContent.replaceChildren();
-
+ const box=$('reportContent');
+ box.replaceChildren();
  const rows=[
-  ['اسم الحقل',data.field_name],
-  ['المحصول',data.crop],
-  ['المساحة',Number(data.area_donum).toLocaleString('ar-IQ')+' دونم عراقي'],
-  ['طريقة الري',data.irrigation],
-  ['نوع التربة',data.soil],
-  ['الموقع',data.location],
-  ['ملاحظات المزارع',data.notes],
-  ['الخطوة المقترحة',
-   'استكمال المعاينة بتسجيل موعد الري، ومصدر المياه، ومرحلة نمو المحصول، ونتائج فحص التربة والمياه إن توفرت.']
+ ['اسم الحقل',data.field_name],
+ ['المحصول',data.crop],
+ ['المساحة بالدونم',data.area_donum],
+ ['طريقة الري',data.irrigation],
+ ['التربة',data.soil],
+ ['الموقع',data.location],
+ ['ملاحظات المزارع',data.notes]
  ];
-
- rows.forEach(([label,value])=>addRow(label,value));
-
- report.style.display='block';
- report.scrollIntoView({behavior:'smooth',block:'start'});
+ rows.forEach(([label,value])=>{
+  const div=document.createElement('div');
+  div.className='result';
+  const strong=document.createElement('strong');
+  strong.textContent=label;
+  const p=document.createElement('p');
+  p.textContent=value||'لم يتم الإدخال';
+  div.append(strong,p);
+  box.appendChild(div);
+ });
+ $('report').style.display='block';
+ $('report').scrollIntoView({behavior:'smooth'});
 }
 
 async function loadHistory(){
  const box=$('history');
- box.textContent='جارٍ تحميل التقارير...';
-
- const {data,error}=await supabase
-  .from('field_reports')
+ if(!session){
+  box.textContent='سجّل الدخول لعرض تقاريرك السابقة.';
+  return;
+ }
+ const {data,error}=await supabase.from('field_reports')
   .select('id,field_id,field_name,crop,area_donum,irrigation,soil,location,notes,created_at')
   .eq('owner_id',session.user.id)
-  .order('created_at',{ascending:false})
-  .limit(50);
+  .order('created_at',{ascending:false}).limit(50);
 
  if(error){
   box.textContent='تعذر تحميل التقارير: '+error.message;
   return;
  }
-
  box.replaceChildren();
-
- if(!data||data.length===0){
-  box.textContent='لا توجد تقارير محفوظة بعد.';
+ const query=($('reportSearch').value||'').trim().toLowerCase();
+ const rows=(data||[]).filter(x=>
+  ((x.field_name||'')+' '+(x.crop||'')).toLowerCase().includes(query)
+ );
+ if(!rows.length){
+  box.textContent='لا توجد تقارير محفوظة تطابق البحث.';
   return;
  }
-
- 
-const query = ($('reportSearch').value || '').trim().toLocaleLowerCase();
-const filtered = data.filter(item =>
-  `${item.field_name || ''} ${item.crop || ''}`
-    .toLocaleLowerCase()
-    .includes(query)
-);
-
-if (filtered.length === 0) {
-  box.textContent = query
-    ? 'لا توجد تقارير تطابق البحث.'
-    : 'لا توجد تقارير محفوظة بعد.';
-  return;
-}
-
-filtered.forEach(item=>{
-
+ rows.forEach(item=>{
   const card=document.createElement('div');
   card.className='history-item';
-
-  const info=document.createElement('div');
-  info.textContent=item.field_name+' — '+item.area_donum+
-   ' دونم — '+(item.crop||'محصول غير محدد')+
-   ' — '+new Date(item.created_at).toLocaleString('ar-IQ');
-
-  const button=document.createElement('button');
-  button.type='button';
-  button.className='secondary';
-  button.textContent='فتح التقرير';
-  button.addEventListener('click',()=>showReport(item));
-
-const deleteButton = document.createElement('button');
-deleteButton.type = 'button';
-deleteButton.className = 'secondary';
-deleteButton.textContent = 'حذف التقرير';
-
-deleteButton.addEventListener('click', async () => {
-  if (!confirm('هل أنت متأكد من حذف هذا التقرير؟ لا يمكن التراجع عن الحذف.')) return;
-
-  deleteButton.disabled = true;
-  deleteButton.textContent = 'جارٍ الحذف...';
-
-  const { error } = await supabase
-    .from('field_reports')
-    .delete()
-    .eq('id', item.id)
-    .eq('owner_id', session.user.id);
-
-  if (error) {
-    setStatus('تعذر حذف التقرير: ' + error.message);
-    deleteButton.disabled = false;
-    deleteButton.textContent = 'حذف التقرير';
-    return;
-  }
-
-  setStatus('تم حذف التقرير.');
-  await loadHistory();
-});
-card.appendChild(deleteButton);
-  card.append(info,button);
+  const info=document.createElement('p');
+  info.textContent=`${item.field_name} — ${item.crop||''} — ${item.area_donum} دونم`;
+  const open=document.createElement('button');
+  open.className='secondary';
+  open.textContent='فتح التقرير';
+  open.onclick=()=>showReport(item);
+  const del=document.createElement('button');
+  del.className='secondary';
+  del.textContent='حذف التقرير';
+  del.onclick=async()=>{
+   if(!confirm('هل تريد حذف هذا التقرير؟'))return;
+   const {error}=await supabase.from('field_reports')
+    .delete().eq('id',item.id).eq('owner_id',session.user.id);
+   if(error){setStatus('تعذر الحذف: '+error.message);return;}
+   setStatus('تم حذف التقرير.');
+   await loadHistory();
+  };
+  card.append(info,open,del);
   box.appendChild(card);
  });
 }
 
-$('reportSearch').addEventListener('input', () => loadHistory());
-
-$('getAdviceButton').addEventListener('click', async () => {
-  const crop = $('crop').value;
-  const soil = $('soil').value;
-  const irrigation = $('irrigation').value;
-  const stage = $('growthStage').value;
-  const symptoms = $('plantSymptoms').value;
-  const moisture = $('soilMoisture').value;
-  const notes = $('notes').value.trim();
-  const result = $('adviceResult');
-
-  const advice = [];
-  let confidence = 'محدودة';
-
-  if (!crop) {
-    advice.push('اختر المحصول أولًا لتخصيص الإرشادات.');
-  }
-
-  if (!stage) {
-    advice.push('حدد مرحلة نمو المحصول؛ فهي تؤثر في احتياجات الماء والتغذية.');
-  }
-
-  if (moisture === 'جافة') {
-    advice.push(
-      'التربة تبدو جافة حسب ملاحظتك. افحص الرطوبة في منطقة الجذور قبل تحديد موعد الري، وتجنب الري اعتمادًا على مظهر السطح وحده.'
-    );
-  } else if (moisture === 'مشبعة بالماء') {
-    advice.push(
-      'التربة مشبعة بالماء. افحص الصرف واحتمال تجمع المياه، وتجنب إضافة مياه أخرى قبل التحقق من حاجة النبات.'
-    );
-  } else if (moisture === 'رطبة باعتدال') {
-    advice.push(
-      'الرطوبة تبدو معتدلة. راقب منطقة الجذور والطقس ومرحلة النمو قبل تحديد موعد الري التالي.'
-    );
-  } else {
-    advice.push(
-      'تحقق من رطوبة التربة قرب الجذور قبل اتخاذ قرار الري.'
-    );
-  }
-
-  if (symptoms === 'اصفرار الأوراق') {
-    advice.push(
-      'افحص موضع الاصفرار وعمر الأوراق، والجذور والرطوبة والصرف. قد تكون الأسباب متعددة؛ لا تضف سمادًا قبل تحديد السبب.'
-    );
-  } else if (symptoms === 'ذبول') {
-    advice.push(
-      'افحص رطوبة التربة والجذور وحرارة الجو. قد ينتج الذبول عن نقص الماء أو زيادة الرطوبة أو مشكلة في الجذور.'
-    );
-  } else if (symptoms === 'ضعف النمو') {
-    advice.push(
-      'راجع انتظام الري والصرف، وكثافة النباتات، ووجود الآفات. يُفضّل تحليل التربة قبل تعديل برنامج التسميد.'
-    );
-  } else if (symptoms === 'بقع أو آفات ظاهرة') {
-    advice.push(
-      'صوّر الأعراض بوضوح على الأوراق من الجهتين، وسجّل مكان ظهورها وانتشارها. لا تستخدم مبيدًا قبل تشخيص السبب.'
-    );
-  } else if (symptoms === 'نمو طبيعي') {
-    advice.push(
-      'استمر في المراقبة الدورية وسجّل الري ومراحل النمو، وتحقق من ظهور أي تغيرات جديدة.'
-    );
-  } else {
-    advice.push(
-      'حدد الأعراض بدقة، ويفضل إرفاق صورة للنبات لتسهيل التشخيص الأولي.'
-    );
-  }
-
-  if (irrigation === 'الري بالرش') {
-    advice.push(
-      'راقب انتظام توزيع الرش والتسربات، وراعِ سرعة الرياح ووقت الري لتقليل الفواقد.'
-    );
-  } else if (irrigation === 'الري بالتنقيط') {
-    advice.push(
-      'تحقق من نظافة المرشحات وانتظام تصريف النقاطات ورطوبة التربة حول الجذور.'
-    );
-  } else if (irrigation === 'الري السيحي') {
-    advice.push(
-      'راقب تجانس وصول الماء إلى أجزاء الحقل وتجنب تجمع المياه أو جريانها خارج منطقة الجذور.'
-    );
-  }
-
-  if (soil === 'طينية') {
-    advice.push(
-      'التربة الطينية قد تحتفظ بالماء مدة أطول؛ راقب الصرف والرطوبة قبل تكرار الري.'
-    );
-  } else if (soil === 'رملية') {
-    advice.push(
-      'التربة الرملية غالبًا أسرع تصريفًا للماء؛ راقب الرطوبة بانتظام ولا تحدد عدد الريات دون معرفة المحصول والطقس.'
-    );
-  }
-
-  if (notes) {
-    advice.push(
-      'ملاحظات المزارع المسجلة: ' + notes +
-      '. ينبغي مراجعة هذه الملاحظات ميدانيًا قبل اعتماد أي إجراء.'
-    );
-  }
-
-  if (crop && stage && symptoms && moisture !== 'غير معروفة' && moisture) {
-    confidence = 'أولية — تعتمد على الملاحظات المدخلة فقط';
-  }
-
-  result.replaceChildren();
-
-  const heading = document.createElement('h3');
-  heading.textContent = 'التوصية الزراعية الأولية';
-  result.appendChild(heading);
-
-  const confidenceText = document.createElement('p');
-  confidenceText.textContent = 'مستوى التقييم: ' + confidence;
-  result.appendChild(confidenceText);
-
-  const list = document.createElement('ol');
-
-  advice.forEach(text => {
-    const item = document.createElement('li');
-    item.textContent = text;
-    list.appendChild(item);
-  });
-
-  result.appendChild(list);
-
-  const disclaimer = document.createElement('p');
-  disclaimer.className = 'muted';
-  disclaimer.textContent =
-    'هذه إرشادات أولية مبنية على قواعد عامة، وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تعتمد عليها وحدها لتحديد جرعات الأسمدة أو المبيدات.';
-  result.appendChild(disclaimer);
-
-
-  result.style.display = 'block';
-
-  const saveStatus = document.createElement('p');
-  saveStatus.className = 'muted';
-  result.appendChild(saveStatus);
-
-  if (!session || !farm) {
-    saveStatus.textContent =
-      'ظهرت التوصية، لكن لم تُحفظ. سجّل الدخول ثم أعد إنشاء التوصية.';
-  } else {
-    const selectedField = fields.find(
-      field => field.id === savedField.value
-    );
-
-    saveStatus.textContent = 'جارٍ حفظ التوصية في حسابك...';
-
-    
-    const { data: savedRecord, error: saveError } = await supabase
-      .from('field_recommendations')
-      .insert({
-        owner_id: session.user.id,
-        farm_id: farm.id,
-        field_id: selectedField ? selectedField.id : null,
-        crop,
-        growth_stage: stage,
-        plant_symptoms: symptoms,
-        soil_moisture: moisture,
-        recommendation: advice.join('\n\n'),
-        confidence
-      })
-      .select('id')
-      .single();
-
-    if (saveError) {
-      saveStatus.textContent =
-        'تعذر حفظ التوصية: ' + saveError.message;
-    } else if (savedRecord && savedRecord.id) {
-      saveStatus.textContent =
-        '✓ تم حفظ التوصية. رقم السجل: ' + savedRecord.id;
-    } else {
-      saveStatus.textContent =
-        'لم نتأكد من حفظ التوصية. أعد الفحص من قاعدة البيانات.';
-    }
-
-  }
-
-  result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-});
-
-
-form.addEventListener('submit',async event=>{
- event.preventDefault();
- if(!form.reportValidity())return;
-
- if(!Number.isFinite(Number($('area').value))||Number($('area').value)<=0){
-  setStatus('أدخل مساحة صحيحة أكبر من صفر.');
+async function loadFields(){
+ const {data:authData,error:authError}=await supabase.auth.getSession();
+ if(authError)throw authError;
+ session=authData.session;
+ if(!session){
+  setStatus('يرجى تسجيل الدخول لتحميل الحقول وحفظ التقارير.');
+  $('savedField').innerHTML='<option value="">سجّل الدخول أولًا</option>';
+  await loadHistory();
   return;
  }
 
- const selected=fields.find(f=>f.id===savedField.value);
+ const {data:farms,error:farmError}=await supabase.from('farms')
+  .select('id,name').eq('owner_id',session.user.id).limit(1);
+ if(farmError)throw farmError;
+ if(!farms?.length){
+  setStatus('لم يتم العثور على مزرعة مرتبطة بالحساب.');
+  $('savedField').innerHTML='<option value="">لا توجد مزرعة</option>';
+  return;
+ }
+ farm=farms[0];
 
+ const {data,error}=await supabase.from('fields')
+  .select('id,name,crop,area_donum,farm_id')
+  .eq('farm_id',farm.id).order('created_at',{ascending:false});
+ if(error)throw error;
+ fields=data||[];
+
+ const select=$('savedField');
+ select.replaceChildren(new Option(fields.length?'اختر حقلًا محفوظًا':'لا توجد حقول محفوظة',''));
+ fields.forEach(f=>{
+  select.add(new Option(`${f.name} — ${f.area_donum} دونم — ${f.crop||''}`,f.id));
+ });
+ setStatus('تم الاتصال بالسحابة. المزرعة: '+farm.name);
+ await loadHistory();
+}
+
+$('savedField').addEventListener('change',()=>{
+ const f=fields.find(x=>x.id===$('savedField').value);
+ if(!f)return;
+ $('farm').value=f.name||'';
+ const cropAliases={'قمح':'الحنطة','حنطة':'الحنطة'};
+ const crop=cropAliases[f.crop]||f.crop;
+ $('crop').value=[...$('crop').options].some(o=>o.value===crop)?crop:'';
+ $('area').value=f.area_donum??'';
+ setStatus('تم تعبئة بيانات الحقل المحفوظ.');
+});
+
+$('fieldForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const form=$('fieldForm');
+ if(!form.reportValidity())return;
+ if(!session||!farm){
+  setStatus('لم يتم الحفظ. سجّل الدخول أولًا.');
+  return;
+ }
+ const selected=fields.find(f=>f.id===$('savedField').value);
  const payload={
+  owner_id:session.user.id,
+  farm_id:farm.id,
+  field_id:selected?selected.id:null,
   field_name:$('farm').value.trim(),
   crop:$('crop').value,
   area_donum:Number($('area').value),
@@ -602,170 +315,145 @@ form.addEventListener('submit',async event=>{
   location:$('location').value.trim()||null,
   notes:$('notes').value.trim()||null
  };
-
  const button=$('createButton');
  button.disabled=true;
- button.textContent='جارٍ حفظ التقرير...';
-
+ button.textContent='جارٍ الحفظ...';
  try{
-  if(!session||!farm){
-   setStatus('لم يتم حفظ التقرير: سجّل الدخول أولًا.');
-   return;
-  }
-
-  const record={
-   owner_id:session.user.id,
-   farm_id:farm.id,
-   field_id:selected?selected.id:null,
-   ...payload
-  };
-
-  const {error}=await supabase
-   .from('field_reports')
-   .insert(record);
-
-  if(error){
-   setStatus('لم يتم حفظ التقرير: '+error.message);
-   return;
-  }
-
+  const {error}=await supabase.from('field_reports').insert(payload);
+  if(error)throw error;
   showReport(payload);
-  setStatus('تم إنشاء التقرير وحفظه في Supabase بنجاح.');
+  setStatus('تم حفظ التقرير بنجاح.');
   await loadHistory();
-
- }catch(error){
-  setStatus('حدث خطأ أثناء حفظ التقرير: '+error.message);
+ }catch(err){
+  setStatus('تعذر حفظ التقرير: '+err.message);
  }finally{
   button.disabled=false;
-  button.textContent='إنشاء التقرير وحفظه في السحابة';
+  button.textContent='إنشاء التقرير وحفظه';
  }
 });
 
-$('printButton').addEventListener('click',()=>window.print());
+$('getAdviceButton').addEventListener('click',async()=>{
+ const crop=$('crop').value;
+ const irrigation=$('irrigation').value;
+ const soil=$('soil').value;
+ const stage=$('growthStage').value;
+ const symptoms=$('plantSymptoms').value;
+ const moisture=$('soilMoisture').value;
+ const result=$('adviceResult');
 
+ if(!crop||!stage||!symptoms||!moisture){
+  result.style.display='block';
+  result.textContent='أكمل المحصول ومرحلة النمو وحالة النبات ورطوبة التربة أولًا.';
+  return;
+ }
+
+ const advice=[];
+ if(moisture==='جافة'){
+  advice.push('افحص رطوبة منطقة الجذور. إذا تأكد الجفاف، حدّد موعد الري وفق احتياج المحصول ومرحلة نموه.');
+ }else if(moisture==='مشبعة بالماء'){
+  advice.push('افحص الصرف وتجمع المياه، ولا تضف ريًا جديدًا قبل التحقق من حالة الجذور.');
+ }else if(moisture==='رطبة باعتدال'){
+  advice.push('راقب رطوبة التربة والطقس قبل تحديد موعد الري التالي.');
+ }else{
+  advice.push('تحقق من رطوبة التربة في منطقة الجذور قبل اتخاذ قرار الري.');
+ }
+
+ if(symptoms==='اصفرار الأوراق'){
+  advice.push('افحص عمر الأوراق ونمط الاصفرار والجذور والصرف. لا تضف سمادًا قبل تحديد السبب.');
+ }else if(symptoms==='ذبول'){
+  advice.push('افحص رطوبة التربة والجذور ونظام الري؛ قد ينتج الذبول عن الجفاف أو تشبع التربة أو مرض.');
+ }else if(symptoms==='ضعف النمو'){
+  advice.push('راجع انتظام الري والصرف والأعشاب والآفات. يمكن تحليل التربة إذا استمر ضعف النمو.');
+ }else if(symptoms==='بقع أو آفات ظاهرة'){
+  advice.push('صوّر الأعراض من الجهتين وسجّل انتشارها. لا تستخدم مبيدًا قبل تشخيص السبب.');
+ }else{
+  advice.push('واصل متابعة نمو النبات وسجّل أي تغير في اللون أو النمو.');
+ }
+
+ if(irrigation==='الري بالتنقيط'){
+  advice.push('تحقق من نظافة المرشحات وانتظام تصريف النقاطات.');
+ }else if(irrigation==='الري بالرش'){
+  advice.push('راقب تجانس توزيع الرش والتسربات وسرعة الرياح.');
+ }else if(irrigation==='الري السيحي'){
+  advice.push('راقب تجانس وصول المياه وتجنب تجمعها لفترة طويلة.');
+ }
+ if(soil==='طينية'){
+  advice.push('التربة الطينية قد تحتفظ بالماء مدة أطول؛ راقب الصرف قبل تكرار الري.');
+ }
+ if(soil==='رملية'){
+  advice.push('التربة الرملية أسرع تصريفًا غالبًا؛ راقب رطوبة الجذور بانتظام.');
+ }
+ if(stage==='الإزهار'||stage==='تكوين الحبوب أو الثمار'){
+  advice.push('راقب توفر الماء في هذه المرحلة الحساسة وتجنب الإجهاد المائي دون الإفراط في الري.');
+ }
+
+ result.replaceChildren();
+ const title=document.createElement('h3');
+ title.textContent='التوصية الزراعية الأولية';
+ const info=document.createElement('p');
+ info.textContent=`المحصول: ${crop} — مرحلة النمو: ${stage}`;
+ const list=document.createElement('ol');
+ advice.forEach(text=>{
+  const li=document.createElement('li');
+  li.textContent=text;
+  list.appendChild(li);
+ });
+ const disclaimer=document.createElement('p');
+ disclaimer.className='muted';
+ disclaimer.textContent='هذه إرشادات مجانية مبنية على قواعد عامة وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تعتمد عليها وحدها لتحديد جرعات الأسمدة أو المبيدات.';
+ result.append(title,info,list,disclaimer);
+ result.style.display='block';
+
+ if(session&&farm){
+  const selected=fields.find(f=>f.id===$('savedField').value);
+  const saveStatus=document.createElement('p');
+  saveStatus.className='muted';
+  saveStatus.textContent='جارٍ حفظ التوصية...';
+  result.appendChild(saveStatus);
+
+  const {data,error}=await supabase.from('field_recommendations').insert({
+   owner_id:session.user.id,
+   farm_id:farm.id,
+   field_id:selected?selected.id:null,
+   crop,
+   growth_stage:stage,
+   plant_symptoms:symptoms,
+   soil_moisture:moisture,
+   recommendation:advice.join('\n\n'),
+   confidence:'إرشادات أولية'
+  }).select('id').single();
+
+  if(error){
+   saveStatus.textContent='ظهرت التوصية لكن تعذر حفظها: '+error.message;
+  }else{
+   saveStatus.textContent='تم حفظ التوصية بنجاح. رقم السجل: '+data.id;
+  }
+ }else{
+  const p=document.createElement('p');
+  p.className='muted';
+  p.textContent='التوصية لم تُحفظ؛ سجّل الدخول لحفظها في حسابك.';
+  result.appendChild(p);
+ }
+ result.scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+
+$('reportSearch').addEventListener('input',loadHistory);
+$('printButton').addEventListener('click',()=>window.print());
 $('newButton').addEventListener('click',()=>{
- form.reset();
- savedField.value='';
- report.style.display='none';
- reportContent.replaceChildren();
- form.scrollIntoView({behavior:'smooth',block:'start'});
+ $('fieldForm').reset();
+ $('savedField').value='';
+ $('report').style.display='none';
+ $('fieldForm').scrollIntoView({behavior:'smooth'});
 });
 
 await loadFields();
 
-$('getAdviceButton').addEventListener('click', async () => {
-  const crop = $('crop').value;
-  const irrigation = $('irrigation').value;
-  const soil = $('soil').value;
-  const stage = $('growthStage').value;
-  const symptoms = $('plantSymptoms').value;
-  const moisture = $('soilMoisture').value;
-  const result = $('adviceResult');
-
-  const advice = [];
-  let confidence = 'منخفضة — بيانات الحقل غير مكتملة';
-
-  if (!crop || !irrigation || !soil || !stage ||
-      !symptoms || !moisture) {
-    result.style.display = 'block';
-    result.textContent =
-      'يرجى إكمال بيانات المحصول والري والتربة ومرحلة النمو والأعراض ورطوبة التربة قبل إعداد التوصية.';
-    return;
-  }
-
-  if (moisture === 'جافة') {
-    advice.push(
-      'تحقق من رطوبة منطقة الجذور قبل الري. إذا تأكد الجفاف، فحدّد موعد الري وفق احتياج المحصول ومرحلة نموه.'
-    );
-  } else if (moisture === 'مشبعة بالماء') {
-    advice.push(
-      'افحص الصرف واحتمال تجمع المياه. لا تضف ريًا جديدًا قبل التحقق من حالة منطقة الجذور.'
-    );
-  } else if (moisture === 'رطبة باعتدال') {
-    advice.push(
-      'راقب رطوبة التربة دوريًا، ولا تزد الري لمجرد اتباع جدول ثابت.'
-    );
-  } else {
-    advice.push(
-      'تحقق من رطوبة التربة في منطقة الجذور قبل اتخاذ قرار الري.'
-    );
-  }
-
-  if (symptoms === 'اصفرار الأوراق') {
-    advice.push(
-      'افحص نمط الاصفرار وعمر الأوراق والجذور، وتحقق من الصرف والملوحة قبل افتراض نقص عنصر غذائي.'
-    );
-  } else if (symptoms === 'ذبول') {
-    advice.push(
-      'افحص رطوبة التربة والجذور وسلامة نظام الري. قد ينتج الذبول عن الجفاف أو تشبع التربة أو مشكلة مرضية.'
-    );
-  } else if (symptoms === 'ضعف النمو') {
-    advice.push(
-      'راجع انتظام الري ومكافحة الأعشاب ومرحلة النمو، واطلب تحليل التربة عند استمرار ضعف النمو.'
-    );
-  } else if (symptoms === 'بقع أو آفات ظاهرة') {
-    advice.push(
-      'صوّر الأعراض من قرب وافحص جانبي الأوراق. لا تستخدم مبيدًا قبل تحديد الآفة أو المرض.'
-    );
-  } else {
-    advice.push(
-      'واصل متابعة نمو النبات وتسجيل أي تغير في اللون أو الكثافة أو النمو.'
-    );
-  }
-
-  if (stage === 'الإزهار' ||
-      stage === 'تكوين الحبوب أو الثمار') {
-    advice.push(
-      'راقب انتظام توفر الماء خلال هذه المرحلة الحساسة، وتجنب الإجهاد المائي دون الإفراط في الري.'
-    );
-  }
-
-  if (soil === 'طينية' && irrigation === 'الري بالرش') {
-    advice.push(
-      'راقب تشكل البرك وجريان المياه، واضبط مدة الري وفق معدل تسرب التربة وتجانس توزيع الرش.'
-    );
-  }
-
-  confidence =
-    symptoms === 'نمو طبيعي' && moisture === 'رطبة باعتدال'
-      ? 'متوسطة للإرشادات العامة فقط'
-      : 'منخفضة إلى متوسطة؛ يلزم فحص ميداني للتشخيص';
-
-  result.replaceChildren();
-
-  const heading = document.createElement('h3');
-  heading.textContent = 'التوصية الزراعية الأولية';
-  result.appendChild(heading);
-
-  const cropInfo = document.createElement('p');
-  cropInfo.textContent =
-    'المحصول: ' + crop + ' | مرحلة النمو: ' + stage;
-  result.appendChild(cropInfo);
-
-  const list = document.createElement('ul');
-
-  advice.forEach(text => {
-    const item = document.createElement('li');
-    item.textContent = text;
-    list.appendChild(item);
-  });
-
-  result.appendChild(list);
-
-  const confidenceText = document.createElement('p');
-  confidenceText.textContent = 'مستوى الثقة: ' + confidence;
-  result.appendChild(confidenceText);
-
-  const disclaimer = document.createElement('p');
-  disclaimer.className = 'muted';
-  disclaimer.textContent =
-    'هذه إرشادات مبنية على قواعد أولية وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تحدد جرعات الأسمدة أو المبيدات دون معلومات وفحوص مناسبة.';
-  result.appendChild(disclaimer);
-
-  result.style.display = 'block';
-  result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-});
-
+}catch(error){
+ const status=document.getElementById('status');
+ if(status)status.textContent='تعذر تشغيل المنصة أو الاتصال: '+(error?.message||error);
+ console.error(error);
+}
+})();
 </script>
 </body>
 </html>
