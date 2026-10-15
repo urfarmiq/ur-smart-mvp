@@ -405,7 +405,7 @@ card.appendChild(deleteButton);
 
 $('reportSearch').addEventListener('input', () => loadHistory());
 
-$('getAdviceButton').addEventListener('click', () => {
+$('getAdviceButton').addEventListener('click', async () => {
   const crop = $('crop').value;
   const soil = $('soil').value;
   const irrigation = $('irrigation').value;
