@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -17,7 +16,13 @@ button{background:#176b45;color:white;border:0;cursor:pointer}
 button:disabled{opacity:.55}
 a{color:#176b45}
 #status{padding:12px;background:#e8f3e9;border-radius:8px;overflow-wrap:anywhere}
-.field{padding:10px;margin:8px 0;background:#f1f7f2;border-radius:8px}
+.field{padding:10px;margin:8px 0;background:#f1f7f2;border-radius:8px;overflow-wrap:anywhere}
+.field small{display:block;color:#5a6e60}
+.actions{display:flex;gap:8px}
+.actions button{margin:6px 0 0;padding:8px;font-size:14px}
+.actions .edit{background:#e8f3e9;color:#176b45}
+.actions .del{background:#fbe9e7;color:#a12a1a}
+#cancelEdit{background:#e8f3e9;color:#176b45;display:none}
 </style>
 </head>
 <body>
@@ -31,14 +36,12 @@ a{color:#176b45}
 </section>
 
 <section class="card">
-<h2>إضافة حقل زراعي</h2>
+<h2 id="formTitle">إضافة حقل زراعي</h2>
 <form id="fieldForm">
 <label for="fieldName">اسم الحقل</label>
-<input id="fieldName" required placeholder="مثال: حقل القمح">
-
-<label for="area">المساحة بالدونم</label>
+<input id="fieldName" required maxlength="100" placeholder="مثال: حقل القمح">
+<label for="area">المساحة بالدونم العراقي</label>
 <input id="area" type="number" min="0.1" step="0.1" required>
-
 <label for="crop">المحصول</label>
 <select id="crop" required>
 <option value="">اختر المحصول</option>
@@ -49,12 +52,30 @@ a{color:#176b45}
 <option>نخيل</option>
 <option>أخرى</option>
 </select>
+<label for="soil">نوع التربة</label>
+<select id="soil">
+<option value="">غير محدد</option>
+<option>طينية</option>
+<option>مزيجية</option>
+<option>رملية</option>
+<option>غير معروف</option>
+</select>
+<label for="irrigation">طريقة الري</label>
+<select id="irrigation">
+<option value="">غير محدد</option>
+<option>الري بالتنقيط</option>
+<option>الري بالرش</option>
+<option>الري السيحي</option>
+<option>طريقة أخرى</option>
+</select>
+<label for="location">الموقع أو الإحداثيات</label>
+<input id="location" maxlength="180" placeholder="المحافظة أو إحداثيات الحقل">
 <button id="saveButton" type="submit">حفظ الحقل في السحابة</button>
+<button id="cancelEdit" type="button">إلغاء التعديل</button>
 </form>
 
-<h2>حقولي المحفوظة في Supabase</h2>
+<h2>حقولي المحفوظة</h2>
 <div id="cloudFields">جارٍ تحميل الحقول...</div>
-
 <p><a href="./field-analysis.html">الانتقال إلى تحليل الحقول الزراعية</a></p>
 </section>
 
@@ -73,21 +94,23 @@ const supabase=createClient(
 'sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc'
 );
 
-const status=document.getElementById('status');
-const welcome=document.getElementById('welcome');
-const saveButton=document.getElementById('saveButton');
-const cloudFields=document.getElementById('cloudFields');
+const $=id=>document.getElementById(id);
+const status=$('status');
+const saveButton=$('saveButton');
+const cloudFields=$('cloudFields');
 const storageKey='ur-smart-fields';
-
+const SAVE_LABEL='حفظ الحقل في السحابة';
 let session=null;
 let farmId=null;
+let fields=[];
+let editingId=null;
 
 function showError(prefix,error){
  status.textContent=prefix+(error?.message||'حدث خطأ غير معروف.');
 }
 
 function renderLocalFields(){
- const box=document.getElementById('localFields');
+ const box=$('localFields');
  box.replaceChildren();
  let items=[];
  try{items=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{}
@@ -103,34 +126,91 @@ function renderLocalFields(){
  });
 }
 
+function resetForm(){
+ editingId=null;
+ $('fieldForm').reset();
+ $('formTitle').textContent='إضافة حقل زراعي';
+ saveButton.textContent=SAVE_LABEL;
+ $('cancelEdit').style.display='none';
+}
+
+function startEdit(item){
+ editingId=item.id;
+ $('fieldName').value=item.name||'';
+ $('area').value=item.area_donum??'';
+ $('crop').value=item.crop||'';
+ $('soil').value=item.soil||'';
+ $('irrigation').value=item.irrigation||'';
+ $('location').value=item.location||'';
+ $('formTitle').textContent='تعديل الحقل';
+ saveButton.textContent='حفظ التعديلات';
+ $('cancelEdit').style.display='block';
+ $('fieldForm').scrollIntoView({behavior:'smooth'});
+}
+
+async function deleteField(item){
+ if(!confirm('هل تريد حذف الحقل "'+item.name+'"؟')) return;
+ const {error}=await supabase.from('fields').delete().eq('id',item.id);
+ if(error){showError('تعذر حذف الحقل: ',error);return;}
+ if(editingId===item.id) resetForm();
+ status.textContent='تم حذف الحقل.';
+ await loadCloudFields();
+}
+
 async function loadCloudFields(){
  if(!session||!farmId){
-  cloudFields.textContent='سجّل الدخول وتأكد من وجود مزرعة لعرض الحقول.';
+  cloudFields.textContent='سجّل الدخول لعرض الحقول.';
   return;
  }
  cloudFields.textContent='جارٍ تحميل الحقول...';
  const {data,error}=await supabase
   .from('fields')
-  .select('id,name,crop,area_donum,created_at')
+  .select('id,name,crop,area_donum,soil,irrigation,location,created_at')
   .eq('farm_id',farmId)
   .order('created_at',{ascending:false});
-
  if(error){
   cloudFields.textContent='تعذر تحميل الحقول.';
   showError('خطأ في تحميل الحقول: ',error);
   return;
  }
+ fields=data||[];
  cloudFields.replaceChildren();
- if(!data||data.length===0){
-  cloudFields.textContent='لم تتم إضافة حقول سحابية بعد.';
+ if(!fields.length){
+  cloudFields.textContent='لم تتم إضافة حقول بعد. استخدم النموذج أعلاه لإضافة أول حقل.';
   return;
  }
- data.forEach(item=>{
-  const p=document.createElement('p');
-  p.className='field';
-  p.textContent=item.name+' — '+item.area_donum+' دونم — '+(item.crop||'غير محدد');
-  cloudFields.appendChild(p);
+ fields.forEach(item=>{
+  const box=document.createElement('div');
+  box.className='field';
+  const title=document.createElement('strong');
+  title.textContent=item.name+' — '+item.area_donum+' دونم — '+(item.crop||'غير محدد');
+  const details=document.createElement('small');
+  details.textContent='التربة: '+(item.soil||'غير محدد')+' | الري: '+(item.irrigation||'غير محدد')+' | الموقع: '+(item.location||'غير محدد');
+  const actions=document.createElement('div');
+  actions.className='actions';
+  const edit=document.createElement('button');
+  edit.type='button';edit.className='edit';edit.textContent='تعديل';
+  edit.onclick=()=>startEdit(item);
+  const del=document.createElement('button');
+  del.type='button';del.className='del';del.textContent='حذف';
+  del.onclick=()=>deleteField(item);
+  actions.append(edit,del);
+  box.append(title,details,actions);
+  cloudFields.appendChild(box);
  });
+}
+
+async function ensureFarm(){
+ const {data:farms,error}=await supabase
+  .from('farms').select('id,name').eq('owner_id',session.user.id).limit(1);
+ if(error) throw error;
+ if(farms&&farms.length) return farms[0];
+ const {data:created,error:createError}=await supabase
+  .from('farms')
+  .insert({name:'مزرعتي',owner_id:session.user.id})
+  .select('id,name').single();
+ if(createError) throw createError;
+ return created;
 }
 
 async function initialize(){
@@ -138,82 +218,74 @@ async function initialize(){
  const {data,error}=await supabase.auth.getSession();
  if(error){
   showError('خطأ في التحقق من تسجيل الدخول: ',error);
-  welcome.textContent='تعذر التحقق من الحساب.';
+  $('welcome').textContent='تعذر التحقق من الحساب.';
   return;
  }
  session=data.session;
  if(!session){
   status.textContent='يرجى تسجيل الدخول أولًا.';
-  welcome.textContent='لم يتم تسجيل الدخول.';
-  document.getElementById('logout').textContent='الذهاب إلى تسجيل الدخول';
+  $('welcome').textContent='لم يتم تسجيل الدخول.';
+  $('logout').textContent='الذهاب إلى تسجيل الدخول';
   cloudFields.textContent='سجّل الدخول لعرض حقولك.';
   return;
  }
-
- welcome.textContent='مرحبًا بك في منصة أور الزراعية.';
+ $('welcome').textContent='مرحبًا بك في منصة أور الزراعية.';
  status.textContent='تم تسجيل الدخول: '+(session.user.email||'المزارع');
-
- const {data:farms,error:farmError}=await supabase
-  .from('farms')
-  .select('id,name')
-  .eq('owner_id',session.user.id)
-  .limit(1);
-
- if(farmError){
-  showError('تعذر تحميل المزرعة: ',farmError);
-  cloudFields.textContent='تعذر تحديد مزرعتك.';
-  return;
+ try{
+  const farm=await ensureFarm();
+  farmId=farm.id;
+  status.textContent='تم الاتصال بنجاح. المزرعة: '+farm.name;
+  saveButton.disabled=false;
+  await loadCloudFields();
+ }catch(err){
+  showError('تعذر تحميل أو إنشاء المزرعة: ',err);
+  cloudFields.textContent='تعذر تحديد مزرعتك. تأكد من تشغيل أوامر SQL الخاصة بالصلاحيات.';
  }
- if(!farms||farms.length===0){
-  status.textContent='لا توجد مزرعة مرتبطة بحسابك. يرجى مراجعة إعدادات قاعدة البيانات.';
-  cloudFields.textContent='لا يمكن حفظ الحقول قبل ربط مزرعة بحسابك.';
-  return;
- }
- farmId=farms[0].id;
- status.textContent='تم الاتصال بنجاح. المزرعة: '+farms[0].name;
- saveButton.disabled=false;
- await loadCloudFields();
 }
 
-document.getElementById('fieldForm').addEventListener('submit',async event=>{
+$('fieldForm').addEventListener('submit',async event=>{
  event.preventDefault();
  if(!session||!farmId){
-  status.textContent='يرجى تسجيل الدخول والتأكد من وجود مزرعة أولًا.';
+  status.textContent='يرجى تسجيل الدخول أولًا.';
   return;
  }
-
- const name=document.getElementById('fieldName').value.trim();
- const area=Number(document.getElementById('area').value);
- const crop=document.getElementById('crop').value;
-
+ const name=$('fieldName').value.trim();
+ const area=Number($('area').value);
+ const crop=$('crop').value;
  if(!name||!Number.isFinite(area)||area<=0||!crop){
   status.textContent='يرجى إدخال اسم الحقل والمساحة والمحصول بصورة صحيحة.';
   return;
  }
-
- saveButton.disabled=true;
- saveButton.textContent='جارٍ الحفظ...';
-
- const {error}=await supabase.from('fields').insert({
-  farm_id:farmId,
+ const payload={
   name:name,
   crop:crop,
-  area_donum:area
- });
-
+  area_donum:area,
+  soil:$('soil').value||null,
+  irrigation:$('irrigation').value||null,
+  location:$('location').value.trim()||null
+ };
+ saveButton.disabled=true;
+ saveButton.textContent='جارٍ الحفظ...';
+ let error;
+ if(editingId){
+  ({error}=await supabase.from('fields').update(payload).eq('id',editingId));
+ }else{
+  ({error}=await supabase.from('fields').insert({...payload,farm_id:farmId}));
+ }
  if(error){
   showError('لم يتم حفظ الحقل. التفاصيل: ',error);
+  saveButton.textContent=editingId?'حفظ التعديلات':SAVE_LABEL;
  }else{
-  status.textContent='تم حفظ الحقل في Supabase بنجاح.';
-  event.target.reset();
+  status.textContent=editingId?'تم تعديل الحقل بنجاح.':'تم حفظ الحقل بنجاح.';
+  resetForm();
   await loadCloudFields();
  }
-
  saveButton.disabled=false;
- saveButton.textContent='حفظ الحقل في السحابة';
 });
 
-document.getElementById('logout').addEventListener('click',async()=>{
+$('cancelEdit').addEventListener('click',resetForm);
+
+$('logout').addEventListener('click',async()=>{
  if(!session){
   location.href='./auth.html';
   return;
