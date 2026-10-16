@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -47,15 +46,24 @@ const email = document.getElementById('email');
 const password = document.getElementById('password');
 const msg = document.getElementById('msg');
 const say = text => msg.textContent = text;
+const openDashboard = () => {
+ say('تم تسجيل الدخول. جارٍ فتح لوحة المزارع...');
+ window.location.assign('./dashboard.html');
+};
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
  e.preventDefault();
  say('جارٍ تسجيل الدخول...');
- const {error} = await supabase.auth.signInWithPassword({
+ const {data,error} = await supabase.auth.signInWithPassword({
   email: email.value.trim(),
   password: password.value
  });
- say(error ? 'تعذر الدخول: ' + error.message : 'تم تسجيل الدخول بنجاح.');
+ if (error) {
+  say('تعذر الدخول: ' + error.message);
+  return;
+ }
+ if (data.session) openDashboard();
+ else say('تم التحقق من الحساب، لكن لم تُنشأ جلسة. حاول تسجيل الدخول مجددًا.');
 });
 
 document.getElementById('signup').addEventListener('click', async () => {
@@ -69,8 +77,8 @@ document.getElementById('signup').addEventListener('click', async () => {
   password: password.value
  });
  if (error) say('تعذر التسجيل: ' + error.message);
- else if (data.session) say('تم إنشاء الحساب وتسجيل الدخول.');
- else say('تم إرسال طلب التسجيل. افحص بريدك الإلكتروني لتأكيد الحساب.');
+ else if (data.session) openDashboard();
+ else say('تم إرسال طلب التسجيل. افحص بريدك الإلكتروني لتأكيد الحساب، ثم ارجع إلى هذه الصفحة وسجّل الدخول.');
 });
 
 document.getElementById('logout').addEventListener('click', async () => {
@@ -80,7 +88,8 @@ document.getElementById('logout').addEventListener('click', async () => {
 
 supabase.auth.getSession().then(({data,error}) => {
  if (error) say('تعذر الاتصال: ' + error.message);
- else say(data.session ? 'أنت مسجل الدخول.' : 'أدخل بياناتك لتسجيل الدخول أو إنشاء حساب.');
+ else if (data.session) openDashboard();
+ else say('أدخل بياناتك لتسجيل الدخول أو إنشاء حساب.');
 });
 </script>
 </body>
