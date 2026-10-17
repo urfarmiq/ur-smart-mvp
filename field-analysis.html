@@ -45,6 +45,11 @@ body{background:white}main{width:100%;margin:0}
 <label for="savedField">اختيار حقل محفوظ</label>
 <select id="savedField"><option value="">جارٍ تحميل الحقول...</option></select>
 
+<div id="boundaryPanel" class="result no-print" aria-live="polite">اختر حقلًا محفوظًا لعرض قياسات حدوده من الخريطة.</div>
+<div class="no-print" style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="secondary" id="refreshBoundary" type="button">↻ تحديث قياسات الحدود</button>
+<a class="secondary" id="openFieldMap" href="./field-map.html" style="display:inline-block;text-decoration:none;font-weight:bold">🗺️ فتح خريطة الحقل</a>
+</div>
 <form id="fieldForm">
 <label for="farm">اسم المزرعة أو الحقل</label>
 <input id="farm" maxlength="100" required placeholder="مثال: حقل الحنطة">
@@ -168,6 +173,29 @@ let session=null;
 let farm=null;
 let fields=[];
 
+let boundaryMeasurement=null;
+async function loadBoundaryMeasurement(){
+ const box=$('boundaryPanel'),fieldId=$('savedField').value;
+ boundaryMeasurement=null;
+ $('openFieldMap').href='./field-map.html';
+ if(!fieldId){box.textContent='اختر حقلًا محفوظًا لعرض قياسات حدوده من الخريطة.';return}
+ if(!session){box.textContent='سجّل الدخول أولًا لعرض حدود الحقل.';return}
+ box.textContent='جارٍ قراءة قياسات الحقل المحفوظة...';
+ const {data,error}=await supabase.from('field_boundaries').select('area_m2,perimeter_m,updated_at').eq('field_id',fieldId).maybeSingle();
+ if(error){box.textContent='تعذر قراءة الحدود: '+error.message;return}
+ if(!data){box.textContent='لا توجد حدود سحابية محفوظة لهذا الحقل بعد. افتح الخريطة وارسم الحدود واحفظها.';return}
+ const a=Number(data.area_m2),p=Number(data.perimeter_m);
+ if(!Number.isFinite(a)||a<=0||!Number.isFinite(p)){box.textContent='قياسات الحدود المحفوظة غير صالحة.';return}
+ boundaryMeasurement={fieldId,area:a,perimeter:p};
+ box.replaceChildren();
+ const heading=document.createElement('strong');heading.textContent='✓ قياسات الحدود المحفوظة في Supabase';
+ const detail=document.createElement('p');detail.textContent='المساحة: '+(a/2500).toLocaleString('ar-IQ',{maximumFractionDigits:3})+' دونم عراقي ('+Math.round(a).toLocaleString('ar-IQ')+' م²) — المحيط: '+Math.round(p).toLocaleString('ar-IQ')+' متر';
+ const note=document.createElement('p');note.className='muted';note.textContent='المساحة محسوبة من إحداثيات الحدود التي رسمتها، ودقتها تعتمد على دقة تحديد النقاط. ليست قياسًا مساحيًا رسميًا.';
+ const apply=document.createElement('button');apply.type='button';apply.className='secondary';apply.textContent='استخدام المساحة المقاسة في التقرير';apply.onclick=()=>{$('area').value=(a/2500).toFixed(3);box.appendChild(document.createTextNode(' ✓ تم نقل المساحة إلى النموذج.'))};
+ box.append(heading,detail,note,apply);
+}
+$('refreshBoundary').addEventListener('click',loadBoundaryMeasurement);
+$('savedField').addEventListener('change',loadBoundaryMeasurement);
 function setStatus(message){
  status.textContent=message;
 }
