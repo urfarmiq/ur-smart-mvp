@@ -11,7 +11,7 @@ function evaluatePixel(s){let good=s.dataMask===1&&![0,1,3,8,9,10,11].includes(s
 export default {async fetch(req,env){
  const origin=req.headers.get('Origin')||'';
  const allowed=env.ALLOWED_ORIGIN||'https://urfarmiq.github.io';
- if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':allowed,'access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','vary':'Origin'}});
+ if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':allowed,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','access-control-max-age':'86400','vary':'Origin'}});
  if(origin&&origin!==allowed)return reply({error:'Origin not allowed'},403,allowed);
  if(req.method!=='POST')return reply({error:'POST only'},405,allowed);
  try{
