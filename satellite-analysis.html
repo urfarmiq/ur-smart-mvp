@@ -10,7 +10,7 @@
 <script type="module">
 const $=id=>document.getElementById(id);
 // Set to the deployed Cloudflare Worker HTTPS URL once the satellite backend is configured.
-const SATELLITE_API_URL='';
+const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
 $('autoAnalyze').onclick=async()=>{
  const box=$('autoResult'),fieldId=$('field').value;
  if(!fieldId){box.textContent='اختر حقلًا محفوظًا أولًا.';return}
