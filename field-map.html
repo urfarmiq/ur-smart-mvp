@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>خرائط الحقول | UR Smart</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzxZjsa+UeE9Y0Hf6v+QjFhQ=" crossorigin="">
+<style>body{font-family:Arial,sans-serif;background:#f4f8f4;color:#183d2b;margin:0}header,main{padding:18px;max-width:1050px;margin:auto}a{color:#176b45}#map{height:65vh;min-height:380px;border-radius:12px}button{padding:12px;margin:6px;border:0;border-radius:8px;background:#176b45;color:white;cursor:pointer}.note{background:white;padding:15px;border-radius:10px;line-height:1.8}</style></head><body>
+<header><a href="./dashboard.html">← لوحة المزارع</a><h1>خرائط الحقول الزراعية</h1><p>ارسم حدود حقلك بالنقر على الخريطة، ثم احسب المساحة التقديرية بالدونم العراقي.</p></header>
+<main><div class="note">هذه أداة رسم وقياس أولية. الخرائط ليست صور NDVI ولا تشخيصًا لصحة المحصول. لا تُرسل إحداثيات الحقل إلى قاعدة بيانات UR Smart من هذه الصفحة؛ قد يطلب مزود الخرائط بيانات تقنية لعرض البلاطات.</div><p><button id="undo">تراجع عن آخر نقطة</button><button id="clear">مسح الرسم</button><button id="locate">تحديد موقعي</button></p><div id="map" role="application" aria-label="خريطة لرسم حدود الحقل"></div><p id="result" aria-live="polite">اضغط على الخريطة لإضافة نقاط الحدود (ثلاث نقاط على الأقل).</p><p class="note">المساحة بالدونم العراقي (2500 متر مربع). القياس تقريبي ويعتمد على دقة تحديد الحدود؛ لا يستخدم لأغراض المسح العقاري.</p></main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const map=L.map('map').setView([32.5,45.8],8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+const points=[];let shape;const result=document.getElementById('result');
+function area(pts){const R=6378137;let sum=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];sum+=(b.lng-a.lng)*Math.PI/180*(2+Math.sin(a.lat*Math.PI/180)+Math.sin(b.lat*Math.PI/180));}return Math.abs(sum*R*R/2);}
+function redraw(){if(shape)map.removeLayer(shape);if(points.length)shape=(points.length>=3?L.polygon(points,{color:'#187044'}):L.polyline(points,{color:'#187044'})).addTo(map);else shape=null;result.textContent=points.length>=3?'المساحة التقديرية: '+(area(points)/2500).toLocaleString('ar-IQ',{maximumFractionDigits:3})+' دونم عراقي ('+Math.round(area(points)).toLocaleString('ar-IQ')+' م²)':'عدد النقاط: '+points.length+' — أضف '+Math.max(0,3-points.length)+' نقاط لإغلاق الحقل.';}
+map.on('click',e=>{points.push(e.latlng);redraw()});
+document.getElementById('undo').onclick=()=>{points.pop();redraw()};
+document.getElementById('clear').onclick=()=>{points.length=0;redraw()};
+document.getElementById('locate').onclick=()=>{if(!navigator.geolocation){result.textContent='تحديد الموقع غير مدعوم في هذا المتصفح.';return}navigator.geolocation.getCurrentPosition(p=>map.setView([p.coords.latitude,p.coords.longitude],16),()=>result.textContent='تعذر تحديد الموقع. تحقق من إذن الموقع.',{enableHighAccuracy:true,timeout:12000})};
+</script></body></html>
