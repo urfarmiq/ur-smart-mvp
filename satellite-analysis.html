@@ -30,7 +30,7 @@ $('autoAnalyze').onclick=async()=>{
  const title=document.createElement('h3');title.textContent='نتائج Sentinel-2 الفعلية';
  const numbers=document.createElement('p');numbers.textContent='NDVI: '+data.ndvi.toFixed(3)+' | NDMI: '+data.ndmi.toFixed(3);
  const meta=document.createElement('p');meta.textContent='تاريخ الصورة: '+safeDate(data.date)+' — الدقة المكانية: '+(data.resolution_m||20)+' متر — المصدر: '+(data.source||'Sentinel-2');
- const warning=document.createElement('p');warning.className='muted';warning.textContent='متوسط الحقل بعد استبعاد الغيوم والظلال وفق بيانات المصدر. لا يُستخدم وحده لتحديد كمية السماد أو الري.';
+ const warning=document.createElement('p');warning.className='muted';warning.textContent=Number.isFinite(pixels)&&pixels<3?'هذه قراءة لعينة محدودة، وليست متوسطًا موثوقًا للحقل بأكمله. لا تستخدم لتحديد الري أو التسميد.':'قراءة للبكسلات الصالحة وفق بيانات المصدر. لا تستخدم وحدها لتحديد الري أو التسميد.';
  const quality=document.createElement('p');quality.className='notice';quality.textContent=sampleNote;
  const interpretation=document.createElement('p');interpretation.textContent='قراءة NDVI '+(data.ndvi<0.2?'منخفضة':data.ndvi<0.5?'متوسطة':'مرتفعة')+' نسبيًا. NDMI '+(data.ndmi<0?'سالب':data.ndmi<0.2?'موجب منخفض':'موجب')+'. لا يُستنتج العطش أو نقص السماد من هذين المؤشرين دون نوع المحصول ومرحلة نموه وقياسات أرضية.';
  const actions=document.createElement('div');actions.className='grid';
