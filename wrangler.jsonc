@@ -1,0 +1,8 @@
+{
+  // UR Smart satellite Worker deployment configuration.
+  // This file does not contain credentials or change the live deployment.
+  "name": "ur-smart-satellite",
+  "main": "satellite-backend/worker.js",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true
+}
