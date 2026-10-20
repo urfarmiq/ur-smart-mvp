@@ -6,6 +6,10 @@
 <section class="panel"><h2>1. اختر الحقل</h2><div id="status">جارٍ التحقق من تسجيل الدخول...</div><label for="field">الحقول المحفوظة</label><select id="field"><option value="">اختر حقلًا</option></select><button id="refresh" class="secondary">↻ تحديث حقولي</button><div id="boundary" class="result">اختر حقلًا لعرض المساحة وحدوده المحفوظة.</div><a href="./field-map.html">فتح خريطة الحدود ←</a></section>
 <section class="panel"><h2>2. تحليل تلقائي من الأقمار الصناعية</h2><p class="muted">اختر حقلًا محفوظًا ثم اضغط التحليل للحصول على أحدث قراءة متاحة من Sentinel-2، دون إدخال قيم الحزم.</p><button id="autoAnalyze">🛰️ تحليل الحقل تلقائيًا</button><details><summary style="cursor:pointer;color:#176b45">🔎 أدوات تشخيص الاتصال (عند الحاجة)</summary><button id="testConnection" class="secondary">فحص الاتصال التفصيلي</button><div id="connectionResult" class="result" aria-live="polite">فحص الاتصال يفصل بين مشكلة CORS وطلبات POST.</div></details><div id="autoResult" class="result" aria-live="polite">جاهز لطلب تحليل فعلي من Sentinel-2. اختر حقلًا واضغط زر التحليل.</div></section>
 <section class="panel"><h2>3. الحساب اليدوي الاختياري من بيانات طيفية</h2><p class="muted">القيم يجب أن تكون انعكاسية Reflectance ضمن المجال 0 إلى 1، من نفس المشهد والتاريخ والموقع، وبعد معالجة الغيوم والظلال. في Sentinel-2: الأحمر B04، القريب من تحت الأحمر B08، وتحت الأحمر قصير الموجة B11.</p><div class="grid"><div><label for="red">الأحمر Red — B04</label><input id="red" type="number" min="0" max="1" step="0.0001" placeholder="0 إلى 1"></div><div><label for="nir">القريب من تحت الأحمر NIR — B08</label><input id="nir" type="number" min="0" max="1" step="0.0001" placeholder="0 إلى 1"></div><div><label for="swir">تحت الأحمر قصير الموجة SWIR — B11</label><input id="swir" type="number" min="0" max="1" step="0.0001" placeholder="0 إلى 1"></div><div><label for="observed">تاريخ الرصد</label><input id="observed" type="date"></div></div><label for="source">مصدر البيانات</label><input id="source" maxlength="160" placeholder="مثال: Sentinel-2 L2A — مشهد وتاريخ محددان"><button id="calculate">حساب NDVI وNDMI</button><div id="results" class="result" aria-live="polite">لم تُدخل قراءات بعد.</div></section>
+<section class="panel" id="moreIndices"><h2>🌿 مؤشرات زراعية إضافية</h2><p class="muted">احسب مؤشرات SAVI وEVI وGNDVI وNDRE وNDWI من قيم انعكاس طيفي حقيقية. هذه حاسبة يدوية، ولا تعرض قياسات أقمار صناعية تلقائية.</p>
+<div class="grid"><div><label for="blueBand">الأزرق B02</label><input id="blueBand" type="number" min="0" max="1" step="any" placeholder="مثال: 0.08"></div><div><label for="greenBand">الأخضر B03</label><input id="greenBand" type="number" min="0" max="1" step="any" placeholder="مثال: 0.12"></div><div><label for="redEdgeBand">حافة الأحمر B05 (NDRE)</label><input id="redEdgeBand" type="number" min="0" max="1" step="any" placeholder="مثال: 0.20"></div></div>
+<p class="muted">أدخل قيم B04 وB08 وB11 في قسم الحساب اليدوي أعلاه، ثم أضف B02 وB03 وB05 هنا. استخدم قيمًا مصححة جويًا ومن المشهد نفسه؛ لا تخلط بيانات من تواريخ مختلفة.</p>
+<button id="calculateAll">🌱 احسب جميع المؤشرات السبعة</button><div id="allResults" class="result" aria-live="polite">أدخل قيم الحزم المطلوبة ثم اضغط الحساب.</div></section>
 <section class="panel"><h2>4. الحصول على بيانات فضائية فعلية</h2><p>يمكنك استكشاف مشاهد Sentinel-2 في <a href="https://browser.dataspace.copernicus.eu/" target="_blank" rel="noopener noreferrer">Copernicus Browser</a>. اختر موقع الحقل وتاريخ الصورة، وتحقق من الغيوم، ثم استخرج القيم الطيفية من بيانات مصححة جويًا. مجرد مشاهدة صورة ملونة لا يكفي لحساب NDVI أو NDMI.</p><p class="muted">NDVI = (NIR − Red) / (NIR + Red) ؛ NDMI = (NIR − SWIR) / (NIR + SWIR). لا يمكن استنتاج الاحتياج المائي أو جرعة السماد من هذين المؤشرين وحدهما. اختلاف المحصول ومرحلة نموه والتربة والغيوم يؤثر في التفسير.</p></section></main>
 <script type="module">
 const $=id=>document.getElementById(id);
@@ -89,6 +93,30 @@ $('calculate').onclick=()=>{
  const b=document.createElement('p');b.textContent='الحقل: '+($('field').selectedOptions[0]?.textContent||'غير محدد')+' — التاريخ: '+($('observed').value||'غير مدخل')+' — المصدر: '+($('source').value.trim()||'غير موثق');
  const note=document.createElement('p');note.className='muted';note.textContent='هذه نتائج رياضية لقيم أدخلها المستخدم وليست قراءة فضائية تم جلبها أو التحقق منها بواسطة UR Smart. لا تكفي وحدها لتشخيص صحة النبات أو تحديد جرعات الري والتسميد.';
  box.append(title,a,b,note);
+};
+$('calculateAll').onclick=()=>{
+ const box=$('allResults');
+ const ids=['blueBand','greenBand','red','redEdgeBand','nir','swir'];
+ const raw=ids.map(id=>$(id).value.trim());
+ if(raw.some(v=>v==='')){box.textContent='أدخل قيم الحزم الست B02 وB03 وB04 وB05 وB08 وB11 أولًا.';return}
+ const values=raw.map(Number);
+ if(values.some(v=>!Number.isFinite(v)||v<0||v>1)){box.textContent='يجب أن تكون قيم الانعكاس الطيفي بين صفر وواحد.';return}
+ const [blue,green,red,edge,nir,swir]=values;
+ const ratio=(numerator,denominator)=>Math.abs(denominator)<1e-10?null:numerator/denominator;
+ const indicators=[
+ ['NDVI','كثافة وحيوية الغطاء النباتي',ratio(nir-red,nir+red)],
+ ['NDMI','مؤشر رطوبة الغطاء النباتي',ratio(nir-swir,nir+swir)],
+ ['SAVI','مؤشر نباتي يقلل أثر التربة (L=0.5)',ratio(1.5*(nir-red),nir+red+0.5)],
+ ['EVI','مؤشر نباتي محسّن',ratio(2.5*(nir-red),nir+6*red-7.5*blue+1)],
+ ['GNDVI','مؤشر يعتمد على الحزمة الخضراء',ratio(nir-green,nir+green)],
+ ['NDRE','مؤشر حافة الأحمر',ratio(nir-edge,nir+edge)],
+ ['NDWI (McFeeters)','مؤشر المياه السطحية',ratio(green-nir,green+nir)]
+ ];
+ box.replaceChildren();
+ const heading=document.createElement('h3');heading.textContent='نتائج حساب المؤشرات السبعة';box.append(heading);
+ const table=document.createElement('table');table.style.cssText='width:100%;border-collapse:collapse;text-align:right';
+ indicators.forEach(([name,description,value])=>{const row=document.createElement('tr');const nameCell=document.createElement('th'),valueCell=document.createElement('td');nameCell.style.cssText='padding:10px 5px;border-bottom:1px solid #dce8df';valueCell.style.cssText='padding:10px 5px;border-bottom:1px solid #dce8df';nameCell.textContent=name+' — '+description;valueCell.textContent=value===null||!Number.isFinite(value)?'غير قابل للحساب (مقام صفر) ':value.toFixed(4);row.append(nameCell,valueCell);table.append(row)});box.append(table);
+ const note=document.createElement('p');note.className='muted';note.textContent='هذه حسابات رياضية من قيم أدخلتها أنت، وليست قراءات فضائية تلقائية. NDWI هنا بصيغة McFeeters للمياه السطحية، وهي مختلفة عن NDMI لرطوبة النبات. لا تستنتج جرعات ري أو تسميد من القيم وحدها.';box.append(note);
 };
 refresh();
 </script></body></html>
