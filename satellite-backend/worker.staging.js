@@ -16,12 +16,12 @@ export default {async fetch(req,env){
  if(origin&&origin!==allowed)return reply({error:'Origin not allowed'},403,allowed);
  if(req.method!=='POST')return reply({error:'POST only'},405,allowed);
  try{
- if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
+ if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!(env.SUPABASE_PUBLISHABLE_KEY||env.SUPABASE_ANON_KEY))return reply({error:'Satellite service is not configured'},503,allowed);
  const bearer=req.headers.get('Authorization')||'';
  if(!/^Bearer [^ ]+$/.test(bearer))return reply({error:'Login required'},401,allowed);
  const {field_id}=await req.json();
  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(field_id||''))return reply({error:'Invalid field ID'},400,allowed);
- const headers={'apikey':env.SUPABASE_PUBLISHABLE_KEY,'Authorization':bearer};
+ const headers={'apikey':env.SUPABASE_PUBLISHABLE_KEY||env.SUPABASE_ANON_KEY,'Authorization':bearer};
  const auth=await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers});
  if(!auth.ok)return reply({error:'Session expired'},401,allowed);
  const u=await auth.json();
