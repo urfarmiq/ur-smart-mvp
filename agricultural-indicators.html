@@ -5,7 +5,7 @@
 </style></head><body><header><strong>🌿 أور الذكية | التحليل الزراعي</strong><nav><a href="./dashboard.html">لوحة المزارع</a> · <a href="./satellite-analysis.html">التحليل الفضائي</a></nav></header><main>
 <h1>🛰️ صورة الحقل والمؤشرات الزراعية</h1><p class="lead muted">واجهة عربية لاستعراض خريطة الحقل ونتائج التحليل الزراعي. لا تُعرض قيم تقديرية على أنها قراءات فضائية.</p>
 <div class="layout"><section class="card map"><iframe title="خريطة الحقول التفاعلية وصورة القمر الصناعي" loading="lazy" src="./field-map.html"></iframe></section>
-<section class="card"><h2>📋 مؤشرات صحة الحقل</h2><p class="muted">اختر حقلًا من حسابك ثم اطلب القراءة الفضائية. لا تُعرض إلا نتائج موثقة نجحت في فحص جودة العينة.</p><label for="savedField" style="display:block;font-weight:700">الحقل المحفوظ</label><select id="savedField" style="width:100%;padding:12px;border:1px solid #cdded2;border-radius:10px;margin:8px 0"><option value="">جارٍ تحميل الحقول...</option></select><button id="runSatellite" class="btn" type="button" style="border:0;cursor:pointer;width:100%;font:inherit">🛰️ تحليل الحقل الآن</button><div id="satelliteStatus" role="status" aria-live="polite" class="note">سجّل الدخول ثم اختر الحقل لبدء التحليل.</div><p id="satelliteMeta" class="muted"></p><div class="metric-grid">
+<section class="card"><h2>📋 مؤشرات صحة الحقل</h2><p class="muted">اختر حقلًا من حسابك ثم اطلب القراءة الفضائية. لا تُعرض إلا نتائج موثقة نجحت في فحص جودة العينة.</p><label for="savedField" style="display:block;font-weight:700">الحقل المحفوظ</label><select id="savedField" style="width:100%;padding:12px;border:1px solid #cdded2;border-radius:10px;margin:8px 0"><option value="">جارٍ تحميل الحقول...</option></select><button id="runSatellite" class="btn" type="button" style="border:0;cursor:pointer;width:100%;font:inherit">🛰️ تحليل الحقل الآن</button><div id="satelliteStatus" role="status" aria-live="polite" class="note">سجّل الدخول ثم اختر الحقل لبدء التحليل.</div><p id="satelliteMeta" class="muted"></p><div id="visualReadings" hidden><h2>📊 عرض بصري للمتوسطات المقاسة</h2><p class="muted">الأشرطة أدناه تعرض متوسط الحقل فقط، ولا تمثل خريطة اختلاف القيم داخل الحقل.</p><div>الغطاء النباتي NDVI <strong id="ndviText"></strong><div style="height:15px;background:#e5eae6;border-radius:20px;overflow:hidden"><div id="ndviBar" style="height:100%;width:0;background:#238b45"></div></div></div><div style="margin-top:12px">رطوبة الغطاء النباتي NDMI <strong id="ndmiText"></strong><div style="height:15px;background:#e5eae6;border-radius:20px;overflow:hidden"><div id="ndmiBar" style="height:100%;width:0;background:#3689bf"></div></div></div><button type="button" id="copyReport" class="btn alt" style="border:0;font:inherit;cursor:pointer;margin-top:16px">📋 نسخ التقرير بالعربية</button></div><div class="metric-grid">
 <div class="metric"><strong>NDVI</strong><span>مؤشر الغطاء النباتي</span><div class="pill" id="ndviValue">بانتظار التحليل</div></div>
 <div class="metric"><strong>NDMI</strong><span>مؤشر رطوبة الغطاء النباتي</span><div class="pill" id="ndmiValue">بانتظار التحليل</div></div>
 <div class="metric"><strong>NDRE</strong><span>مؤشر الحافة الحمراء</span><div class="pill">بانتظار التحليل</div></div>
@@ -29,7 +29,8 @@ const $=id=>document.getElementById(id);
 const API='https://ur-smart-satellite.alialbatekh111.workers.dev';
 const select=$('savedField'),status=$('satelliteStatus'),button=$('runSatellite');
 let supabase=null,user=null;
-function reset(){ $('ndviValue').textContent='بانتظار التحليل';$('ndmiValue').textContent='بانتظار التحليل';$('satelliteMeta').textContent=''; }
+let latestReport='';
+function reset(){latestReport='';$('visualReadings').hidden=true; $('ndviValue').textContent='بانتظار التحليل';$('ndmiValue').textContent='بانتظار التحليل';$('satelliteMeta').textContent=''; }
 function explain(error){const messages={
 'Insufficient satellite coverage for a reliable field average':'لا تتوفر تغطية صالحة كافية لإعطاء متوسط موثوق لهذا الحقل. أعد المحاولة لاحقاً.',
 'Field boundary unavailable for this account':'لا توجد حدود محفوظة لهذا الحقل. افتح خريطة الحقول واحفظ حدوده.',
@@ -67,9 +68,15 @@ if(data.coverage_percent!==undefined&&(!Number.isFinite(Number(data.coverage_per
 $('ndviValue').textContent=ndvi.toFixed(3);$('ndmiValue').textContent=ndmi.toFixed(3);
 const date=data.date?new Date(data.date):null;const dateText=date&&!Number.isNaN(date.getTime())?new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeZone:'UTC'}).format(date):'غير متاح';
 $('satelliteMeta').textContent='المصدر: '+(data.source||'Sentinel-2')+' | تاريخ الرصد: '+dateText+' | البكسلات الصالحة: '+pixels+(Number.isFinite(Number(data.coverage_percent))?' | التغطية: '+Number(data.coverage_percent).toFixed(1)+'%':'');
-status.textContent='اكتمل التحليل بنجاح. هذه متوسطات فضائية للحقل وليست وصفة ري أو تسميد. الخرائط الملونة لم تُنشأ بعد.';
+$('visualReadings').hidden=false;
+$('ndviBar').style.width=(Math.max(0,Math.min(100,(ndvi+1)*50)))+'%';
+$('ndmiBar').style.width=(Math.max(0,Math.min(100,(ndmi+1)*50)))+'%';
+$('ndviText').textContent=ndvi.toFixed(3);$('ndmiText').textContent=ndmi.toFixed(3);
+latestReport=['تقرير أور الذكية — المؤشرات الزراعية','الحقل: '+select.selectedOptions[0].textContent,'تاريخ الرصد: '+dateText,'المصدر: '+(data.source||'Sentinel-2'),'NDVI: '+ndvi.toFixed(3),'NDMI: '+ndmi.toFixed(3),'البكسلات الصالحة: '+pixels,'نسبة التغطية: '+(Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent).toFixed(1)+'%':'غير متاحة'),'ملاحظة: متوسطات طيفية للحقل، وليست قياساً لرطوبة التربة أو جرعات الري والتسميد.'].join('\n');
+status.textContent='اكتمل التحليل بنجاح. الأشرطة تمثل المتوسطات فقط؛ الخرائط المكانية الملونة تحتاج صور مؤشرات فعلية.';
 }catch(e){status.textContent=/Failed to fetch|Load failed|NetworkError/i.test(e.message)?'تعذر الوصول إلى خادم الأقمار الصناعية. تحقق من الاتصال أو إعدادات الخادم.':explain(e.message);}
 finally{button.disabled=false;}
 });
+$('copyReport').addEventListener('click',async()=>{if(!latestReport)return;try{await navigator.clipboard.writeText(latestReport);$('copyReport').textContent='✓ تم نسخ التقرير';}catch(e){$('copyReport').textContent='تعذر النسخ في هذا المتصفح';}});
 load();
 </script></body></html>
