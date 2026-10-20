@@ -45,15 +45,16 @@ export default {async fetch(req,env){
  // Sentinel Hub reports sampleCount and noDataCount per interval and output band.
  // Valid-pixel fraction must use matching interval statistics, not a top-level geometryPixelCount.
  const MIN_VALID_PIXELS=3,MIN_COVERAGE=0.60;
- const items=(result.data||[]).map(x=>{
+ const candidates=(result.data||[]).map(x=>{
   const n=x.outputs?.ndvi?.bands?.B0?.stats,m=x.outputs?.ndmi?.bands?.B0?.stats;
-  const geometryPixels=Number(n?.sampleCount);
-  const noDataPixels=Number(n?.noDataCount);
+  const geometryPixels=n?.sampleCount==null?NaN:Number(n.sampleCount);
+  const noDataPixels=n?.noDataCount==null?NaN:Number(n.noDataCount);
   const validPixels=geometryPixels-noDataPixels;
   const coverage=Number.isFinite(geometryPixels)&&geometryPixels>0&&Number.isFinite(noDataPixels)?validPixels/geometryPixels:null;
   return {date:x.interval?.from,ndvi:n?.mean,ndmi:m?.mean,validPixels,geometryPixels,coverage};
- }).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>=MIN_VALID_PIXELS&&x.coverage!==null&&x.coverage>=MIN_COVERAGE).sort((a,b)=>b.date.localeCompare(a.date));
- if(!items.length)return reply({error:'Insufficient satellite coverage for a reliable field average',min_valid_pixels:MIN_VALID_PIXELS,min_coverage_percent:60,geometry_pixels:Math.max(0,...(result.data||[]).map(x=>Number(x.outputs?.ndvi?.bands?.B0?.stats?.sampleCount)||0))},422,allowed);
+ });
+ const items=candidates.filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&Number.isFinite(x.validPixels)&&x.validPixels>=MIN_VALID_PIXELS&&x.coverage!==null&&x.coverage>=MIN_COVERAGE).sort((a,b)=>b.date.localeCompare(a.date));
+ if(!items.length){const bestCandidate=candidates.filter(x=>Number.isFinite(x.validPixels)).sort((a,b)=>b.validPixels-a.validPixels)[0];return reply({error:'Insufficient satellite coverage for a reliable field average',min_valid_pixels:MIN_VALID_PIXELS,min_coverage_percent:60,intervals_checked:candidates.length,best_available_valid_pixels:bestCandidate?.validPixels??null,best_available_coverage_percent:bestCandidate?.coverage==null?null:Math.round(bestCandidate.coverage*1000)/10,geometry_pixels:bestCandidate?.geometryPixels??null},422,allowed)}
  const best=items[0];return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,coverage_percent:Math.round(best.coverage*1000)/10,geometry_pixels:best.geometryPixels,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m_approx:20,resolution_m:null,method:'Mean of valid SCL-masked pixels; newest available daily interval',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
  }catch(e){return reply({error:'Analysis temporarily unavailable',details:String(e.message||e).slice(0,150)},500,allowed)}
 }};
