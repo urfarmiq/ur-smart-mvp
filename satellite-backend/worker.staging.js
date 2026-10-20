@@ -41,7 +41,6 @@ export default {async fetch(req,env){
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
  if(visualization){
   // Process API creates a real Sentinel-2 PNG clipped to the saved field polygon.
-  const ring=geometry.coordinates.flat(2).filter((_,i)=>i%2===0);
   const pts=geometry.coordinates.flat(1);
   const xs=pts.map(p=>Number(p[0])),ys=pts.map(p=>Number(p[1]));
   if(xs.some(x=>!Number.isFinite(x))||ys.some(y=>!Number.isFinite(y)))return reply({error:'Invalid coordinates'},400,allowed);
@@ -52,7 +51,7 @@ export default {async fetch(req,env){
   const width=Math.max(16,Math.min(1024,Math.ceil(wMeters/10)));
   const height=Math.max(16,Math.min(1024,Math.ceil(hMeters/10)));
   const expression=visualization==='truecolor'?'return [2.5*s.B04,2.5*s.B03,2.5*s.B02,1]':visualization==='ndvi'?'let v=(s.B08-s.B04)/(s.B08+s.B04+0.00001);return [v<0.15?0.78:v<0.35?0.96:v<0.55?0.60:0.10,v<0.15?0.23:v<0.35?0.77:v<0.55?0.80:0.55,v<0.15?0.18:v<0.35?0.16:v<0.55?0.22:0.18,1]':'let v=(s.B08-s.B11)/(s.B08+s.B11+0.00001);return [v<0?0.77:v<0.2?0.96:v<0.4?0.32:0.08,v<0?0.41:v<0.2?0.84:v<0.4?0.76:0.39,v<0?0.17:v<0.2?0.25:v<0.4?0.84:0.65,1]';
-  const evalscript='//VERSION=3\\nfunction setup(){return {input:[{bands:["B02","B03","B04","B08","B11","SCL","dataMask"]}],output:{bands:4,sampleType:"FLOAT32"}};}\\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];'+expression+'}';
+  const evalscript='//VERSION=3\nfunction setup(){return {input:[{bands:["B02","B03","B04","B08","B11","SCL","dataMask"]}],output:{bands:4,sampleType:"FLOAT32"}};}\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];'+expression+'}';
   const body={input:{bounds:{bbox,geometry,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},data:[{type:'sentinel-2-l2a',dataFilter:{timeRange:{from:start.toISOString(),to:now.toISOString()},mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},output:{width,height,responses:[{identifier:'default',format:{type:'image/png'}}]},evalscript};
   const pr=await fetch(SH+'/api/v1/process',{method:'POST',headers:{Authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)});
   if(!pr.ok)return reply({error:'Satellite image unavailable',details:(await pr.text()).slice(0,160)},502,allowed);
