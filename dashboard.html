@@ -23,10 +23,10 @@ a{color:#176b45}
 .actions .edit{background:#e8f3e9;color:#176b45}
 .actions .del{background:#fbe9e7;color:#a12a1a}
 #cancelEdit{background:#e8f3e9;color:#176b45;display:none}
-</style>
+.quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick a{display:flex;align-items:center;justify-content:center;min-height:80px;text-align:center;padding:15px;border-radius:14px;background:#e8f3e9;border:1px solid #c9dfce;font-size:17px;font-weight:800;text-decoration:none;color:#14573a}.quick a:hover{background:#d5ebdb}.hint{font-size:14px;color:#58715e}.card{box-shadow:0 6px 25px #173d2610}@media(max-width:550px){.quick{grid-template-columns:1fr}.actions{flex-wrap:wrap}} </style>
 </head>
 <body>
-<header><strong>🌱 UR Smart — أور الزراعية الذكية</strong></header>
+<header><strong>🌱 UR Smart — أور الزراعية الذكية</strong> <a href="./index.html" style="color:white;float:left;font-size:14px">الرئيسية ↩</a></header>
 <main>
 <section class="card">
 <h1>لوحة المزارع</h1>
@@ -35,7 +35,7 @@ a{color:#176b45}
 <button id="logout">تسجيل الخروج</button>
 </section>
 
-<section class="card">
+<section class="card"><h2>🌾 شنو تريد تسوي اليوم؟</h2><p class="hint">اضغط على الخدمة اللي تحتاجها:</p><div class="quick"><a href="#fieldForm">➕ أضف حقل جديد</a><a href="./field-map.html">🗺️ حدد أرضك على الخريطة</a><a href="./satellite-analysis.html">🛰️ افحص حالة الزرع</a><a href="./field-analysis.html">📋 سوّي تقرير لحقلك</a></div></section><section class="card">
 <h2 id="formTitle">إضافة حقل زراعي</h2>
 <form id="fieldForm">
 <label for="fieldName">اسم الحقل</label>
@@ -47,7 +47,7 @@ a{color:#176b45}
 <option value="">اختر المحصول</option>
 <option>قمح</option>
 <option>شعير</option>
-<option>ذرة</option>
+<option>ذرة</option><option>رز</option><option>بطاطا</option><option>بصل</option><option>باقلاء</option><option>برسيم</option><option>رمان</option><option>تين</option><option>عنب</option><option>زيتون</option>
 <option>طماطم</option>
 <option>نخيل</option>
 <option>أخرى</option>
