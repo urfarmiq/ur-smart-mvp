@@ -19,7 +19,8 @@ export default {async fetch(req,env){
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!(env.SUPABASE_PUBLISHABLE_KEY||env.SUPABASE_ANON_KEY))return reply({error:'Satellite service is not configured'},503,allowed);
  const bearer=req.headers.get('Authorization')||'';
  if(!/^Bearer [^ ]+$/.test(bearer))return reply({error:'Login required'},401,allowed);
- const {field_id}=await req.json();
+ const {field_id,visualization}=await req.json();
+ if(visualization!==undefined&&!['ndvi','ndmi','truecolor'].includes(visualization))return reply({error:'Invalid visualization'},400,allowed);
  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(field_id||''))return reply({error:'Invalid field ID'},400,allowed);
  const headers={'apikey':env.SUPABASE_PUBLISHABLE_KEY||env.SUPABASE_ANON_KEY,'Authorization':bearer};
  const auth=await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers});
@@ -38,6 +39,26 @@ export default {async fetch(req,env){
  if(!oauth.ok)return reply({error:'Satellite authentication failed'},502,allowed);
  const token=(await oauth.json()).access_token;
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
+ if(visualization){
+  // Process API creates a real Sentinel-2 PNG clipped to the saved field polygon.
+  const ring=geometry.coordinates.flat(2).filter((_,i)=>i%2===0);
+  const pts=geometry.coordinates.flat(1);
+  const xs=pts.map(p=>Number(p[0])),ys=pts.map(p=>Number(p[1]));
+  if(xs.some(x=>!Number.isFinite(x))||ys.some(y=>!Number.isFinite(y)))return reply({error:'Invalid coordinates'},400,allowed);
+  const bbox=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+  const centerLat=(bbox[1]+bbox[3])/2;
+  const wMeters=(bbox[2]-bbox[0])*111320*Math.cos(centerLat*Math.PI/180);
+  const hMeters=(bbox[3]-bbox[1])*111320;
+  const width=Math.max(16,Math.min(1024,Math.ceil(wMeters/10)));
+  const height=Math.max(16,Math.min(1024,Math.ceil(hMeters/10)));
+  const expression=visualization==='truecolor'?'return [2.5*s.B04,2.5*s.B03,2.5*s.B02,1]':visualization==='ndvi'?'let v=(s.B08-s.B04)/(s.B08+s.B04+0.00001);return [v<0.15?0.78:v<0.35?0.96:v<0.55?0.60:0.10,v<0.15?0.23:v<0.35?0.77:v<0.55?0.80:0.55,v<0.15?0.18:v<0.35?0.16:v<0.55?0.22:0.18,1]':'let v=(s.B08-s.B11)/(s.B08+s.B11+0.00001);return [v<0?0.77:v<0.2?0.96:v<0.4?0.32:0.08,v<0?0.41:v<0.2?0.84:v<0.4?0.76:0.39,v<0?0.17:v<0.2?0.25:v<0.4?0.84:0.65,1]';
+  const evalscript='//VERSION=3\\nfunction setup(){return {input:[{bands:["B02","B03","B04","B08","B11","SCL","dataMask"]}],output:{bands:4,sampleType:"FLOAT32"}};}\\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];'+expression+'}';
+  const body={input:{bounds:{bbox,geometry,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},data:[{type:'sentinel-2-l2a',dataFilter:{timeRange:{from:start.toISOString(),to:now.toISOString()},mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},output:{width,height,responses:[{identifier:'default',format:{type:'image/png'}}]},evalscript};
+  const pr=await fetch(SH+'/api/v1/process',{method:'POST',headers:{Authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)});
+  if(!pr.ok)return reply({error:'Satellite image unavailable',details:(await pr.text()).slice(0,160)},502,allowed);
+  return new Response(pr.body,{status:200,headers:{'content-type':'image/png','cache-control':'private, no-store','access-control-allow-origin':allowed,'vary':'Origin','x-ur-visualization':visualization}});
+ }
+
  const statsRequest={input:{bounds:{geometry:{type:'Polygon',coordinates:geometry.coordinates},properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D',lastIntervalBehavior:'SHORTEN'},evalscript:EVALSCRIPT,resx:0.00018,resy:0.00018}};
  const sr=await fetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)});
  if(!sr.ok){const message=(await sr.text()).slice(0,200);return reply({error:'Satellite processing failed',details:message},502,allowed)}
