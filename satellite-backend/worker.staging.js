@@ -5,6 +5,7 @@
 const SH='https://sh.dataspace.copernicus.eu';
 const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 function reply(body,status=200,origin=''){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','access-control-allow-origin':origin||'https://urfarmiq.github.io','vary':'Origin','cache-control':'no-store'}})}
+// For EPSG:4326, resolution values are degrees, not meters. ~0.00018° is approximately 20 m north-south; east-west varies by latitude.
 const EVALSCRIPT=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B08","B11","SCL","dataMask"]}],output:[{id:"ndvi",bands:1,sampleType:"FLOAT32"},{id:"ndmi",bands:1,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
 function evaluatePixel(s){let good=s.dataMask===1&&![0,1,3,8,9,10,11].includes(s.SCL);let nv=s.B08+s.B04, nm=s.B08+s.B11;if(!good||nv<=0||nm<=0)return {ndvi:[0],ndmi:[0],dataMask:[0]};return {ndvi:[(s.B08-s.B04)/nv],ndmi:[(s.B08-s.B11)/nm],dataMask:[1]};}`;
@@ -29,7 +30,7 @@ export default {async fetch(req,env){
  if(!br.ok)return reply({error:'Could not read field boundary'},502,allowed);
  const rows=await br.json();const record=rows[0];
  if(!record||record.owner_id!==u.id)return reply({error:'Field boundary unavailable for this account'},404,allowed);
- const geometry=record.geometry;
+ const geometry=typeof record.geometry==='string'?JSON.parse(record.geometry):record.geometry;
  if(geometry?.type!=='Polygon'||!Array.isArray(geometry.coordinates?.[0])||geometry.coordinates[0].length<4)return reply({error:'Invalid saved polygon'},400,allowed);
  if(!Number.isFinite(Number(record.area_m2))||Number(record.area_m2)<=0)return reply({error:'Invalid field area'},400,allowed);
  if(Number(record.area_m2)>2e7)return reply({error:'Field too large for this analysis tier'},413,allowed);
@@ -37,7 +38,7 @@ export default {async fetch(req,env){
  if(!oauth.ok)return reply({error:'Satellite authentication failed'},502,allowed);
  const token=(await oauth.json()).access_token;
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
- const statsRequest={input:{bounds:{geometry:{type:'Polygon',coordinates:geometry.coordinates},properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D',lastIntervalBehavior:'SHORTEN'},evalscript:EVALSCRIPT,resx:20,resy:20}};
+ const statsRequest={input:{bounds:{geometry:{type:'Polygon',coordinates:geometry.coordinates},properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D',lastIntervalBehavior:'SHORTEN'},evalscript:EVALSCRIPT,resx:0.00018,resy:0.00018}};
  const sr=await fetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)});
  if(!sr.ok){const message=(await sr.text()).slice(0,200);return reply({error:'Satellite processing failed',details:message},502,allowed)}
  const result=await sr.json();
@@ -45,11 +46,11 @@ export default {async fetch(req,env){
  const items=(result.data||[]).map(x=>{
   const n=x.outputs?.ndvi?.bands?.B0?.stats,m=x.outputs?.ndmi?.bands?.B0?.stats;
   const validPixels=Number(n?.sampleCount)-Number(n?.noDataCount);
-  const geometryPixels=Number(x.outputs?.ndvi?.geometryPixelCount??x.geometryPixelCount);
+  const geometryPixels=Number(result.geometryPixelCount);
   const coverage=geometryPixels>0?validPixels/geometryPixels:null;
   return {date:x.interval?.from,ndvi:n?.mean,ndmi:m?.mean,validPixels,geometryPixels,coverage};
  }).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>=MIN_VALID_PIXELS&&x.coverage!==null&&x.coverage>=MIN_COVERAGE).sort((a,b)=>b.date.localeCompare(a.date));
- if(!items.length)return reply({error:'Insufficient satellite coverage for a reliable field average',min_valid_pixels:MIN_VALID_PIXELS,min_coverage_percent:60},422,allowed);
- const best=items[0];return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,coverage_percent:Math.round(best.coverage*1000)/10,geometry_pixels:best.geometryPixels,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; newest available daily interval',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
+ if(!items.length)return reply({error:'Insufficient satellite coverage for a reliable field average',min_valid_pixels:MIN_VALID_PIXELS,min_coverage_percent:60,geometry_pixels:Number(result.geometryPixelCount)||0},422,allowed);
+ const best=items[0];return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,coverage_percent:Math.round(best.coverage*1000)/10,geometry_pixels:best.geometryPixels,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m_approx:20,resolution_m:null,method:'Mean of valid SCL-masked pixels; newest available daily interval',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
  }catch(e){return reply({error:'Analysis temporarily unavailable',details:String(e.message||e).slice(0,150)},500,allowed)}
 }};
