@@ -24,7 +24,7 @@ $('autoAnalyze').onclick=async()=>{
  try{
  const {data:{session}}=await client.auth.getSession();if(!session)throw Error('انتهت جلسة تسجيل الدخول');
  const res=await fetch(SATELLITE_API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:fieldId})});
- const data=await res.json();if(!res.ok)throw Error(data.error||'تعذر التحليل');
+ const data=await res.json();if(!res.ok){const msg={'Insufficient satellite coverage for a reliable field average':'التغطية الفضائية الصالحة غير كافية لإعطاء نتيجة موثوقة. حاول لاحقًا أو تأكد من حدود الحقل.','No valid pixels found in the last 65 days':'لم تتوفر بكسلات صالحة للتحليل خلال آخر 65 يومًا.','Field boundary unavailable for this account':'ارسم حدود الحقل واحفظها أولًا.','Session expired':'انتهت جلسة الدخول. سجّل الدخول مرة ثانية.'};throw Error(msg[data.error]||data.error||'تعذر التحليل')}
  if(!Number.isFinite(data.ndvi)||!Number.isFinite(data.ndmi))throw Error('النتيجة الفضائية غير صالحة');
  box.replaceChildren();
  const safeDate=(value)=>{if(!value)return 'غير متاح';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):new Intl.DateTimeFormat('ar-IQ',{year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}).format(d)};
