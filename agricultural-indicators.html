@@ -18,7 +18,7 @@
 <div class="metric"><strong>EC / pH / NPK</strong><span>ملوحة وحموضة ومغذيات التربة</span><div class="pill">يتطلب فحصاً أو حساساً</div></div>
 </div><div class="links"><a class="btn" href="./satellite-analysis.html">فتح التحليل الفضائي الحقيقي</a><a class="btn alt" href="./field-map.html">رسم حدود الحقل</a></div></section></div>
 <div class="note"><strong>تنبيه علمي:</strong> ألوان الخرائط أدناه أمثلة لمفاتيح التفسير فقط؛ لا تمثل صورة فعلية لحقل المستخدم. لا يمكن استخراج تركيز NPK أو pH أو رطوبة التربة الدقيقة من NDVI وحده، ولا تصدر توصيات تسميد أو ري مؤكدة من دون بيانات ميدانية.</div>
-<section class="indices"><article class="card"><h2>🌱 خريطة NDVI</h2><div class="empty">خريطة المؤشر ستظهر بعد استرجاع البيانات الفضائية الفعلية للحقل</div><div class="legend"><span>منخفض</span><div class="gradient"></div><span>مرتفع</span></div></article>
+<section class="card" id="liveMaps" hidden><h2>🗺️ خرائط الحقل الفضائية الفعلية</h2><p class="muted" id="mapStatus">تُعرض الخرائط عند نجاح جلب صور Sentinel-2، وقد تختلف تواريخ الصور عن تاريخ المتوسطات.</p><div class="indices"><article><h2>🌿 مؤشر NDVI</h2><img id="ndviMap" alt="خريطة NDVI الفعلية" style="width:100%;border-radius:12px" hidden></article><article><h2>💧 مؤشر NDMI</h2><img id="ndmiMap" alt="خريطة NDMI الفعلية" style="width:100%;border-radius:12px" hidden></article><article><h2>🛰️ صورة الألوان الطبيعية</h2><img id="truecolorMap" alt="صورة Sentinel-2 للحقل" style="width:100%;border-radius:12px" hidden></article></div><p class="muted">الألوان تصنيف بصري تقريبي لقيم المؤشرات، ولا تعني قياساً مباشراً لرطوبة التربة أو العناصر الغذائية.</p></section><section class="indices"><article class="card"><h2>🌱 خريطة NDVI</h2><div class="empty">خريطة المؤشر ستظهر بعد استرجاع البيانات الفضائية الفعلية للحقل</div><div class="legend"><span>منخفض</span><div class="gradient"></div><span>مرتفع</span></div></article>
 <article class="card"><h2>💧 خريطة NDMI</h2><div class="empty">بانتظار مشهد صالح خالٍ من الغيوم</div><p>يساعد في تقدير المحتوى المائي للغطاء النباتي، وليس قياس رطوبة التربة مباشرةً.</p></article>
 <article class="card"><h2>🌾 خريطة NDRE</h2><div class="empty">بانتظار بيانات الحافة الحمراء من Sentinel‑2</div><p>يساعد في متابعة تغيرات حالة الغطاء النباتي.</p></article></section>
 <section class="card"><h2>🧭 خطوات التحليل</h2><p>افتح خريطة الحقل وحدد الحدود واحفظها، ثم انتقل إلى التحليل الفضائي. عند توفر اتصال ناجح وبيانات صالحة ستظهر المؤشرات المحسوبة هناك. الخرائط الملونة داخل هذه اللوحة تحتاج خدمة صور المؤشرات قبل تفعيلها. النتائج الرقمية المعتمدة تظهر فقط بعد نجاح التحليل.</p></section>
@@ -28,9 +28,18 @@
 const $=id=>document.getElementById(id);
 const API='https://ur-smart-satellite.alialbatekh111.workers.dev';
 const select=$('savedField'),status=$('satelliteStatus'),button=$('runSatellite');
-let supabase=null,user=null;
+let supabase=null,user=null;let mapUrls=[];
+const STAGING_API='https://ur-smart-satellite-staging.alialbatekh111.workers.dev';
+async function loadMaps(fieldId,token){
+ $('liveMaps').hidden=false;$('mapStatus').textContent='جارٍ محاولة تحميل خرائط الحقل الحقيقية من خادم الاختبار...';
+ mapUrls.forEach(u=>URL.revokeObjectURL(u));mapUrls=[];
+ const kinds=['ndvi','ndmi','truecolor'];let successes=0;
+ await Promise.all(kinds.map(async kind=>{const el=$(kind+'Map');el.hidden=true;try{const response=await fetch(STAGING_API,{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({field_id:fieldId,visualization:kind})});if(!response.ok)throw Error('HTTP '+response.status);const blob=await response.blob();if(!blob.type.includes('image/png'))throw Error('Invalid image');const url=URL.createObjectURL(blob);mapUrls.push(url);el.src=url;el.hidden=false;successes++;}catch(e){console.warn('Map unavailable',kind,e.message);}}));
+ $('mapStatus').textContent=successes===3?'تم جلب الخرائط الثلاث من Sentinel-2.':successes?'ظهرت '+successes+' من 3 خرائط؛ بقية الصور غير متاحة حالياً.':'لم تُحمّل صور فضائية فعلية من خادم الاختبار بعد. ستبقى القيم الرقمية منفصلة عن الخرائط.';
+}
+
 let latestReport='';
-function reset(){latestReport='';$('visualReadings').hidden=true; $('ndviValue').textContent='بانتظار التحليل';$('ndmiValue').textContent='بانتظار التحليل';$('satelliteMeta').textContent=''; }
+function reset(){mapUrls.forEach(u=>URL.revokeObjectURL(u));mapUrls=[];$('liveMaps').hidden=true;latestReport='';$('visualReadings').hidden=true; $('ndviValue').textContent='بانتظار التحليل';$('ndmiValue').textContent='بانتظار التحليل';$('satelliteMeta').textContent=''; }
 function explain(error){const messages={
 'Insufficient satellite coverage for a reliable field average':'لا تتوفر تغطية صالحة كافية لإعطاء متوسط موثوق لهذا الحقل. أعد المحاولة لاحقاً.',
 'Field boundary unavailable for this account':'لا توجد حدود محفوظة لهذا الحقل. افتح خريطة الحقول واحفظ حدوده.',
@@ -73,7 +82,8 @@ $('ndviBar').style.width=(Math.max(0,Math.min(100,(ndvi+1)*50)))+'%';
 $('ndmiBar').style.width=(Math.max(0,Math.min(100,(ndmi+1)*50)))+'%';
 $('ndviText').textContent=ndvi.toFixed(3);$('ndmiText').textContent=ndmi.toFixed(3);
 latestReport=['تقرير أور الذكية — المؤشرات الزراعية','الحقل: '+select.selectedOptions[0].textContent,'تاريخ الرصد: '+dateText,'المصدر: '+(data.source||'Sentinel-2'),'NDVI: '+ndvi.toFixed(3),'NDMI: '+ndmi.toFixed(3),'البكسلات الصالحة: '+pixels,'نسبة التغطية: '+(Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent).toFixed(1)+'%':'غير متاحة'),'ملاحظة: متوسطات طيفية للحقل، وليست قياساً لرطوبة التربة أو جرعات الري والتسميد.'].join('\n');
-status.textContent='اكتمل التحليل بنجاح. الأشرطة تمثل المتوسطات فقط؛ الخرائط المكانية الملونة تحتاج صور مؤشرات فعلية.';
+status.textContent='اكتمل التحليل الرقمي بنجاح. جارٍ التحقق من توفر الخرائط الحقيقية...';
+await loadMaps(select.value,session.access_token);
 }catch(e){status.textContent=/Failed to fetch|Load failed|NetworkError/i.test(e.message)?'تعذر الوصول إلى خادم الأقمار الصناعية. تحقق من الاتصال أو إعدادات الخادم.':explain(e.message);}
 finally{button.disabled=false;}
 });
