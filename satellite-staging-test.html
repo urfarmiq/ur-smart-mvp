@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#103f2e"><title>لوحة المؤشرات الزراعية | أور الذكية</title>
+<style>
+:root{font-family:system-ui,Tahoma,Arial;background:#f1f6f3;color:#163a2b}*{box-sizing:border-box}body{margin:0}header{background:#103f2e;color:white;padding:17px max(16px,calc((100vw - 1200px)/2));display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}header strong{font-size:22px}header a{color:#e4ffeb;text-decoration:none}main{max-width:1240px;margin:auto;padding:22px 16px}h1{margin:0 0 6px;font-size:clamp(24px,4vw,36px)}h2{font-size:19px;margin:0 0 12px}.muted{color:#577266}.lead{margin-bottom:18px}.layout{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}.card{background:white;border:1px solid #d8e8de;border-radius:18px;padding:20px;box-shadow:0 4px 16px #153c2610}.map{min-height:380px;overflow:hidden;padding:0}.map iframe{border:0;width:100%;height:540px;display:block}.metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.metric{background:#f5faf6;border:1px solid #e2eee5;border-radius:13px;padding:14px}.metric strong{display:block;font-size:19px;color:#115d39}.metric span{font-size:13px;color:#526c5c}.pill{display:inline-block;background:#fff0c5;color:#775313;border-radius:30px;padding:3px 9px;font-size:12px;margin-top:7px}.links{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.btn{display:inline-block;padding:12px 17px;background:#12683f;color:white;text-decoration:none;border-radius:11px;font-weight:700}.btn.alt{background:#e5f2e9;color:#125437}.legend{display:flex;align-items:center;gap:9px;font-size:13px;color:#577266;margin-top:12px}.gradient{width:145px;height:11px;border-radius:20px;background:linear-gradient(to left,#147d36,#88ca31,#f5dd40,#ef7137,#b92827)}.note{background:#fff9e9;border-right:4px solid #d4a43a;padding:14px;border-radius:10px;margin:15px 0}.indices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}.indices .card p{color:#526b5b;font-size:14px;margin:5px 0}.empty{border:2px dashed #c9dacf;background:#f7fbf8;border-radius:12px;min-height:130px;display:grid;place-items:center;text-align:center;color:#688174;padding:12px}.footer{color:#587062;font-size:13px;margin:18px 0}@media(max-width:820px){.layout{grid-template-columns:1fr}.indices{grid-template-columns:1fr 1fr}.map iframe{height:470px}}@media(max-width:520px){.indices,.metric-grid{grid-template-columns:1fr 1fr}.card{padding:15px}.indices .card{grid-column:span 2}.map{padding:0}.map iframe{height:460px}}
+</style></head><body><header><strong>🌿 أور الذكية | التحليل الزراعي</strong><nav><a href="./dashboard.html">لوحة المزارع</a> · <a href="./satellite-analysis.html">التحليل الفضائي</a></nav></header><main>
+<h1>🛰️ صورة الحقل والمؤشرات الزراعية</h1><p class="lead muted">واجهة عربية لاستعراض خريطة الحقل ونتائج التحليل الزراعي. لا تُعرض قيم تقديرية على أنها قراءات فضائية.</p>
+<div class="layout"><section class="card map"><iframe title="خريطة الحقول التفاعلية وصورة القمر الصناعي" loading="lazy" src="./field-map.html"></iframe></section>
+<section class="card"><h2>📋 مؤشرات صحة الحقل</h2><p class="muted">اختر حقلًا من حسابك ثم اطلب القراءة الفضائية. لا تُعرض إلا نتائج موثقة نجحت في فحص جودة العينة.</p><label for="savedField" style="display:block;font-weight:700">الحقل المحفوظ</label><select id="savedField" style="width:100%;padding:12px;border:1px solid #cdded2;border-radius:10px;margin:8px 0"><option value="">جارٍ تحميل الحقول...</option></select><button id="runSatellite" class="btn" type="button" style="border:0;cursor:pointer;width:100%;font:inherit">🛰️ تحليل الحقل الآن</button><div id="satelliteStatus" role="status" aria-live="polite" class="note">سجّل الدخول ثم اختر الحقل لبدء التحليل.</div><p id="satelliteMeta" class="muted"></p><div id="visualReadings" hidden><h2>📊 عرض بصري للمتوسطات المقاسة</h2><p class="muted">الأشرطة أدناه تعرض متوسط الحقل فقط، ولا تمثل خريطة اختلاف القيم داخل الحقل.</p><div>الغطاء النباتي NDVI <strong id="ndviText"></strong><div style="height:15px;background:#e5eae6;border-radius:20px;overflow:hidden"><div id="ndviBar" style="height:100%;width:0;background:#238b45"></div></div></div><div style="margin-top:12px">رطوبة الغطاء النباتي NDMI <strong id="ndmiText"></strong><div style="height:15px;background:#e5eae6;border-radius:20px;overflow:hidden"><div id="ndmiBar" style="height:100%;width:0;background:#3689bf"></div></div></div><button type="button" id="copyReport" class="btn alt" style="border:0;font:inherit;cursor:pointer;margin-top:16px">📋 نسخ التقرير بالعربية</button></div><div class="metric-grid">
+<div class="metric"><strong>NDVI</strong><span>مؤشر الغطاء النباتي</span><div class="pill" id="ndviValue">بانتظار التحليل</div></div>
+<div class="metric"><strong>NDMI</strong><span>مؤشر رطوبة الغطاء النباتي</span><div class="pill" id="ndmiValue">بانتظار التحليل</div></div>
+<div class="metric"><strong>NDRE</strong><span>مؤشر الحافة الحمراء</span><div class="pill">بانتظار التحليل</div></div>
+<div class="metric"><strong>GNDVI</strong><span>مؤشر الكلوروفيل التقريبي</span><div class="pill">بانتظار التحليل</div></div>
+<div class="metric"><strong>SAVI</strong><span>مؤشر الغطاء النباتي المصحح للتربة</span><div class="pill">بانتظار التحليل</div></div>
+<div class="metric"><strong>EVI</strong><span>مؤشر الغطاء النباتي المحسّن</span><div class="pill">بانتظار التحليل</div></div>
+<div class="metric"><strong>NDWI</strong><span>مؤشر المياه الطيفي</span><div class="pill">بانتظار التحليل</div></div>
+<div class="metric"><strong>LST</strong><span>حرارة سطح الأرض</span><div class="pill">يتطلب مصدراً حرارياً</div></div>
+<div class="metric"><strong>رطوبة التربة</strong><span>قياس حساس أو نموذج معاير</span><div class="pill">غير متوفر</div></div>
+<div class="metric"><strong>EC / pH / NPK</strong><span>ملوحة وحموضة ومغذيات التربة</span><div class="pill">يتطلب فحصاً أو حساساً</div></div>
+</div><div class="links"><a class="btn" href="./satellite-analysis.html">فتح التحليل الفضائي الحقيقي</a><a class="btn alt" href="./field-map.html">رسم حدود الحقل</a></div></section></div>
+<div class="note"><strong>تنبيه علمي:</strong> ألوان الخرائط أدناه أمثلة لمفاتيح التفسير فقط؛ لا تمثل صورة فعلية لحقل المستخدم. لا يمكن استخراج تركيز NPK أو pH أو رطوبة التربة الدقيقة من NDVI وحده، ولا تصدر توصيات تسميد أو ري مؤكدة من دون بيانات ميدانية.</div>
+<section class="card" id="liveMaps" hidden><h2>🗺️ خرائط الحقل الفضائية الفعلية</h2><p class="muted" id="mapStatus">تُعرض الخرائط عند نجاح جلب صور Sentinel-2، وقد تختلف تواريخ الصور عن تاريخ المتوسطات.</p><div class="indices"><article><h2>🌿 مؤشر NDVI</h2><img id="ndviMap" alt="خريطة NDVI الفعلية" style="width:100%;border-radius:12px" hidden></article><article><h2>💧 مؤشر NDMI</h2><img id="ndmiMap" alt="خريطة NDMI الفعلية" style="width:100%;border-radius:12px" hidden></article><article><h2>🛰️ صورة الألوان الطبيعية</h2><img id="truecolorMap" alt="صورة Sentinel-2 للحقل" style="width:100%;border-radius:12px" hidden></article></div><p class="muted">الألوان تصنيف بصري تقريبي لقيم المؤشرات، ولا تعني قياساً مباشراً لرطوبة التربة أو العناصر الغذائية.</p></section><section class="indices"><article class="card"><h2>🌱 خريطة NDVI</h2><div class="empty">خريطة المؤشر ستظهر بعد استرجاع البيانات الفضائية الفعلية للحقل</div><div class="legend"><span>منخفض</span><div class="gradient"></div><span>مرتفع</span></div></article>
+<article class="card"><h2>💧 خريطة NDMI</h2><div class="empty">بانتظار مشهد صالح خالٍ من الغيوم</div><p>يساعد في تقدير المحتوى المائي للغطاء النباتي، وليس قياس رطوبة التربة مباشرةً.</p></article>
+<article class="card"><h2>🌾 خريطة NDRE</h2><div class="empty">بانتظار بيانات الحافة الحمراء من Sentinel‑2</div><p>يساعد في متابعة تغيرات حالة الغطاء النباتي.</p></article></section>
+<section class="card"><h2>🧭 خطوات التحليل</h2><p>افتح خريطة الحقل وحدد الحدود واحفظها، ثم انتقل إلى التحليل الفضائي. عند توفر اتصال ناجح وبيانات صالحة ستظهر المؤشرات المحسوبة هناك. الخرائط الملونة داخل هذه اللوحة تحتاج خدمة صور المؤشرات قبل تفعيلها. النتائج الرقمية المعتمدة تظهر فقط بعد نجاح التحليل.</p></section>
+<p class="footer">أور الذكية — صفحة اختبار مستقلة للخادم التجريبي — لا تغيّر المنصة الأساسية. المصدر المرئي للخريطة داخل الإطار هو صفحة خرائط الحقول الموجودة بالمشروع، وليس صورة ثابتة مولّدة.</p>
+</main>
+<script type="module">
+const $=id=>document.getElementById(id);
+const API='https://ur-smart-satellite-staging.alialbatekh111.workers.dev'; // Staging only; production API remains unchanged.
+const select=$('savedField'),status=$('satelliteStatus'),button=$('runSatellite');
+let supabase=null,user=null;let mapUrls=[];
+const STAGING_API='https://ur-smart-satellite-staging.alialbatekh111.workers.dev';
+async function loadMaps(fieldId,token){
+ $('liveMaps').hidden=false;$('mapStatus').textContent='جارٍ محاولة تحميل خرائط الحقل الحقيقية من خادم الاختبار...';
+ mapUrls.forEach(u=>URL.revokeObjectURL(u));mapUrls=[];
+ const kinds=['ndvi','ndmi','truecolor'];let successes=0;const currentField=select.value;
+ await Promise.all(kinds.map(async kind=>{const el=$(kind+'Map');el.hidden=true;try{const response=await fetch(STAGING_API,{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({field_id:fieldId,visualization:kind})});if(!response.ok)throw Error('HTTP '+response.status);const blob=await response.blob();if(!blob.type.includes('image/png'))throw Error('Invalid image');if(select.value!==currentField)return;const url=URL.createObjectURL(blob);mapUrls.push(url);el.src=url;el.hidden=false;successes++;}catch(e){console.warn('Map unavailable',kind,e.message);}}));
+ if(select.value!==currentField)return;
+ $('mapStatus').textContent=successes===3?'تم جلب الخرائط الثلاث من Sentinel-2.':successes?'ظهرت '+successes+' من 3 خرائط؛ بقية الصور غير متاحة حالياً.':'لم تُحمّل صور فضائية فعلية من خادم الاختبار بعد. ستبقى القيم الرقمية منفصلة عن الخرائط.';
+}
+
+let latestReport='';
+function reset(){mapUrls.forEach(u=>URL.revokeObjectURL(u));mapUrls=[];$('liveMaps').hidden=true;latestReport='';$('visualReadings').hidden=true; $('ndviValue').textContent='بانتظار التحليل';$('ndmiValue').textContent='بانتظار التحليل';$('satelliteMeta').textContent=''; }
+function explain(error){const messages={
+'Insufficient satellite coverage for a reliable field average':'لا تتوفر تغطية صالحة كافية لإعطاء متوسط موثوق لهذا الحقل. أعد المحاولة لاحقاً.',
+'Field boundary unavailable for this account':'لا توجد حدود محفوظة لهذا الحقل. افتح خريطة الحقول واحفظ حدوده.',
+'Session expired':'انتهت جلسة تسجيل الدخول. يرجى الدخول مجدداً.',
+'Satellite service is not configured':'خدمة التحليل الفضائي غير مكتملة الإعداد بعد.',
+'No valid pixels found in the last 65 days':'لم تتوفر بكسلات صالحة خلال الفترة المطلوبة.'
+};return messages[error]||'تعذر إكمال التحليل: '+String(error||'خطأ غير معروف');}
+async function load(){
+try{
+const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+supabase=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
+const {data:{user:u},error:authError}=await supabase.auth.getUser();
+if(authError||!u){status.textContent='يرجى تسجيل الدخول من لوحة المزارع أولاً.';select.innerHTML='<option value="">يلزم تسجيل الدخول</option>';return;}
+user=u;
+const {data,error}=await supabase.from('fields').select('id,name,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');
+if(error)throw error;
+select.replaceChildren(new Option('اختر الحقل',''));
+(data||[]).forEach(f=>select.add(new Option(f.name,f.id)));
+status.textContent=(data||[]).length?'اختر الحقل ثم اضغط تحليل الحقل الآن.':'لا توجد حقول محفوظة في حسابك بعد.';
+}catch(e){status.textContent='تعذر تحميل الحقول: '+e.message;}
+}
+select.addEventListener('change',()=>{reset();status.textContent='اضغط تحليل الحقل الآن لجلب أحدث قراءة صالحة.';});
+button.addEventListener('click',async()=>{
+reset();if(!supabase||!user){status.textContent='سجّل الدخول أولاً.';return;}
+if(!select.value){status.textContent='اختر حقلًا محفوظًا أولاً.';return;}
+button.disabled=true;status.textContent='جارٍ طلب بيانات Sentinel-2 والتحقق من جودة التغطية...';
+try{
+const {data:{session}}=await supabase.auth.getSession();if(!session)throw Error('Session expired');
+const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:select.value})});
+let data;try{data=await res.json()}catch(_){throw Error('استجابة الخادم ليست JSON صالحاً');}
+if(!res.ok){if(res.status===422){const p=Number(data.best_available_valid_pixels),c=Number(data.best_available_coverage_percent);const diag=[Number.isFinite(p)?'أفضل عدد بكسلات صالحة: '+p:null,Number.isFinite(c)?'أفضل تغطية: '+c+'%':null,Number.isFinite(Number(data.intervals_checked))?'الفترات المفحوصة: '+data.intervals_checked:null].filter(Boolean).join(' | ');throw Error(explain(data.error)+(diag?' ('+diag+')':''));}throw Error(explain(data.error));}
+if(data.ndvi===null||data.ndvi===undefined||data.ndmi===null||data.ndmi===undefined||data.valid_pixels===null||data.valid_pixels===undefined)throw Error('الاستجابة لا تحتوي على قراءات كاملة');
+const ndvi=Number(data.ndvi),ndmi=Number(data.ndmi),pixels=Number(data.valid_pixels);
+if(!Number.isFinite(ndvi)||!Number.isFinite(ndmi)||!Number.isFinite(pixels)||pixels<3||ndvi< -1||ndvi>1||ndmi< -1||ndmi>1)throw Error('البيانات غير كافية أو غير صالحة للنشر');
+if(data.coverage_percent===undefined||data.coverage_percent===null||!Number.isFinite(Number(data.coverage_percent))||Number(data.coverage_percent)<60)throw Error('نسبة التغطية أقل من 60%');
+$('ndviValue').textContent=ndvi.toFixed(3);$('ndmiValue').textContent=ndmi.toFixed(3);
+const date=data.date?new Date(data.date):null;const dateText=date&&!Number.isNaN(date.getTime())?new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeZone:'UTC'}).format(date):'غير متاح';
+$('satelliteMeta').textContent='المصدر: '+(data.source||'Sentinel-2')+' | تاريخ الرصد: '+dateText+' | البكسلات الصالحة: '+pixels+(Number.isFinite(Number(data.coverage_percent))?' | التغطية: '+Number(data.coverage_percent).toFixed(1)+'%':'');
+$('visualReadings').hidden=false;
+$('ndviBar').style.width=(Math.max(0,Math.min(100,(ndvi+1)*50)))+'%';
+$('ndmiBar').style.width=(Math.max(0,Math.min(100,(ndmi+1)*50)))+'%';
+$('ndviText').textContent=ndvi.toFixed(3);$('ndmiText').textContent=ndmi.toFixed(3);
+latestReport=['تقرير أور الذكية — المؤشرات الزراعية','الحقل: '+select.selectedOptions[0].textContent,'تاريخ الرصد: '+dateText,'المصدر: '+(data.source||'Sentinel-2'),'NDVI: '+ndvi.toFixed(3),'NDMI: '+ndmi.toFixed(3),'البكسلات الصالحة: '+pixels,'نسبة التغطية: '+(Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent).toFixed(1)+'%':'غير متاحة'),'ملاحظة: متوسطات طيفية للحقل، وليست قياساً لرطوبة التربة أو جرعات الري والتسميد.'].join('\n');
+status.textContent='اكتمل التحليل الرقمي بنجاح. جارٍ التحقق من توفر الخرائط الحقيقية...';
+await loadMaps(select.value,session.access_token);
+}catch(e){status.textContent=/Failed to fetch|Load failed|NetworkError/i.test(e.message)?'تعذر الوصول إلى خادم الأقمار الصناعية التجريبي. تحقق من الاتصال أو إعدادات الخادم.':explain(e.message);}
+finally{button.disabled=false;}
+});
+$('copyReport').addEventListener('click',async()=>{if(!latestReport)return;try{await navigator.clipboard.writeText(latestReport);$('copyReport').textContent='✓ تم نسخ التقرير';}catch(e){$('copyReport').textContent='تعذر النسخ في هذا المتصفح';}});
+load();
+</script></body></html>
