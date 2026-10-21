@@ -26,7 +26,7 @@
 </main>
 <script type="module">
 const $=id=>document.getElementById(id);
-const API='https://ur-smart-satellite.alialbatekh111.workers.dev';
+const API='https://ur-smart-satellite-staging.alialbatekh111.workers.dev'; // Staging only; production API remains unchanged.
 const select=$('savedField'),status=$('satelliteStatus'),button=$('runSatellite');
 let supabase=null,user=null;let mapUrls=[];
 const STAGING_API='https://ur-smart-satellite-staging.alialbatekh111.workers.dev';
@@ -71,7 +71,7 @@ try{
 const {data:{session}}=await supabase.auth.getSession();if(!session)throw Error('Session expired');
 const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:select.value})});
 let data;try{data=await res.json()}catch(_){throw Error('استجابة الخادم ليست JSON صالحاً');}
-if(!res.ok)throw Error(explain(data.error));
+if(!res.ok){if(res.status===422){const p=Number(data.best_available_valid_pixels),c=Number(data.best_available_coverage_percent);const diag=[Number.isFinite(p)?'أفضل عدد بكسلات صالحة: '+p:null,Number.isFinite(c)?'أفضل تغطية: '+c+'%':null,Number.isFinite(Number(data.intervals_checked))?'الفترات المفحوصة: '+data.intervals_checked:null].filter(Boolean).join(' | ');throw Error(explain(data.error)+(diag?' ('+diag+')':''));}throw Error(explain(data.error));}
 if(data.ndvi===null||data.ndvi===undefined||data.ndmi===null||data.ndmi===undefined||data.valid_pixels===null||data.valid_pixels===undefined)throw Error('الاستجابة لا تحتوي على قراءات كاملة');
 const ndvi=Number(data.ndvi),ndmi=Number(data.ndmi),pixels=Number(data.valid_pixels);
 if(!Number.isFinite(ndvi)||!Number.isFinite(ndmi)||!Number.isFinite(pixels)||pixels<3||ndvi< -1||ndvi>1||ndmi< -1||ndmi>1)throw Error('البيانات غير كافية أو غير صالحة للنشر');
@@ -86,7 +86,7 @@ $('ndviText').textContent=ndvi.toFixed(3);$('ndmiText').textContent=ndmi.toFixed
 latestReport=['تقرير أور الذكية — المؤشرات الزراعية','الحقل: '+select.selectedOptions[0].textContent,'تاريخ الرصد: '+dateText,'المصدر: '+(data.source||'Sentinel-2'),'NDVI: '+ndvi.toFixed(3),'NDMI: '+ndmi.toFixed(3),'البكسلات الصالحة: '+pixels,'نسبة التغطية: '+(Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent).toFixed(1)+'%':'غير متاحة'),'ملاحظة: متوسطات طيفية للحقل، وليست قياساً لرطوبة التربة أو جرعات الري والتسميد.'].join('\n');
 status.textContent='اكتمل التحليل الرقمي بنجاح. جارٍ التحقق من توفر الخرائط الحقيقية...';
 await loadMaps(select.value,session.access_token);
-}catch(e){status.textContent=/Failed to fetch|Load failed|NetworkError/i.test(e.message)?'تعذر الوصول إلى خادم الأقمار الصناعية. تحقق من الاتصال أو إعدادات الخادم.':explain(e.message);}
+}catch(e){status.textContent=/Failed to fetch|Load failed|NetworkError/i.test(e.message)?'تعذر الوصول إلى خادم الأقمار الصناعية التجريبي. تحقق من الاتصال أو إعدادات الخادم.':explain(e.message);}
 finally{button.disabled=false;}
 });
 $('copyReport').addEventListener('click',async()=>{if(!latestReport)return;try{await navigator.clipboard.writeText(latestReport);$('copyReport').textContent='✓ تم نسخ التقرير';}catch(e){$('copyReport').textContent='تعذر النسخ في هذا المتصفح';}});
