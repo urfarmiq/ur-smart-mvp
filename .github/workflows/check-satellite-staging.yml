@@ -1,0 +1,43 @@
+name: Check satellite staging
+on:
+  pull_request:
+    paths:
+      - 'satellite-backend/**'
+      - 'agricultural-indicators.html'
+      - 'dashboard.html'
+      - 'wrangler.staging.jsonc'
+      - '.github/workflows/check-satellite-staging.yml'
+  workflow_dispatch:
+jobs:
+  syntax-and-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate staging worker JavaScript
+        run: node --check satellite-backend/worker.staging.js
+      - name: Validate dashboard inline JavaScript
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import vm from 'node:vm';
+          const html=fs.readFileSync('agricultural-indicators.html','utf8');
+          const scripts=[...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
+          if(!scripts.length)throw new Error('Missing scripts');
+          for(const script of scripts)new vm.SourceTextModule(script);
+          if(!html.includes('coverage_percent'))throw new Error('Coverage validation missing');
+          console.log('Arabic dashboard scripts parsed');
+          NODE
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
+      - name: Check deployment isolation
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const staging=JSON.parse(fs.readFileSync('wrangler.staging.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
+          if(staging.name!=='ur-smart-satellite-staging')throw new Error('Staging name mismatch');
+          if(staging.main!=='satellite-backend/worker.staging.js')throw new Error('Unexpected worker entrypoint');
+          console.log('Production Worker untouched by staging configuration');
+          NODE
