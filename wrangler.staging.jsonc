@@ -1,0 +1,7 @@
+{
+  // Staging ONLY. Do not overwrite the production ur-smart-satellite Worker.
+  "name": "ur-smart-satellite-staging",
+  "main": "satellite-backend/worker.staging.js",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true
+}
