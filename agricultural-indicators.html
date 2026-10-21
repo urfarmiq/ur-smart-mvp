@@ -33,8 +33,9 @@ const STAGING_API='https://ur-smart-satellite-staging.alialbatekh111.workers.dev
 async function loadMaps(fieldId,token){
  $('liveMaps').hidden=false;$('mapStatus').textContent='جارٍ محاولة تحميل خرائط الحقل الحقيقية من خادم الاختبار...';
  mapUrls.forEach(u=>URL.revokeObjectURL(u));mapUrls=[];
- const kinds=['ndvi','ndmi','truecolor'];let successes=0;
- await Promise.all(kinds.map(async kind=>{const el=$(kind+'Map');el.hidden=true;try{const response=await fetch(STAGING_API,{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({field_id:fieldId,visualization:kind})});if(!response.ok)throw Error('HTTP '+response.status);const blob=await response.blob();if(!blob.type.includes('image/png'))throw Error('Invalid image');const url=URL.createObjectURL(blob);mapUrls.push(url);el.src=url;el.hidden=false;successes++;}catch(e){console.warn('Map unavailable',kind,e.message);}}));
+ const kinds=['ndvi','ndmi','truecolor'];let successes=0;const currentField=select.value;
+ await Promise.all(kinds.map(async kind=>{const el=$(kind+'Map');el.hidden=true;try{const response=await fetch(STAGING_API,{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({field_id:fieldId,visualization:kind})});if(!response.ok)throw Error('HTTP '+response.status);const blob=await response.blob();if(!blob.type.includes('image/png'))throw Error('Invalid image');if(select.value!==currentField)return;const url=URL.createObjectURL(blob);mapUrls.push(url);el.src=url;el.hidden=false;successes++;}catch(e){console.warn('Map unavailable',kind,e.message);}}));
+ if(select.value!==currentField)return;
  $('mapStatus').textContent=successes===3?'تم جلب الخرائط الثلاث من Sentinel-2.':successes?'ظهرت '+successes+' من 3 خرائط؛ بقية الصور غير متاحة حالياً.':'لم تُحمّل صور فضائية فعلية من خادم الاختبار بعد. ستبقى القيم الرقمية منفصلة عن الخرائط.';
 }
 
@@ -71,9 +72,10 @@ const {data:{session}}=await supabase.auth.getSession();if(!session)throw Error(
 const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:select.value})});
 let data;try{data=await res.json()}catch(_){throw Error('استجابة الخادم ليست JSON صالحاً');}
 if(!res.ok)throw Error(explain(data.error));
+if(data.ndvi===null||data.ndvi===undefined||data.ndmi===null||data.ndmi===undefined||data.valid_pixels===null||data.valid_pixels===undefined)throw Error('الاستجابة لا تحتوي على قراءات كاملة');
 const ndvi=Number(data.ndvi),ndmi=Number(data.ndmi),pixels=Number(data.valid_pixels);
-if(!Number.isFinite(ndvi)||!Number.isFinite(ndmi)||!Number.isFinite(pixels)||pixels<3)throw Error('البيانات غير كافية أو غير صالحة للنشر');
-if(data.coverage_percent!==undefined&&(!Number.isFinite(Number(data.coverage_percent))||Number(data.coverage_percent)<60))throw Error('نسبة التغطية أقل من 60%');
+if(!Number.isFinite(ndvi)||!Number.isFinite(ndmi)||!Number.isFinite(pixels)||pixels<3||ndvi< -1||ndvi>1||ndmi< -1||ndmi>1)throw Error('البيانات غير كافية أو غير صالحة للنشر');
+if(data.coverage_percent===undefined||data.coverage_percent===null||!Number.isFinite(Number(data.coverage_percent))||Number(data.coverage_percent)<60)throw Error('نسبة التغطية أقل من 60%');
 $('ndviValue').textContent=ndvi.toFixed(3);$('ndmiValue').textContent=ndmi.toFixed(3);
 const date=data.date?new Date(data.date):null;const dateText=date&&!Number.isNaN(date.getTime())?new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeZone:'UTC'}).format(date):'غير متاح';
 $('satelliteMeta').textContent='المصدر: '+(data.source||'Sentinel-2')+' | تاريخ الرصد: '+dateText+' | البكسلات الصالحة: '+pixels+(Number.isFinite(Number(data.coverage_percent))?' | التغطية: '+Number(data.coverage_percent).toFixed(1)+'%':'');
