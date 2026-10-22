@@ -74,14 +74,14 @@ export default {async fetch(req,env){
    let script;
    if(mapIndex){
      if(!indexExpressions[mapIndex])return reply({error:"Unsupported map indicator"},400,allowed);
-     const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI";
+     const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI",span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
  if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
  const v=${expression};
  if(!Number.isFinite(v))return [0,0,0,0];
- let t=Math.max(0,Math.min(1,(v-(${range[0]}))/(${range[1]}-(${range[0]}))));
+ let t=Math.max(0,Math.min(1,${scaleExpression}));
  ${invert?"t=1-t;":""}
  return [Math.round(255*(1-t)),Math.round(255*t),30,205];
 }`;
