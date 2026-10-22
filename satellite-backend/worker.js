@@ -76,22 +76,22 @@ export default {async fetch(req,env){
      if(!indexExpressions[mapIndex])return reply({error:"Unsupported map indicator"},400,allowed);
      const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI";
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:3,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
+ if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0];
  const v=${expression};
- if(!Number.isFinite(v))return [0,0,0,0];
+ if(!Number.isFinite(v))return [0,0,0];
  let t=Math.max(0,Math.min(1,(v-${range[0]})/(${range[1]}-${range[0]})));
  ${invert?"t=1-t;":""}
- return [Math.round(255*(1-t)),Math.round(255*t),30,205];
+ return [Math.round(255*(1-t)),Math.round(255*t),30];
 }`;
    }else{
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:3,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
+ if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
- return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
+ return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02))];
 }`;
    }
    const body={input:{bounds:{geometry,properties:{crs:"http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
