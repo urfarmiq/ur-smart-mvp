@@ -81,7 +81,7 @@ function evaluatePixel(s){
  if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
  const v=${expression};
  if(!Number.isFinite(v))return [0,0,0,0];
- let t=Math.max(0,Math.min(1,(v-${range[0]})/(${range[1]}-${range[0]})));
+ let t=Math.max(0,Math.min(1,(v-(${range[0]}))/(${range[1]}-(${range[0]}))));
  ${invert?"t=1-t;":""}
  return [Math.round(255*(1-t)),Math.round(255*t),30,205];
 }`;
