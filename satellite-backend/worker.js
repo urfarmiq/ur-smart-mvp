@@ -41,7 +41,7 @@ export default {async fetch(req,env){
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
  const bearer=req.headers.get('Authorization')||'';
  if(!/^Bearer [^ ]+$/.test(bearer))return reply({error:'Login required'},401,allowed);
- const {field_id,action,map_date:mapDate}=await req.json();
+ const {field_id,action,map_date:mapDate,map_indices:mapIndices}=await req.json();
  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(field_id||''))return reply({error:'Invalid field ID'},400,allowed);
  const headers={'apikey':env.SUPABASE_PUBLISHABLE_KEY,'Authorization':bearer};
  const auth=await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers});
@@ -63,23 +63,42 @@ export default {async fetch(req,env){
  if(action==="maps"){
    if(!/^\d{4}-\d{2}-\d{2}$/.test(mapDate||""))return reply({error:"Invalid map date"},400,allowed);
    const day=new Date(mapDate+"T00:00:00.000Z");if(Number.isNaN(day.getTime())||day.toISOString().slice(0,10)!==mapDate||day<start||day>now)return reply({error:"Map date is outside the analysis window"},400,allowed);
+   const indices=Array.isArray(mapIndices)?mapIndices:["NDVI","NDMI"];if(indices.length!==2)return reply({error:"Choose two map indices"},400,allowed);
+   const specs={
+     NDVI:{expr:"(s.B08-s.B04)/(s.B08+s.B04)",min:-0.2,max:0.8},
+     NDMI:{expr:"(s.B08-s.B11)/(s.B08+s.B11)",min:-0.5,max:0.5},
+     SAVI:{expr:"1.5*(s.B08-s.B04)/(s.B08+s.B04+0.5)",min:-0.2,max:0.8},
+     OSAVI:{expr:"1.16*(s.B08-s.B04)/(s.B08+s.B04+0.16)",min:-0.2,max:0.8},
+     MSAVI2:{expr:"(2*s.B08+1-Math.sqrt(Math.max(0,(2*s.B08+1)*(2*s.B08+1)-8*(s.B08-s.B04))))/2",min:-0.2,max:0.8},
+     EVI:{expr:"2.5*(s.B08-s.B04)/(s.B08+6*s.B04-7.5*s.B02+1)",min:-0.2,max:1},
+     GNDVI:{expr:"(s.B08-s.B03)/(s.B08+s.B03)",min:-0.2,max:0.8},
+     NDRE:{expr:"(s.B08-s.B05)/(s.B08+s.B05)",min:-0.2,max:0.8},
+     MNDWI:{expr:"(s.B03-s.B11)/(s.B03+s.B11)",min:-0.8,max:0.8},
+     NBR:{expr:"(s.B08-s.B12)/(s.B08+s.B12)",min:-1,max:1},
+     MSI:{expr:"s.B11/s.B08",min:0,max:2},
+     CIGREEN:{expr:"s.B08/s.B03-1",min:0,max:4},
+     NDRE2:{expr:"(s.B8A-s.B06)/(s.B8A+s.B06)",min:-0.2,max:0.8},
+     NDRE3:{expr:"(s.B8A-s.B07)/(s.B8A+s.B07)",min:-0.2,max:0.8},
+     CIREDGE:{expr:"s.B8A/s.B05-1",min:0,max:4},
+     NIRV:{expr:"((s.B08-s.B04)/(s.B08+s.B04))*s.B08",min:0,max:0.5}
+   };
+   const normalized=indices.map(x=>String(x).toUpperCase());if(normalized.some(x=>!specs[x]))return reply({error:"Unsupported map index"},400,allowed);
    const from=day.toISOString(),to=new Date(day.getTime()+86400000-1).toISOString();
    const bounds=projected.coordinates.flat().reduce((b,p)=>({minX:Math.min(b.minX,p[0]),minY:Math.min(b.minY,p[1]),maxX:Math.max(b.maxX,p[0]),maxY:Math.max(b.maxY,p[1])}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
    const wide=bounds.maxX-bounds.minX,high=bounds.maxY-bounds.minY;if(!wide||!high)return reply({error:"Invalid field map bounds"},400,allowed);
    const maxSide=640,width=Math.max(96,Math.min(maxSide,Math.round(maxSide*wide/Math.max(wide,high)))),height=Math.max(96,Math.min(maxSide,Math.round(maxSide*high/Math.max(wide,high))));
    const crs="http://www.opengis.net/def/crs/EPSG/0/"+epsg;
-   const makeMap=async(kind)=>{
-     const ndvi=kind==="ndvi";
-     const bands=ndvi?["B04","B08","SCL","dataMask"]:["B08","B11","SCL","dataMask"];
-     const expr=ndvi?"(s.B08-s.B04)/(s.B08+s.B04)":"(s.B08-s.B11)/(s.B08+s.B11)";
-     const offset=ndvi?"0.2":"0.5";
-     const script="//VERSION=3\nfunction setup(){return {input:[{bands:"+JSON.stringify(bands)+"}],output:{bands:4,sampleType:\"UINT8\"}};}\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];const v="+expr+";const t=Math.max(0,Math.min(1,(v+"+offset+")/1));return [Math.round(220*(1-t)),Math.round(110+145*t),Math.round(55*(1-t)),255];}";
+   const makeMap=async(index)=>{
+     const spec=specs[index];
+     const bands=["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"];
+     const script="//VERSION=3\nfunction setup(){return {input:[{bands:"+JSON.stringify(bands)+"}],output:{bands:4,sampleType:\"UINT8\"}};}\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];const v="+spec.expr+";const t=Math.max(0,Math.min(1,(v-("+spec.min+"))/("+spec.max+"-("+spec.min+"))));return [Math.round(220*(1-t)),Math.round(110+145*t),Math.round(55*(1-t)),255];}";
      const body={input:{bounds:{geometry:projected,properties:{crs}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
      const r=await fetch(SH+"/process/v1",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
      if(!r.ok)throw Error("Map generation failed ("+r.status+"): "+(await r.text()).slice(0,120));
      const bytes=new Uint8Array(await r.arrayBuffer());let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return "data:image/png;base64,"+btoa(binary);
    };
-   const maps=await Promise.all([makeMap("ndvi"),makeMap("ndmi")]);return reply({field_id,date:mapDate,source:"Sentinel-2 L2A via Copernicus Data Space Process API",resolution_m:20,maps:{ndvi:maps[0],ndmi:maps[1]}},200,allowed);
+   const images=await Promise.all(normalized.map(makeMap));const maps={};normalized.forEach((key,i)=>maps[key]=images[i]);
+   return reply({field_id,date:mapDate,source:"Sentinel-2 L2A via Copernicus Data Space Process API",resolution_m:20,maps},200,allowed);
  }
  const sr=await fetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)});
  if(!sr.ok){const message=(await sr.text()).slice(0,200);return reply({error:'Satellite processing failed',details:message},502,allowed)}
