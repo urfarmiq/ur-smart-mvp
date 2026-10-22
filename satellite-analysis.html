@@ -99,7 +99,7 @@ $('autoAnalyze').onclick=async()=>{
     const objectUrl=URL.createObjectURL(new Blob([bytes],{type:"image/png"}));freshUrls.push(objectUrl);
     const card=document.createElement("div");card.className="map-card";const h=document.createElement("h4");h.textContent=key+" — "+names[key]+" · "+safeDate(mapsData.date);
     const img=document.createElement("img");img.src=objectUrl;img.alt="خريطة الحقل لمؤشر "+key;img.loading="eager";img.style.cursor="zoom-in";img.onclick=()=>showMapImage(objectUrl);img.onerror=()=>{img.alt="تعذر عرض صورة المؤشر "+key;img.insertAdjacentText("afterend"," تعذر تحميل الصورة؛ أعد إنشاء الخريطة.")};
-    const legend=document.createElement("div");legend.className="legend";const scale=document.createElement("p");scale.className="muted";scale.textContent="مقياس لوني تقريبي: "+ranges[key]+" — الدقة المصدرية "+mapsData.resolution_m+"م";
+    const legend=document.createElement("div");legend.className="legend";const scale=document.createElement("p");scale.className="muted";scale.textContent="مقياس لوني تقريبي: "+ranges[key]+" — الدقة المصدرية "+mapsData.resolution_m+"م. الخلايا الرمادية تعني بيانات مستبعدة أو غير صالحة.";
     const open=document.createElement("a");open.href="#";open.textContent="↗ فتح الصورة بالحجم الكامل";open.onclick=e=>{e.preventDefault();showMapImage(objectUrl)};
     const download=document.createElement("a");download.href=objectUrl;download.download="ur-smart-"+key.toLowerCase()+"-"+mapsData.date+".png";download.textContent="⬇ تنزيل صورة "+key;
     card.append(h,img,legend,scale,open,document.createTextNode(" · "),download);cards.push(card)
