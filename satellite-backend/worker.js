@@ -91,7 +91,7 @@ export default {async fetch(req,env){
    const makeMap=async(index)=>{
      const spec=specs[index];
      const bands=["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"];
-     const script="//VERSION=3\nfunction setup(){return {input:[{bands:"+JSON.stringify(bands)+"}],output:{bands:4,sampleType:\"UINT8\"}};}\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];const v="+spec.expr+";const t=Math.max(0,Math.min(1,(v-("+spec.min+"))/("+spec.max+"-("+spec.min+"))));return [Math.round(220*(1-t)),Math.round(110+145*t),Math.round(55*(1-t)),255];}";
+     const script="//VERSION=3\nfunction setup(){return {input:[{bands:"+JSON.stringify(bands)+"}],output:{bands:4,sampleType:\"UINT8\"}};}\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [175,180,175,255];const v="+spec.expr+";if(!Number.isFinite(v))return [175,180,175,255];const t=Math.max(0,Math.min(1,(v-("+spec.min+"))/("+spec.max+"-("+spec.min+"))));return [Math.round(220*(1-t)),Math.round(110+145*t),Math.round(55*(1-t)),255];}";
      const body={input:{bounds:{geometry,properties:{crs:"http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
      const r=await fetch(SH+"/process/v1",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
      if(!r.ok)throw Error("Map generation failed ("+r.status+"): "+(await r.text()).slice(0,120));
