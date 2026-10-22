@@ -64,7 +64,7 @@ $('loadIndicatorMap').onclick=async()=>{const button=$('loadIndicatorMap'),field
  if(indicatorBoundary)map.removeLayer(indicatorBoundary);indicatorBoundary=L.geoJSON(indicatorGeometry,{style:{color:'#fff',weight:3,fillOpacity:0}}).addTo(map).bringToFront();
  map.fitBounds(indicatorBoundary.getBounds(),{padding:[25,25],maxZoom:18});indicatorLegend(index);
  const pct=scene?.coverage_percent==null?'':(' — تغطية صالحة '+Number(scene.coverage_percent).toFixed(1)+'%');
- indicatorError('✓ ظهرت طبقة '+index+' على الخريطة بتاريخ '+chosenDate+(Number.isFinite(value)?' — متوسط الحقل '+value.toFixed(3):'')+pct+'. غيّر المؤشر أو التاريخ ثم اضغط تحميل لتحديث الطبقة.');
+ indicatorError('✓ ظهرت طبقة '+index+' على الخريطة بتاريخ '+chosenDate+(Number.isFinite(value)?' — متوسط الحقل '+value.toFixed(3):'')+' — دقة المصدر '+(image.resolution_m||20)+' م'+pct+'. غيّر المؤشر أو التاريخ ثم اضغط تحميل لتحديث الطبقة.');
  }catch(e){indicatorError('تعذر تحميل المؤشر على الخريطة: '+e.message)}finally{button.disabled=false;button.textContent='🛰️ تحديث طبقة المؤشر على الخريطة'}}
 $('cloudField').addEventListener('change',()=>{indicatorStats=null;if(indicatorLayer){map.removeLayer(indicatorLayer);indicatorLayer=null}if(indicatorBoundary){map.removeLayer(indicatorBoundary);indicatorBoundary=null}const sel=$('mapSceneDate');sel.replaceChildren(new Option('حمّل المشاهد أولًا',''));$('indicatorLegend').hidden=true;indicatorError('اضغط تحميل لجلب أحدث المشهد والمؤشر لهذا الحقل.')});
 
