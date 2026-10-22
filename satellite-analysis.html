@@ -76,9 +76,32 @@ $('autoAnalyze').onclick=async()=>{
  const mapControls=document.createElement("div");mapControls.className="grid";
  const mapSelectors=[];
  ["المؤشر في الخريطة الأولى","المؤشر في الخريطة الثانية"].forEach((labelText,i)=>{const wrap=document.createElement("div");const label=document.createElement("label");label.textContent=labelText;const select=document.createElement("select");Object.keys(names).forEach(key=>select.add(new Option(key+" — "+names[key],key)));select.value=i===0?"NDVI":"NDMI";wrap.append(label,select);mapControls.append(wrap);mapSelectors.push(select)});
+ const mapObjectUrls=[];
  const mapButton=document.createElement("button");mapButton.className="secondary";mapButton.textContent="🗺️ إنشاء خريطتي المؤشرين المحددين";
  const mapArea=document.createElement("div");mapArea.className="map-grid";mapArea.setAttribute("aria-live","polite");
- mapButton.onclick=async()=>{mapButton.disabled=true;const selected=mapSelectors.map(x=>x.value);mapButton.textContent="جارٍ تجهيز خريطتي "+selected.join(" و")+"...";mapArea.textContent="جارٍ إنشاء خريطتين للمؤشرين المحددين من مشهد "+safeDate(data.date)+".";try{const mapRes=await fetch(SATELLITE_API_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({field_id:fieldId,action:"maps",map_date:new Date(data.date).toISOString().slice(0,10),map_indices:selected})});const mapsData=await mapRes.json();if(!mapRes.ok)throw Error(mapsData.error||"تعذر إنشاء الخرائط");mapArea.replaceChildren();const ranges={NDVI:"−0.2 إلى 0.8",NDMI:"−0.5 إلى 0.5",SAVI:"−0.2 إلى 0.8",OSAVI:"−0.2 إلى 0.8",MSAVI2:"−0.2 إلى 0.8",EVI:"−0.2 إلى 1",GNDVI:"−0.2 إلى 0.8",NDRE:"−0.2 إلى 0.8",MNDWI:"−0.8 إلى 0.8",NBR:"−1 إلى 1",MSI:"0 إلى 2",CIgreen:"0 إلى 4",NDRE2:"−0.2 إلى 0.8",NDRE3:"−0.2 إلى 0.8",CIrededge:"0 إلى 4",NIRv:"0 إلى 0.5"};for(const key of selected){const card=document.createElement("div");card.className="map-card";const h=document.createElement("h4");h.textContent=key+" — "+names[key]+" · "+safeDate(mapsData.date);const img=document.createElement("img");img.src=mapsData.maps[key];img.alt="خريطة الحقل لمؤشر "+key;const legend=document.createElement("div");legend.className="legend";const scale=document.createElement("p");scale.className="muted";scale.textContent="مقياس لوني تقريبي: "+ranges[key]+" — الدقة المصدرية "+mapsData.resolution_m+"م";const link=document.createElement("a");link.href=mapsData.maps[key];link.download="ur-smart-"+key.toLowerCase()+"-"+mapsData.date+".png";link.textContent="⬇ تنزيل صورة "+key;card.append(h,img,legend,scale,link);mapArea.append(card)}mapButton.textContent="↻ تحديث الخريطتين للمؤشرات المختارة"}catch(e){mapArea.textContent="تعذر إنشاء الخريطتين: "+e.message;mapButton.textContent="إعادة المحاولة"}finally{mapButton.disabled=false}};
+ mapButton.onclick=async()=>{
+  mapButton.disabled=true;const selected=mapSelectors.map(x=>x.value);mapButton.textContent="جارٍ تجهيز خريطتي "+selected.join(" و")+"...";mapArea.textContent="جارٍ إنشاء خريطتين للمؤشرين المحددين من مشهد "+safeDate(data.date)+".";
+  const freshUrls=[];
+  try{
+   const mapRes=await fetch(SATELLITE_API_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({field_id:fieldId,action:"maps",map_date:new Date(data.date).toISOString().slice(0,10),map_indices:selected})});
+   const mapsData=await mapRes.json();if(!mapRes.ok)throw Error([mapsData.error,mapsData.details].filter(Boolean).join(" — ")||"تعذر إنشاء الخرائط");
+   const ranges={NDVI:"−0.2 إلى 0.8",NDMI:"−0.5 إلى 0.5",SAVI:"−0.2 إلى 0.8",OSAVI:"−0.2 إلى 0.8",MSAVI2:"−0.2 إلى 0.8",EVI:"−0.2 إلى 1",GNDVI:"−0.2 إلى 0.8",NDRE:"−0.2 إلى 0.8",MNDWI:"−0.8 إلى 0.8",NBR:"−1 إلى 1",MSI:"0 إلى 2",CIgreen:"0 إلى 4",NDRE2:"−0.2 إلى 0.8",NDRE3:"−0.2 إلى 0.8",CIrededge:"0 إلى 4",NIRv:"0 إلى 0.5"};
+   const cards=[];
+   for(const key of selected){
+    const mapKey=key.toUpperCase(),dataUrl=mapsData.maps?.[mapKey];if(!dataUrl||!dataUrl.startsWith("data:image/png;base64,"))throw Error("لم تصل صورة PNG للمؤشر "+key);
+    const binary=atob(dataUrl.slice(dataUrl.indexOf(",")+1)),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const objectUrl=URL.createObjectURL(new Blob([bytes],{type:"image/png"}));freshUrls.push(objectUrl);
+    const card=document.createElement("div");card.className="map-card";const h=document.createElement("h4");h.textContent=key+" — "+names[key]+" · "+safeDate(mapsData.date);
+    const img=document.createElement("img");img.src=objectUrl;img.alt="خريطة الحقل لمؤشر "+key;img.loading="eager";img.onerror=()=>{img.alt="تعذر عرض صورة المؤشر "+key};
+    const legend=document.createElement("div");legend.className="legend";const scale=document.createElement("p");scale.className="muted";scale.textContent="مقياس لوني تقريبي: "+ranges[key]+" — الدقة المصدرية "+mapsData.resolution_m+"م";
+    const open=document.createElement("a");open.href=objectUrl;open.target="_blank";open.rel="noopener noreferrer";open.textContent="↗ فتح الصورة بالحجم الكامل";
+    const download=document.createElement("a");download.href=objectUrl;download.download="ur-smart-"+key.toLowerCase()+"-"+mapsData.date+".png";download.textContent="⬇ تنزيل صورة "+key;
+    card.append(h,img,legend,scale,open,document.createTextNode(" · "),download);cards.push(card)
+   }
+   mapObjectUrls.forEach(URL.revokeObjectURL);mapObjectUrls.length=0;mapObjectUrls.push(...freshUrls);mapArea.replaceChildren(...cards);mapButton.textContent="↻ تحديث الخريطتين للمؤشرات المختارة"
+  }catch(e){freshUrls.forEach(URL.revokeObjectURL);mapArea.textContent="تعذر إنشاء أو عرض الخريطتين: "+e.message;mapButton.textContent="إعادة المحاولة"}
+  finally{mapButton.disabled=false}
+ };
 
  box.append(title,numbers,meta,quality,interpretation,warning,indexTitle,indexTable,indexNote,advisor,actions,mapControls,mapButton,mapArea,historyTitle,historyNote,historyList);
  }catch(e){const network=e instanceof TypeError||/Load failed|Failed to fetch|NetworkError/i.test(e.message);box.textContent=network?'تعذر الاتصال بخادم Cloudflare. افتح رابط فحص الخادم أدناه: إذا لم يفتح، المشكلة من الوصول إلى workers.dev أو إعدادات الشبكة؛ وإذا ظهر JSON، تحقق من إعدادات CORS وCloudflare.':'تعذر التحليل التلقائي: '+e.message; if(network){const link=document.createElement('a');link.href=SATELLITE_API_URL;link.target='_blank';link.rel='noopener noreferrer';link.textContent='فتح رابط الخادم لفحص الاتصال ↗';box.append(document.createElement('br'),link)}}finally{button.disabled=false}
