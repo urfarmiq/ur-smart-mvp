@@ -60,7 +60,7 @@ export default {async fetch(req,env){
  const token=(await oauth.json()).access_token;
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
  if(action==="imagery"){
-   if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(mapDate||""))return reply({error:"Invalid image date"},400,allowed);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(mapDate||""))return reply({error:"Invalid image date"},400,allowed);
    const day=new Date(mapDate+"T00:00:00.000Z");
    if(Number.isNaN(day.getTime())||day.toISOString().slice(0,10)!==mapDate||day<start||day>now)return reply({error:"Image date is outside the analysis window"},400,allowed);
    const coords=geometry.coordinates.flat();
