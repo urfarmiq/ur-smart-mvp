@@ -83,7 +83,12 @@ function evaluatePixel(s){
  if(!Number.isFinite(v))return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
  ${invert?"t=1-t;":""}
- return [Math.round(255*(1-t)),Math.round(255*t),30,205];
+ if("${mapIndex}"==="NDMI"){
+  if(t<0.5){const u=t*2;return [255,Math.round(35+185*u),Math.round(45-5*u),205]}
+  const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(220-100*u),Math.round(40+215*u),205]
+ }
+ if(t<0.5){const u=t*2;return [255,Math.round(55+185*u),Math.round(45-5*u),205]}
+ const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(240-55*u),Math.round(40+145*u),205];
 }`;
    }else{
      script=`//VERSION=3
