@@ -40,9 +40,9 @@ export default {async fetch(req,env){
  if(!br.ok)return reply({error:'Could not read field boundary'},502,allowed);
  const rows=await br.json();const record=rows[0];
  if(!record||record.owner_id!==u.id)return reply({error:'Field boundary unavailable for this account'},404,allowed);
- const geometry=record.geometry;
+ const geometry=typeof record.geometry==='string'?JSON.parse(record.geometry):record.geometry;
  if(geometry?.type!=='Polygon'||!Array.isArray(geometry.coordinates?.[0])||geometry.coordinates[0].length<4)return reply({error:'Invalid saved polygon'},400,allowed);
- if(Number(record.area_m2)>2e7)return reply({error:'Field too large for this analysis tier'},413,allowed);
+ const areaM2=Number(record.area_m2);if(!Number.isFinite(areaM2)||areaM2<=0)return reply({error:'Invalid field area'},400,allowed);if(areaM2>2e7)return reply({error:'Field too large for this analysis tier'},413,allowed);
  const oauth=await fetch(TOKEN_URL,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'client_credentials',client_id:env.SENTINEL_CLIENT_ID,client_secret:env.SENTINEL_CLIENT_SECRET})});
  if(!oauth.ok)return reply({error:'Satellite authentication failed'},502,allowed);
  const token=(await oauth.json()).access_token;
@@ -53,6 +53,6 @@ export default {async fetch(req,env){
  const result=await sr.json();
  const items=(result.data||[]).map(x=>{const n=x.outputs?.ndvi?.bands?.B0?.stats,m=x.outputs?.ndmi?.bands?.B0?.stats;return {date:x.interval?.from,ndvi:n?.mean,ndmi:m?.mean,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));
  if(!items.length)return reply({error:'No valid cloud-free pixels found in the last 65 days'},404,allowed);
- const best=items[0];return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,geometry_pixels:result.geometryPixelCount??null,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; newest available daily interval',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
+ const best=items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; interval with most valid pixels in the last 65 days, newest date on ties',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
  }catch(e){return reply({error:'Analysis temporarily unavailable',details:String(e.message||e).slice(0,150)},500,allowed)}
 }};
