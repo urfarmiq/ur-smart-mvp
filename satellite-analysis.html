@@ -102,7 +102,7 @@ $('autoAnalyze').onclick=async()=>{
   const prior=weatherRows.map((day,i)=>({day,i})).filter(x=>{const t=Date.parse(x.day+"T00:00:00Z");return t<ref&&t>=ref-7*86400000});
   const sum=(key,rows)=>rows.map(x=>Number(weatherData.daily[key]?.[x.i])).filter(Number.isFinite).reduce((a,b)=>a+b,0);
   const rain=sum("precipitation_sum",prior),eto=sum("et0_fao_evapotranspiration",prior),weatherCount=prior.length;
-  const forecast=weatherRows.map((day,i)=>({day,i})).filter(x=>{const t=Date.parse(x.day+"T00:00:00Z");return t>=Date.now()-86400000&&t<=Date.now()+3*86400000});
+  const currentDay=new Date().toISOString().slice(0,10),forecast=String(scene.date).slice(0,10)>=currentDay?weatherRows.map((day,i)=>({day,i})).filter(x=>x.day>=currentDay&&x.day<=new Date(Date.now()+3*86400000).toISOString().slice(0,10)):[];
   const forecastRain=sum("precipitation_sum",forecast);
   const relevant=irrigationLogs.filter(x=>Date.parse(x.irrigated_at)<=ref+86400000).sort((a,b)=>Date.parse(b.irrigated_at)-Date.parse(a.irrigated_at));
   const lastIrr= relevant[0]||null,daysSince=lastIrr?Math.max(0,(ref-Date.parse(lastIrr.irrigated_at))/86400000):Infinity;
