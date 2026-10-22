@@ -1,11 +1,28 @@
-# UR Smart — Sentinel-2 automatic NDVI / NDMI
-This Cloudflare Worker is a **separate backend**, not deployed by GitHub Pages. It verifies the farmer's Supabase access token and reads only their saved field boundary via existing RLS, then calls Sentinel Hub's Statistical API. Sentinel credentials stay on the server.
+# UR Smart — Sentinel-2 NDVI / NDMI
 
-## Setup
-1. Create a Sentinel Hub account and OAuth client credentials with Statistical API access (quota or charges may apply).
-2. Deploy `worker.js` as a Cloudflare Worker.
-3. Configure secrets `SENTINEL_CLIENT_ID` and `SENTINEL_CLIENT_SECRET`; variables `SUPABASE_URL=https://ynsmhtsktbubxfhsekjq.supabase.co`, `SUPABASE_PUBLISHABLE_KEY=<existing publishable key>`, and `ALLOWED_ORIGIN=https://urfarmiq.github.io`.
-4. Set `SATELLITE_API_URL` in `satellite-analysis.html` to the Worker URL, commit and redeploy.
-5. Set a Cloudflare rate limit and Sentinel Hub spending quota before public release.
+هذا العامل الخلفي منفصل عن GitHub Pages. يتحقق من جلسة المزارع في Supabase، ويقرأ حدود حقله وفق سياسات RLS، ثم يطلب إحصاءات Sentinel-2 L2A من Sentinel Hub.
 
-The worker processes the latest available valid Sentinel-2 L2A image within 65 days using cloud/shadow masking (SCL) and returns mean NDVI/NDMI across the saved polygon. The cloud coverage of the scene is filtered but a precise **field cloud percentage is not currently returned**. No results are shown unless the actual API succeeds. No credentials should be committed.
+## الإعداد
+
+1. أنشئ OAuth client في Copernicus Data Space Ecosystem مع صلاحية Sentinel Hub Statistical API.
+2. أضف أسرار Cloudflare Worker:
+   - `SENTINEL_CLIENT_ID`
+   - `SENTINEL_CLIENT_SECRET`
+3. أضف متغيرات Worker:
+   - `SUPABASE_URL`
+   - `SUPABASE_PUBLISHABLE_KEY`
+   - `ALLOWED_ORIGIN=https://urfarmiq.github.io`
+4. تأكد أن صفحة `satellite-analysis.html` تشير إلى عنوان العامل المنشور.
+5. أضف حدًا للطلبات وحصة استخدام في Sentinel Hub قبل فتح الخدمة للجمهور.
+
+لا تحفظ بيانات Sentinel أو Cloudflare السرية في GitHub أو صفحات HTML، ولا ترسلها عبر المحادثة.
+
+## التحليل وجودة العينة
+
+- تُقرأ حدود الحقل المحفوظة في `field_boundaries` وتُحوّل إلى نظام UTM بالمتر قبل طلب الدقة المكانية.
+- تُغطّي المعالجة آخر 65 يومًا، وتختار الفترة ذات أكبر عدد من البكسلات الصالحة؛ وعند التعادل تختار الأحدث.
+- يُستبعد الماء والغيوم والظلال عبر طبقة SCL، مع استبعاد البكسلات خارج المضلع.
+- تُرجع الخدمة NDVI وNDMI وتاريخ الرصد وعدد البكسلات الصالحة والإجمالي ونسبة التغطية.
+- لا تُرجع توصية مؤكدة للري أو التسميد؛ المتوسطات الفضائية لا تقيس رطوبة التربة أو NPK مباشرة.
+
+يقرأ السجل المعروض في صفحة التحليل من تخزين المتصفح على الجهاز الحالي، ولا يُحفظ في Supabase.
