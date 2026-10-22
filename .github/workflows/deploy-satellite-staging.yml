@@ -1,0 +1,35 @@
+name: Deploy UR Smart Satellite Staging Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "satellite-backend/worker.staging.js"
+      - ".github/workflows/deploy-satellite-staging.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ur-smart-satellite-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy staging Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Deploy to Cloudflare staging
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: satellite-backend
+          wranglerVersion: "4"
+          command: deploy worker.staging.js --name ur-smart-satellite-staging --compatibility-date 2026-10-22 --keep-vars
