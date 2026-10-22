@@ -41,7 +41,7 @@ export default {async fetch(req,env){
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
  const bearer=req.headers.get('Authorization')||'';
  if(!/^Bearer [^ ]+$/.test(bearer))return reply({error:'Login required'},401,allowed);
- const {field_id}=await req.json();
+ const {field_id,action,map_date:mapDate}=await req.json();
  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(field_id||''))return reply({error:'Invalid field ID'},400,allowed);
  const headers={'apikey':env.SUPABASE_PUBLISHABLE_KEY,'Authorization':bearer};
  const auth=await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers});
@@ -59,6 +59,30 @@ export default {async fetch(req,env){
  if(!oauth.ok)return reply({error:'Satellite authentication failed'},502,allowed);
  const token=(await oauth.json()).access_token;
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
+ if(action==="imagery"){
+   if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(mapDate||""))return reply({error:"Invalid image date"},400,allowed);
+   const day=new Date(mapDate+"T00:00:00.000Z");
+   if(Number.isNaN(day.getTime())||day.toISOString().slice(0,10)!==mapDate||day<start||day>now)return reply({error:"Image date is outside the analysis window"},400,allowed);
+   const coords=geometry.coordinates.flat();
+   const bounds=coords.reduce((b,p)=>({minLon:Math.min(b.minLon,p[0]),minLat:Math.min(b.minLat,p[1]),maxLon:Math.max(b.maxLon,p[0]),maxLat:Math.max(b.maxLat,p[1])}),{minLon:Infinity,minLat:Infinity,maxLon:-Infinity,maxLat:-Infinity});
+   const projectedCoords=projected.coordinates.flat();const projectedBounds=projectedCoords.reduce((b,p)=>({minX:Math.min(b.minX,p[0]),minY:Math.min(b.minY,p[1]),maxX:Math.max(b.maxX,p[0]),maxY:Math.max(b.maxY,p[1])}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});const wide=Math.max(1,projectedBounds.maxX-projectedBounds.minX),high=Math.max(1,projectedBounds.maxY-projectedBounds.minY);
+   const maxSide=900,width=Math.max(128,Math.min(maxSide,Math.round(maxSide*wide/Math.max(wide,high)))),height=Math.max(128,Math.min(maxSide,Math.round(maxSide*high/Math.max(wide,high))));
+   const from=day.toISOString(),to=new Date(day.getTime()+86400000-1).toISOString();
+   const script=`//VERSION=3
+function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function evaluatePixel(s){
+ if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
+ const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
+ return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
+}`;
+   const body={input:{bounds:{geometry,properties:{crs:"http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
+   const imageRes=await fetch(SH+"/process/v1",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
+   if(!imageRes.ok)return reply({error:"Satellite image unavailable",details:(await imageRes.text()).slice(0,180)},502,allowed);
+   const bytes=new Uint8Array(await imageRes.arrayBuffer());let binary="";
+   for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+   const mapBounds=[[bounds.minLat,bounds.minLon],[bounds.maxLat,bounds.maxLon]];
+   return reply({field_id,date:mapDate,image:"data:image/png;base64,"+btoa(binary),bounds:mapBounds,source:"Sentinel-2 L2A true color via Copernicus Data Space"},200,allowed);
+ }
  const ring=geometry.coordinates[0];const center=ring.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,ring.length-1));const zone=Math.floor((center[0]+180)/6)+1;const epsg=(center[1]<0?32700:32600)+zone;const projected={type:'Polygon',coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,zone)))};const statsRequest={input:{bounds:{geometry:projected,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/'+epsg}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D'},evalscript:EVALSCRIPT,resx:20,resy:20}};
  const sr=await fetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)});
  if(!sr.ok){const message=(await sr.text()).slice(0,200);return reply({error:'Satellite processing failed',details:message},502,allowed)}
@@ -66,6 +90,6 @@ export default {async fetch(req,env){
  const indexNames=["NDVI","NDMI","SAVI","OSAVI","MSAVI2","EVI","GNDVI","NDRE","MNDWI","NBR","MSI","CIgreen","NDRE2","NDRE3","CIrededge","NIRv"];
  const items=(result.data||[]).map(x=>{const bands=x.outputs?.indices?.bands||{};const indices=Object.fromEntries(indexNames.map((n,i)=>[n,bands["B"+i]?.stats?.mean]));const n=bands.B0?.stats;return {date:x.interval?.from,indices,ndvi:indices.NDVI,ndmi:indices.NDMI,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));
  if(!items.length)return reply({error:'No valid cloud-free pixels found in the last 65 days'},404,allowed);
- const best=items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;return reply({field_id,geometry,ndvi:best.ndvi,ndmi:best.ndmi,indices:best.indices,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; interval with most valid pixels in the last 65 days, newest date on ties',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
+ const newest=items.filter(x=>x.validPixels>=3).sort((a,b)=>b.date.localeCompare(a.date))[0];const best=newest||items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;const series=items.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>({date:x.date,indices:x.indices,ndvi:x.ndvi,ndmi:x.ndmi,valid_pixels:x.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:Number.isFinite(totalPixels)&&totalPixels>0?Math.round(x.validPixels/totalPixels*1000)/10:null}));return reply({field_id,geometry,series,ndvi:best.ndvi,ndmi:best.ndmi,indices:best.indices,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; interval with most valid pixels in the last 65 days, newest date on ties',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
  }catch(e){return reply({error:'Analysis temporarily unavailable',details:String(e.message||e).slice(0,150)},500,allowed)}
 }};
