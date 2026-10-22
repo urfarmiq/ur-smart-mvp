@@ -106,7 +106,7 @@ $('autoAnalyze').onclick=async()=>{
   const forecastRain=sum("precipitation_sum",forecast);
   const relevant=irrigationLogs.filter(x=>Date.parse(x.irrigated_at)<=ref+86400000).sort((a,b)=>Date.parse(b.irrigated_at)-Date.parse(a.irrigated_at));
   const lastIrr= relevant[0]||null,daysSince=lastIrr?Math.max(0,(ref-Date.parse(lastIrr.irrigated_at))/86400000):Infinity;
-  const val=Number((scene.indices||{})["NDMI"]??scene.ndmi),ndvi=Number((scene.indices||{})["NDVI"]??scene.ndvi),coverage=Number(scene.coverage_percent),sceneAge=Math.max(0,(Date.now()-ref)/86400000);
+  const val=Number((scene.indices||{})["NDMI"]??scene.ndmi),ndvi=Number((scene.indices||{})["NDVI"]??scene.ndvi),coverage=scene.coverage_percent==null?NaN:Number(scene.coverage_percent),sceneAge=Math.max(0,(Date.now()-ref)/86400000);
   let score=40; if(Number.isFinite(coverage)){score+=coverage>=60?20:coverage>=25?10:-15} else score-=10;
   score+=weatherCount>=5?15:weatherCount>0?7:-15;score+=lastIrr?(daysSince<=7?10:3):-12;score+=sceneAge<=5?10:sceneAge<=12?5:-8;score=Math.max(20,Math.min(90,score));
   const reasons=[];
@@ -122,7 +122,7 @@ $('autoAnalyze').onclick=async()=>{
   }else if((rain>=15||forecastRain>=15||Number.isFinite(val)&&val>=0.15)&&(!lastIrr||daysSince<=3)){
    advice="لا تظهر إشارة كافية لإضافة رية فورية من هذه البيانات. راجع رطوبة الجذور بعد المطر/الري، ثم تابع المؤشر في المشهد التالي.";
   }
-  weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecast.length?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: Open‑Meteo (تقديرات نموذجية).";
+  weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecast.length?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open‑Meteo</a> (تقديرات نموذجية).";
   recommendationText.textContent=advice;recommendationReason.replaceChildren();reasons.forEach(t=>{const li=document.createElement("li");li.textContent=t;recommendationReason.append(li)});
   confidence.textContent="الثقة التشغيلية: "+score+"% — تقدير اكتمال وحداثة البيانات، وليست احتمالًا إحصائيًا لصحة التشخيص.";
   const cropName=$("field").selectedOptions[0]?.dataset.crop||"محصول غير محدد";currentRecommendation={crop:cropName,scene,advice,reasons,score,weather:{rain_mm_7d:weatherCount?rain:null,et0_mm_7d:weatherCount?eto:null,forecast_rain_mm_3d:forecast.length?forecastRain:null},lastIrrigation:lastIrr};
@@ -145,19 +145,28 @@ $('autoAnalyze').onclick=async()=>{
   try{
    mapArea.textContent="جارٍ تجهيز صورة Sentinel‑2 للمشهد المحدد ووضعها داخل الخريطة...";
    const {data:{session}}=await client.auth.getSession();if(!session)throw Error("انتهت جلسة الدخول");
-   const imageRes=await fetch(SATELLITE_API_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({field_id:fieldId,action:"imagery",map_date:String(scene.date).slice(0,10)})});
-   const imageData=await imageRes.json();if(!imageRes.ok)throw Error(imageData.error||"تعذر جلب صورة القمر لهذا التاريخ");
+   const date=String(scene.date).slice(0,10),headers={"Content-Type":"application/json","Authorization":"Bearer "+session.access_token};
+   const requestMap=async(index)=>{const r=await fetch(SATELLITE_API_URL,{method:"POST",headers,body:JSON.stringify({field_id:fieldId,action:"imagery",map_date:date,map_index:index||undefined})});const d=await r.json();if(!r.ok)throw Error(d.error||"تعذر جلب "+(index?"طبقة "+index:"صورة القمر"));return d};
+   const [imageData,...indexData]=await Promise.all([requestMap(null),...selected.map(requestMap)]);
    mapArea.replaceChildren();
-   const mapHost=document.createElement("div");mapHost.id="urFieldIndicatorMap";mapHost.className="field-map";mapHost.setAttribute("aria-label","خريطة حقل تفاعلية بصورة Sentinel-2 وطبقات المؤشرات");mapArea.append(mapHost);
-   const note=document.createElement("p");note.className="muted map-note";note.textContent="المشهد الفضائي: "+safeDate(imageData.date)+" — Sentinel‑2 L2A. من زر الطبقات بدّل بين صورة القمر وخريطة الشوارع، أو شغّل/أخفِ طبقات المؤشرات. اللون يمثل متوسط المؤشر للحقل كله.";mapArea.append(note);
+   const mapHost=document.createElement("div");mapHost.id="urFieldIndicatorMap";mapHost.className="field-map";mapHost.setAttribute("aria-label","خريطة تفاعلية بصورة Sentinel-2 وطبقات مكانية للمؤشرات");mapArea.append(mapHost);
+   const note=document.createElement("p");note.className="muted map-note";note.textContent="المشهد الفضائي: "+safeDate(imageData.date)+" — Sentinel‑2 L2A. طبقات المؤشرات تحسب قيمة كل بكسل مكانيًا؛ بدّل بينها من زر الطبقات. الدقة المصدرية حتى 10–20 مترًا، والتكبير لا يضيف تفاصيل جديدة.";mapArea.append(note);
    const map=L.map(mapHost,{zoomControl:true,scrollWheelZoom:false});
+   const clipToField=async(item)=>{
+    const img=new Image();img.src=item.image;await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error("تعذر تجهيز طبقة الصورة"))});
+    const canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0);
+    ctx.globalCompositeOperation="destination-in";ctx.beginPath();
+    const rings=data.geometry.coordinates||[],bounds=item.bounds,[southwest,northeast]=bounds,minLon=southwest[1],maxLon=northeast[1],minLat=southwest[0],maxLat=northeast[0];
+    for(const ring of rings){ring.forEach(([lon,lat],i)=>{const x=(lon-minLon)/(maxLon-minLon)*canvas.width,y=(maxLat-lat)/(maxLat-minLat)*canvas.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath()}
+    ctx.fillStyle="#fff";ctx.fill("evenodd");ctx.globalCompositeOperation="source-over";
+    return L.imageOverlay(canvas.toDataURL("image/png"),bounds,{opacity:1,interactive:false});
+   };
    const streets=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"});
-   const satellite=L.imageOverlay(imageData.image,imageData.bounds,{opacity:1,alt:"مشهد Sentinel-2 الحقيقي بتاريخ "+imageData.date}).addTo(map);
+   const satellite=await clipToField(imageData);satellite.addTo(map);
    const boundary=L.geoJSON(data.geometry,{style:{color:"#ffffff",weight:3,fillOpacity:0}}).addTo(map);
    const labels={NDVI:"الغطاء النباتي",NDMI:"رطوبة الغطاء النباتي",SAVI:"الغطاء مع تقليل أثر التربة",OSAVI:"الغطاء مع تصحيح التربة",MSAVI2:"الغطاء مع تقليل أثر التربة (MSAVI2)",EVI:"الغطاء النباتي المحسّن",GNDVI:"الغطاء باستخدام الأخضر",NDRE:"حافة الأحمر",MNDWI:"المياه السطحية",NBR:"الحرق/الاضطراب النباتي",MSI:"نسبة SWIR إلى NIR",CIgreen:"مؤشر الكلوروفيل الأخضر",NDRE2:"حافة أحمر بديلة (B8A/B06)",NDRE3:"حافة أحمر بديلة (B8A/B07)",CIrededge:"كلوروفيل حافة الأحمر",NIRv:"انعكاس NIR الموزون بـNDVI"};
-   const ranges={NDVI:[-0.2,0.8],NDMI:[-0.5,0.5],SAVI:[-0.2,0.8],OSAVI:[-0.2,0.8],MSAVI2:[-0.2,0.8],EVI:[-0.2,1],GNDVI:[-0.2,0.8],NDRE:[-0.2,0.8],MNDWI:[-0.8,0.8],NBR:[-1,1],MSI:[0,2],CIgreen:[0,4],NDRE2:[-0.2,0.8],NDRE3:[-0.2,0.8],CIrededge:[0,4],NIRv:[0,0.5]};
-   const vals=scene.indices||{NDVI:scene.ndvi,NDMI:scene.ndmi},overlays={};
-   for(const key of selected){const value=Number(vals[key]);if(!Number.isFinite(value))throw Error("لا تتوفر قراءة صالحة للمؤشر "+key);const range=ranges[key]||[-1,1],t=Math.max(0,Math.min(1,(value-range[0])/(range[1]-range[0]))),color="hsl("+Math.round(t*120)+" 62% 42%)";const layer=L.geoJSON(data.geometry,{style:{color:"#174d32",weight:2,fillColor:color,fillOpacity:0.4}});layer.bindPopup("<b>"+key+" — "+labels[key]+"</b><br>متوسط الحقل: "+value.toFixed(3)+"<br>تاريخ المشهد: "+safeDate(scene.date));overlays[key+" — "+labels[key]+" ("+value.toFixed(3)+")"]=layer}
+   const overlays={};
+   for(let i=0;i<selected.length;i++){const key=selected[i],layer=await clipToField(indexData[i]);layer.setOpacity(0.78);overlays[key+" — "+labels[key]]=layer;if(i===0)layer.addTo(map)}
    L.control.layers({"صورة Sentinel‑2 الحديثة":satellite,"خريطة الشوارع":streets},overlays,{collapsed:false,position:"topright"}).addTo(map);
    boundary.bringToFront();map.fitBounds(boundary.getBounds(),{padding:[28,28],maxZoom:17});
    const legend=document.createElement("div");legend.className="map-legend";legend.innerHTML="<span>قيمة أقل</span><i></i><span>قيمة أعلى</span>";mapArea.append(legend);
