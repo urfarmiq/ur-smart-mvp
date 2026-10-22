@@ -8,6 +8,17 @@ function reply(body,status=200,origin=''){return new Response(JSON.stringify(bod
 const EVALSCRIPT=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B08","B11","SCL","dataMask"]}],output:[{id:"ndvi",bands:1,sampleType:"FLOAT32"},{id:"ndmi",bands:1,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
 function evaluatePixel(s){let good=s.dataMask===1&&![0,1,3,8,9,10,11].includes(s.SCL);let nv=s.B08+s.B04, nm=s.B08+s.B11;if(!good||nv<=0||nm<=0)return {ndvi:[0],ndmi:[0],dataMask:[0]};return {ndvi:[(s.B08-s.B04)/nv],ndmi:[(s.B08-s.B11)/nm],dataMask:[1]};}`;
+function toUtm(lon,lat,zone){
+ const a=6378137,e2=0.00669438,ep2=e2/(1-e2),k0=0.9996;
+ const phi=lat*Math.PI/180,lambda=lon*Math.PI/180,lambda0=((zone-1)*6-180+3)*Math.PI/180;
+ const sin=Math.sin(phi),cos=Math.cos(phi),tan=Math.tan(phi);
+ const N=a/Math.sqrt(1-e2*sin*sin),T=tan*tan,C=ep2*cos*cos,A=cos*(lambda-lambda0);
+ const M=a*((1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)*phi-(3*e2/8+3*e2*e2/32+45*e2*e2*e2/1024)*Math.sin(2*phi)+(15*e2*e2/256+45*e2*e2*e2/1024)*Math.sin(4*phi)-(35*e2*e2*e2/3072)*Math.sin(6*phi));
+ let x=500000+k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120);
+ let y=k0*(M+N*tan*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720));
+ if(lat<0)y+=10000000;
+ return [x,y];
+}
 export default {async fetch(req,env){
  const origin=req.headers.get('Origin')||'';
  const allowed=env.ALLOWED_ORIGIN||'https://urfarmiq.github.io';
@@ -36,12 +47,12 @@ export default {async fetch(req,env){
  if(!oauth.ok)return reply({error:'Satellite authentication failed'},502,allowed);
  const token=(await oauth.json()).access_token;
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
- const statsRequest={input:{bounds:{geometry:{type:'Polygon',coordinates:geometry.coordinates},properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/4326'}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D'},evalscript:EVALSCRIPT,resx:20,resy:20}};
+ const ring=geometry.coordinates[0];const center=ring.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,ring.length-1));const zone=Math.floor((center[0]+180)/6)+1;const epsg=(center[1]<0?32700:32600)+zone;const projected={type:'Polygon',coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,zone)))};const statsRequest={input:{bounds:{geometry:projected,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/'+epsg}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D'},evalscript:EVALSCRIPT,resx:20,resy:20}};
  const sr=await fetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)});
  if(!sr.ok){const message=(await sr.text()).slice(0,200);return reply({error:'Satellite processing failed',details:message},502,allowed)}
  const result=await sr.json();
- const items=(result.data||[]).map(x=>{const n=x.outputs?.ndvi?.bands?.B0?.stats,m=x.outputs?.ndmi?.bands?.B0?.stats;return {date:x.interval?.from,ndvi:n?.mean,ndmi:m?.mean,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.date.localeCompare(a.date));
+ const items=(result.data||[]).map(x=>{const n=x.outputs?.ndvi?.bands?.B0?.stats,m=x.outputs?.ndmi?.bands?.B0?.stats;return {date:x.interval?.from,ndvi:n?.mean,ndmi:m?.mean,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));
  if(!items.length)return reply({error:'No valid cloud-free pixels found in the last 65 days'},404,allowed);
- const best=items[0];return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; newest available daily interval',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
+ const best=items[0];return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,geometry_pixels:result.geometryPixelCount??null,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; newest available daily interval',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
  }catch(e){return reply({error:'Analysis temporarily unavailable',details:String(e.message||e).slice(0,150)},500,allowed)}
 }};
