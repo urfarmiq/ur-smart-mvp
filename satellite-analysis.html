@@ -146,7 +146,7 @@ $('autoAnalyze').onclick=async()=>{
    mapArea.textContent="جارٍ تجهيز صورة Sentinel‑2 للمشهد المحدد ووضعها داخل الخريطة...";
    const {data:{session}}=await client.auth.getSession();if(!session)throw Error("انتهت جلسة الدخول");
    const date=String(scene.date).slice(0,10),headers={"Content-Type":"application/json","Authorization":"Bearer "+session.access_token};
-   const requestMap=async(index)=>{const r=await fetch(SATELLITE_API_URL,{method:"POST",headers,body:JSON.stringify({field_id:fieldId,action:"imagery",map_date:date,map_index:index||undefined})});const d=await r.json();if(!r.ok)throw Error(d.error||"تعذر جلب "+(index?"طبقة "+index:"صورة القمر"));return d};
+   const requestMap=async(index)=>{const r=await fetch(SATELLITE_API_URL,{method:"POST",headers,body:JSON.stringify({field_id:fieldId,action:"imagery",map_date:date,map_index:index||undefined})});const d=await r.json();if(!r.ok)throw Error((d.error||"تعذر جلب "+(index?"طبقة "+index:"صورة القمر"))+(d.details?" ("+d.details+")":""));return d};
    const [imageData,...indexData]=await Promise.all([requestMap(null),...selected.map(requestMap)]);
    mapArea.replaceChildren();
    const mapHost=document.createElement("div");mapHost.id="urFieldIndicatorMap";mapHost.className="field-map";mapHost.setAttribute("aria-label","خريطة تفاعلية بصورة Sentinel-2 وطبقات مكانية للمؤشرات");mapArea.append(mapHost);
@@ -155,6 +155,7 @@ $('autoAnalyze').onclick=async()=>{
    const clipToField=async(item)=>{
     const img=new Image();img.src=item.image;await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error("تعذر تجهيز طبقة الصورة"))});
     const canvas=document.createElement("canvas");canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0);
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height),pixelData=pixels.data;for(let p=0;p<pixelData.length;p+=4)if(pixelData[p]<3&&pixelData[p+1]<3&&pixelData[p+2]<3)pixelData[p+3]=0;ctx.putImageData(pixels,0,0);
     ctx.globalCompositeOperation="destination-in";ctx.beginPath();
     const rings=data.geometry.coordinates||[],bounds=item.bounds,[southwest,northeast]=bounds,minLon=southwest[1],maxLon=northeast[1],minLat=southwest[0],maxLat=northeast[0];
     for(const ring of rings){ring.forEach(([lon,lat],i)=>{const x=(lon-minLon)/(maxLon-minLon)*canvas.width,y=(maxLat-lat)/(maxLat-minLat)*canvas.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath()}
