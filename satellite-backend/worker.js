@@ -6,8 +6,20 @@ const SH='https://sh.dataspace.copernicus.eu';
 const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 function reply(body,status=200,origin=''){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','access-control-allow-origin':origin||'https://urfarmiq.github.io','vary':'Origin','cache-control':'no-store'}})}
 const EVALSCRIPT=`//VERSION=3
-function setup(){return {input:[{bands:["B04","B08","B11","SCL","dataMask"]}],output:[{id:"ndvi",bands:1,sampleType:"FLOAT32"},{id:"ndmi",bands:1,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
-function evaluatePixel(s){let good=s.dataMask===1&&![0,1,3,8,9,10,11].includes(s.SCL);let nv=s.B08+s.B04, nm=s.B08+s.B11;if(!good||nv<=0||nm<=0)return {ndvi:[0],ndmi:[0],dataMask:[0]};return {ndvi:[(s.B08-s.B04)/nv],ndmi:[(s.B08-s.B11)/nm],dataMask:[1]};}`;
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
+function evaluatePixel(s){
+ const good=s.dataMask===1&&![0,1,3,8,9,10,11].includes(s.SCL);
+ const r=(a,b)=>Math.abs(b)>1e-8?a/b:0;
+ const ndvi=r(s.B08-s.B04,s.B08+s.B04),ndmi=r(s.B08-s.B11,s.B08+s.B11);
+ const savi=r(1.5*(s.B08-s.B04),s.B08+s.B04+0.5),osavi=r(1.16*(s.B08-s.B04),s.B08+s.B04+0.16);
+ const msavi2=(2*s.B08+1-Math.sqrt(Math.max(0,(2*s.B08+1)**2-8*(s.B08-s.B04))))/2;
+ const evi=r(2.5*(s.B08-s.B04),s.B08+6*s.B04-7.5*s.B02+1),gndvi=r(s.B08-s.B03,s.B08+s.B03);
+ const ndre=r(s.B08-s.B05,s.B08+s.B05),mndwi=r(s.B03-s.B11,s.B03+s.B11);
+ const nbr=r(s.B08-s.B12,s.B08+s.B12),msi=r(s.B11,s.B08),cigreen=r(s.B08,s.B03)-1;\n const ndre2=r(s.B8A-s.B06,s.B8A+s.B06),ndre3=r(s.B8A-s.B07,s.B8A+s.B07),ciredge=r(s.B8A,s.B05)-1,nirv=ndvi*s.B08;
+ if(!good)return {indices:Array(16).fill(0),dataMask:[0]};
+ return {indices:[ndvi,ndmi,savi,osavi,msavi2,evi,gndvi,ndre,mndwi,nbr,msi,cigreen,ndre2,ndre3,ciredge,nirv],dataMask:[1]};
+}
+`;
 function toUtm(lon,lat,zone){
  const a=6378137,e2=0.00669438,ep2=e2/(1-e2),k0=0.9996;
  const phi=lat*Math.PI/180,lambda=lon*Math.PI/180,lambda0=((zone-1)*6-180+3)*Math.PI/180;
@@ -29,7 +41,7 @@ export default {async fetch(req,env){
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
  const bearer=req.headers.get('Authorization')||'';
  if(!/^Bearer [^ ]+$/.test(bearer))return reply({error:'Login required'},401,allowed);
- const {field_id}=await req.json();
+ const {field_id,action,map_date:mapDate}=await req.json();
  if(!/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(field_id||''))return reply({error:'Invalid field ID'},400,allowed);
  const headers={'apikey':env.SUPABASE_PUBLISHABLE_KEY,'Authorization':bearer};
  const auth=await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers});
@@ -48,11 +60,33 @@ export default {async fetch(req,env){
  const token=(await oauth.json()).access_token;
  const now=new Date(),start=new Date(now.getTime()-65*86400000);
  const ring=geometry.coordinates[0];const center=ring.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,ring.length-1));const zone=Math.floor((center[0]+180)/6)+1;const epsg=(center[1]<0?32700:32600)+zone;const projected={type:'Polygon',coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,zone)))};const statsRequest={input:{bounds:{geometry:projected,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/'+epsg}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:60}}]},aggregation:{timeRange:{from:start.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D'},evalscript:EVALSCRIPT,resx:20,resy:20}};
+ if(action==="maps"){
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(mapDate||""))return reply({error:"Invalid map date"},400,allowed);
+   const day=new Date(mapDate+"T00:00:00.000Z");if(Number.isNaN(day.getTime())||day.toISOString().slice(0,10)!==mapDate||day<start||day>now)return reply({error:"Map date is outside the analysis window"},400,allowed);
+   const from=day.toISOString(),to=new Date(day.getTime()+86400000-1).toISOString();
+   const bounds=projected.coordinates.flat().reduce((b,p)=>({minX:Math.min(b.minX,p[0]),minY:Math.min(b.minY,p[1]),maxX:Math.max(b.maxX,p[0]),maxY:Math.max(b.maxY,p[1])}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
+   const wide=bounds.maxX-bounds.minX,high=bounds.maxY-bounds.minY;if(!wide||!high)return reply({error:"Invalid field map bounds"},400,allowed);
+   const maxSide=640,width=Math.max(96,Math.min(maxSide,Math.round(maxSide*wide/Math.max(wide,high)))),height=Math.max(96,Math.min(maxSide,Math.round(maxSide*high/Math.max(wide,high))));
+   const crs="http://www.opengis.net/def/crs/EPSG/0/"+epsg;
+   const makeMap=async(kind)=>{
+     const ndvi=kind==="ndvi";
+     const bands=ndvi?["B04","B08","SCL","dataMask"]:["B08","B11","SCL","dataMask"];
+     const expr=ndvi?"(s.B08-s.B04)/(s.B08+s.B04)":"(s.B08-s.B11)/(s.B08+s.B11)";
+     const offset=ndvi?"0.2":"0.5";
+     const script="//VERSION=3\nfunction setup(){return {input:[{bands:"+JSON.stringify(bands)+"}],output:{bands:4,sampleType:\"UINT8\"}};}\nfunction evaluatePixel(s){if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];const v="+expr+";const t=Math.max(0,Math.min(1,(v+"+offset+")/1));return [Math.round(220*(1-t)),Math.round(110+145*t),Math.round(55*(1-t)),255];}";
+     const body={input:{bounds:{geometry:projected,properties:{crs}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
+     const r=await fetch(SH+"/process/v1",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});
+     if(!r.ok)throw Error("Map generation failed ("+r.status+"): "+(await r.text()).slice(0,120));
+     const bytes=new Uint8Array(await r.arrayBuffer());let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return "data:image/png;base64,"+btoa(binary);
+   };
+   const maps=await Promise.all([makeMap("ndvi"),makeMap("ndmi")]);return reply({field_id,date:mapDate,source:"Sentinel-2 L2A via Copernicus Data Space Process API",resolution_m:20,maps:{ndvi:maps[0],ndmi:maps[1]}},200,allowed);
+ }
  const sr=await fetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)});
  if(!sr.ok){const message=(await sr.text()).slice(0,200);return reply({error:'Satellite processing failed',details:message},502,allowed)}
  const result=await sr.json();
- const items=(result.data||[]).map(x=>{const n=x.outputs?.ndvi?.bands?.B0?.stats,m=x.outputs?.ndmi?.bands?.B0?.stats;return {date:x.interval?.from,ndvi:n?.mean,ndmi:m?.mean,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));
+ const indexNames=["NDVI","NDMI","SAVI","OSAVI","MSAVI2","EVI","GNDVI","NDRE","MNDWI","NBR","MSI","CIgreen","NDRE2","NDRE3","CIrededge","NIRv"];
+ const items=(result.data||[]).map(x=>{const bands=x.outputs?.indices?.bands||{};const indices=Object.fromEntries(indexNames.map((n,i)=>[n,bands["B"+i]?.stats?.mean]));const n=bands.B0?.stats;return {date:x.interval?.from,indices,ndvi:indices.NDVI,ndmi:indices.NDMI,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));
  if(!items.length)return reply({error:'No valid cloud-free pixels found in the last 65 days'},404,allowed);
- const best=items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; interval with most valid pixels in the last 65 days, newest date on ties',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
+ const best=items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;return reply({field_id,ndvi:best.ndvi,ndmi:best.ndmi,indices:best.indices,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,method:'Mean of valid SCL-masked pixels; interval with most valid pixels in the last 65 days, newest date on ties',note:'Field averages, not fertilizer or irrigation prescriptions'},200,allowed);
  }catch(e){return reply({error:'Analysis temporarily unavailable',details:String(e.message||e).slice(0,150)},500,allowed)}
 }};
