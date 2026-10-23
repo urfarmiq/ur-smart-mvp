@@ -15,7 +15,8 @@ function evaluatePixel(s){
  const msavi2=(2*s.B08+1-Math.sqrt(Math.max(0,(2*s.B08+1)**2-8*(s.B08-s.B04))))/2;
  const evi=r(2.5*(s.B08-s.B04),s.B08+6*s.B04-7.5*s.B02+1),gndvi=r(s.B08-s.B03,s.B08+s.B03);
  const ndre=r(s.B08-s.B05,s.B08+s.B05),mndwi=r(s.B03-s.B11,s.B03+s.B11);
- const nbr=r(s.B08-s.B12,s.B08+s.B12),msi=r(s.B11,s.B08),cigreen=r(s.B08,s.B03)-1;\n const ndre2=r(s.B8A-s.B06,s.B8A+s.B06),ndre3=r(s.B8A-s.B07,s.B8A+s.B07),ciredge=r(s.B8A,s.B05)-1,nirv=ndvi*s.B08;
+ const nbr=r(s.B08-s.B12,s.B08+s.B12),msi=r(s.B11,s.B08),cigreen=r(s.B08,s.B03)-1;
+ const ndre2=r(s.B8A-s.B06,s.B8A+s.B06),ndre3=r(s.B8A-s.B07,s.B8A+s.B07),ciredge=r(s.B8A,s.B05)-1,nirv=ndvi*s.B08;
  if(!good)return {indices:Array(16).fill(0),dataMask:[0]};
  return {indices:[ndvi,ndmi,savi,osavi,msavi2,evi,gndvi,ndre,mndwi,nbr,msi,cigreen,ndre2,ndre3,ciredge,nirv],dataMask:[1]};
 }
