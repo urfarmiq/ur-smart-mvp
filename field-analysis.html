@@ -485,12 +485,12 @@ $('getAdviceButton').addEventListener('click',async()=>{
  if(!crop||!stage||!symptoms||!moisture){result.style.display='block';result.textContent='أكمل المحصول ومرحلة النمو وحالة النبات ورطوبة التربة أولًا.';return}
  const advice=[],reasons=[],sat=fieldContext.satellite,weather=fieldContext.weather,logs=fieldContext.logs||[];
  const profiles={
-  'الحنطة':{kc:[0.35,0.75,1.15,0.45],name:'الحنطة/القمح'},
-  'القمح':{kc:[0.35,0.75,1.15,0.45],name:'الحنطة/القمح'},
-  'الشعير':{kc:[0.35,0.75,1.15,0.45],name:'الشعير'},
-  'الذرة':{kc:[0.40,0.80,1.15,0.70],name:'الذرة الحبية'},
-  'الطماطم':{kc:[0.45,0.75,1.15,0.80],name:'الطماطم'},
-  'البطاطا':{kc:[0.45,0.75,1.15,0.85],name:'البطاطا'}
+  'الحنطة':{kc:[0.70,0.925,1.15,0.325],name:'القمح الشتوي على تربة غير متجمدة'},
+  'القمح':{kc:[0.70,0.925,1.15,0.325],name:'القمح الشتوي على تربة غير متجمدة'},
+  'الشعير':{kc:[0.30,0.725,1.15,0.25],name:'الشعير'},
+  'الذرة':{kc:[0.30,0.75,1.20,0.475],name:'الذرة الحبية'},
+  'الطماطم':{kc:[0.60,0.875,1.15,0.80],name:'الطماطم'},
+  'البطاطا':{kc:[0.50,0.825,1.15,0.75],name:'البطاطا'}
  };
  const profile=profiles[crop]||null,stageIndex=stage==='بداية النمو'?0:stage==='النمو الخضري'?1:stage==='النضج'?3:2;
  let kc=null,stageLabel='';
@@ -534,15 +534,17 @@ $('getAdviceButton').addEventListener('click',async()=>{
  if(sat){
   const indices=sat.indices||{},ndvi=Number(indices.NDVI),ndmi=Number(indices.NDMI),coverage=Number(sat.coverage_percent);
   reasons.push('آخر مشهد Sentinel‑2 بتاريخ '+String(sat.date||'').slice(0,10)+': NDVI '+(Number.isFinite(ndvi)?ndvi.toFixed(3):'غير متاح')+'، NDMI '+(Number.isFinite(ndmi)?ndmi.toFixed(3):'غير متاح')+'، تغطية صالحة '+(Number.isFinite(coverage)?coverage.toFixed(1)+'%':'غير محددة')+'.');
-  const series=fieldContext.series||[],prev=series.find(row=>row.acquisition_date!==String(sat.date||'').slice(0,10));
-  if(prev){
-   const pndvi=Number(prev.indices?.NDVI),pndmi=Number(prev.indices?.NDMI);
-   if(Number.isFinite(ndvi)&&Number.isFinite(pndvi))reasons.push('مقارنة بالمشهد السابق ('+prev.acquisition_date+'): تغير NDVI '+(ndvi-pndvi>=0?'+':'')+(ndvi-pndvi).toFixed(3)+'.');
-   if(Number.isFinite(ndmi)&&Number.isFinite(pndmi))reasons.push('مقارنة بالمشهد السابق ('+prev.acquisition_date+'): تغير NDMI '+(ndmi-pndmi>=0?'+':'')+(ndmi-pndmi).toFixed(3)+'. هذا تغير طيفي نسبي وليس قياسًا مباشرًا لرطوبة التربة.');
-   if(Number.isFinite(ndvi)&&Number.isFinite(pndvi)&&ndvi-pndvi<=-0.08)advice.push('انخفض NDVI عن المشهد السابق بوضوح نسبيًا؛ افحص الجزء المتأثر ميدانيًا وتأكد من مقارنة تاريخين متقاربين في الموسم قبل تغيير الري أو التسميد.');
-   if(Number.isFinite(ndmi)&&Number.isFinite(pndmi)&&ndmi-pndmi<=-0.08)advice.push('انخفض NDMI عن المشهد السابق؛ افحص رطوبة منطقة الجذور وانتظام الري. لا يُفسر هذا وحده على أنه جفاف.');
+  const series=fieldContext.series||[],currentDate=String(sat.date||'').slice(0,10),prev=series.find(row=>row.acquisition_date!==currentDate);
+  const sceneAgeDays=currentDate?Math.max(0,(Date.now()-new Date(currentDate+'T12:00:00').getTime())/86400000):Infinity;
+  if(Number.isFinite(sceneAgeDays)&&sceneAgeDays>30)reasons.push('المشهد الفضائي أقدم من 30 يومًا؛ اعتبره سياقًا تاريخيًا لا وصفًا لحالة اليوم.');
+  let comparablePrev=null;
+  if(prev){const gap=Math.abs((new Date(currentDate)-new Date(prev.acquisition_date))/86400000);if(Number.isFinite(gap)&&gap<=60)comparablePrev=prev;}
+  if(comparablePrev){
+   const pndvi=Number(comparablePrev.indices?.NDVI),pndmi=Number(comparablePrev.indices?.NDMI);
+   if(Number.isFinite(ndvi)&&Number.isFinite(pndvi)){const delta=ndvi-pndvi;reasons.push('مقارنة بالمشهد السابق ('+comparablePrev.acquisition_date+'): تغير NDVI '+(delta>=0?'+':'')+delta.toFixed(3)+'.');if(delta<0)advice.push('NDVI أقل من المشهد السابق؛ افحص هذه المنطقة ميدانيًا قبل أي إجراء، مع مراعاة اختلاف مرحلة النمو أو تاريخ الزراعة بين المشهدين.');}
+   if(Number.isFinite(ndmi)&&Number.isFinite(pndmi)){const delta=ndmi-pndmi;reasons.push('مقارنة بالمشهد السابق ('+comparablePrev.acquisition_date+'): تغير NDMI '+(delta>=0?'+':'')+delta.toFixed(3)+'. وهو تغير طيفي نسبي وليس قياسًا مباشرًا لرطوبة التربة.');if(delta<0)advice.push('NDMI أقل من المشهد السابق؛ افحص رطوبة منطقة الجذور وانتظام الري، ولا تعتبر التغير وحده دليل جفاف.');}
   }else{
-   advice.push('المشهد الحالي يعطي لقطة واحدة فقط؛ لا يمكن تحديد اتجاه تحسن أو تراجع دون مشهد سابق صالح للمقارنة.');
+   advice.push('لا توجد مقارنة زمنية قريبة صالحة (مشهدان خلال 60 يومًا)؛ المؤشر الحالي لقطة واحدة ولا يكشف وحده اتجاه الحقل.');
   }
   if(Number.isFinite(coverage)&&coverage<70)reasons.push('التغطية الصالحة أقل من 70%؛ قد لا تمثل القراءة كامل الحقل.');
  }else reasons.push('لم تتوفر قراءة فضائية حديثة صالحة للحقل؛ التوصية تعتمد على بيانات الطقس والمدخلات الميدانية فقط.');
@@ -551,7 +553,8 @@ $('getAdviceButton').addEventListener('click',async()=>{
   reasons.push('آخر ري مسجل منذ '+ageDays.toFixed(1)+' يومًا'+(last.water_depth_mm===null?'':(' بعمق مسجل '+Number(last.water_depth_mm).toLocaleString('ar-IQ')+' ملم'))+'.');
   if(ageDays<1&&moisture==='جافة')advice.push('يوجد ري مسجل خلال آخر 24 ساعة مع بقاء التربة مدخلة كجافة؛ افحص وصول الماء وتجانس البلل وعمق الجذور قبل إعادة الري.');
  }else if($('savedField').value)reasons.push('لا يوجد سجل ري لهذا الحقل؛ أضف سجلات بتاريخ وعمق الماء (ملم) لتحسين المقارنة.');
- const hasSatellite=!!sat&&Number(sat.coverage_percent)>=70&&Number(sat.valid_pixels)>=10,hasWeather=!!weather,hasHistory=(fieldContext.series||[]).length>=2,hasFieldInput=moisture!=='غير معروفة',hasLogs=logs.length>0;
+ const sceneFreshnessDays=sat?.date?((Date.now()-new Date(String(sat.date).slice(0,10)+'T12:00:00').getTime())/86400000):Infinity;
+ const hasSatellite=!!sat&&Number(sat.coverage_percent)>=70&&Number(sat.valid_pixels)>=10&&Number.isFinite(sceneFreshnessDays)&&sceneFreshnessDays>=0&&sceneFreshnessDays<=30,hasWeather=!!weather,hasHistory=(fieldContext.series||[]).some(row=>row.acquisition_date!==String(sat?.date||'').slice(0,10)&&Math.abs((new Date(String(sat?.date||''))-new Date(row.acquisition_date))/86400000)<=60),hasFieldInput=moisture!=='غير معروفة',hasLogs=logs.length>0;
  let confidence='منخفضة — الاعتماد الأكبر على مدخلات عامة أو مشهد واحد.';
  if(hasSatellite&&hasWeather&&hasHistory&&hasFieldInput&&hasLogs)confidence='متوسطة — مناسبة لتحديد أولوية الفحص فقط؛ لا تكفي لجرعة ري أو سماد.';
  else if(hasSatellite&&hasWeather&&hasFieldInput)confidence='منخفضة إلى متوسطة — تتوفر بيانات فضائية وطقس ومدخل ميداني، لكن سجل المقارنة أو الري محدود.';
@@ -564,7 +567,7 @@ $('getAdviceButton').addEventListener('click',async()=>{
  const reasonList=document.createElement('ul');reasons.forEach(text=>{const li=document.createElement('li');li.textContent=text;reasonList.append(li)});
  const actionTitle=document.createElement('strong');actionTitle.textContent='الخطوات المقترحة';
  const list=document.createElement('ol');advice.forEach(text=>{const li=document.createElement('li');li.textContent=text;list.append(li)});
- const disclaimer=document.createElement('p');disclaimer.className='muted';disclaimer.textContent='التحليل إرشادي قائم على قواعد زراعية ومعاملات مرجعية FAO، وليس تشخيصًا أو وصفة دقيقة. ETc تقدير للاستهلاك التبخري وليس جرعة ري. لا يصدر النظام كمية ماء أو جرعة سماد/مبيد من دون معايرة محلية وبيانات تربة وجذور وقياس ميداني.';
+ const disclaimer=document.createElement('p');disclaimer.className='muted';disclaimer.textContent='التحليل إرشادي لا يشخّص مرضًا ولا يحدد جرعة ري. قيم Kc مأخوذة من جداول FAO‑56 لمحاصيل مدارة جيدًا في مناخ شبه رطب؛ مرحلة التطور استيفاء تقريبي، وتحتاج القيم إلى تصحيح محلي للمناخ والري والصنف. ETc تقدير للاستهلاك التبخري وليس جرعة ري صافية.';
  const source=document.createElement('p');source.className='muted';source.innerHTML='مرجع معاملات Kc: <a href="https://www.fao.org/4/x0490e/x0490e0b.htm" target="_blank" rel="noopener">FAO Irrigation and Drainage Paper 56</a>.';
  result.append(title,info,conf,reasonTitle,reasonList,actionTitle,list,disclaimer,source);result.style.display='block';
  if(session&&farm){
