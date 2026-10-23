@@ -76,27 +76,27 @@ export default {async fetch(req,env){
      if(!indexExpressions[mapIndex])return reply({error:"Unsupported map indicator"},400,allowed);
      const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI",span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:3,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(!(Number(s.dataMask)>0)||(Number.isFinite(Number(s.SCL))&&[0,1,3,8,9,10,11].includes(Number(s.SCL))))return [0,0,0,0];
+ if(!(Number(s.dataMask)>0)||(Number.isFinite(Number(s.SCL))&&[0,1,3,8,9,10,11].includes(Number(s.SCL))))return [90,90,90];
  const v=${expression};
- if(!Number.isFinite(v))return [0,0,0,0];
+ if(!Number.isFinite(v))return [90,90,90];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
  ${invert?"t=1-t;":""}
  if("${mapIndex}"==="NDMI"){
-  if(t<0.5){const u=t*2;return [255,Math.round(35+185*u),Math.round(45-5*u),205]}
-  const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(220-100*u),Math.round(40+215*u),205]
+  if(t<0.5){const u=t*2;return [255,Math.round(35+185*u),Math.round(45-5*u)]}
+  const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(220-100*u),Math.round(40+215*u)]
  }
- if(t<0.5){const u=t*2;return [255,Math.round(55+185*u),Math.round(45-5*u),205]}
- const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(240-55*u),Math.round(40+145*u),205];
+ if(t<0.5){const u=t*2;return [255,Math.round(55+185*u),Math.round(45-5*u)]}
+ const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(240-55*u),Math.round(40+145*u)];
 }`;
    }else{
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:3,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(!(Number(s.dataMask)>0)||(Number.isFinite(Number(s.SCL))&&[0,1,3,8,9,10,11].includes(Number(s.SCL))))return [0,0,0,0];
+ if(!(Number(s.dataMask)>0)||(Number.isFinite(Number(s.SCL))&&[0,1,3,8,9,10,11].includes(Number(s.SCL))))return [90,90,90];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
- return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
+ return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02))];
 }`;
    }
    const body={input:{bounds:{geometry,properties:{crs:"http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
