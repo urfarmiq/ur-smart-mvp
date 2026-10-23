@@ -76,10 +76,11 @@ export default {async fetch(req,env){
    if(mapIndex){
      if(!indexExpressions[mapIndex])return reply({error:"Unsupported map indicator"},400,allowed);
      const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI",span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
+     const requiredBands={NDVI:["B08","B04"],NDMI:["B08","B11"],SAVI:["B08","B04"],OSAVI:["B08","B04"],MSAVI2:["B08","B04"],EVI:["B08","B04","B02"],GNDVI:["B08","B03"],NDRE:["B08","B05"],MNDWI:["B03","B11"],NBR:["B08","B12"],MSI:["B11","B08"],CIgreen:["B08","B03"],NDRE2:["B8A","B06"],NDRE3:["B8A","B07"],CIrededge:["B8A","B05"],NIRv:["B08","B04"]}[mapIndex];
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- const scl=Number(s.SCL),bands=["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12"].map(k=>Number(s[k]));const valid=Number(s.dataMask)>0&&bands.every(Number.isFinite)&&bands.some(v=>v>0)&&Number.isFinite(scl)&&![0,1,3,8,9,10,11].includes(Math.round(scl));
+ const scl=Number(s.SCL),valid=Number(s.dataMask)>0&&requiredBands.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0)&&(!Number.isFinite(scl)||![0,1,3,8,9,10,11].includes(Math.round(scl)));
  if(!valid)return [0,0,0,0];
  const v=${expression};
  if(!(v===v&&v!==Infinity&&v!==-Infinity))return [0,0,0,0];
@@ -96,8 +97,8 @@ function evaluatePixel(s){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- const scl=Number(s.SCL),bands=["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12"].map(k=>Number(s[k]));const valid=Number(s.dataMask)>0&&bands.every(Number.isFinite)&&bands.some(v=>v>0)&&Number.isFinite(scl)&&![0,1,3,8,9,10,11].includes(Math.round(scl));
- if(!valid||!Number.isFinite(s.B04)||!Number.isFinite(s.B03)||!Number.isFinite(s.B02))return [0,0,0,0];
+ const scl=Number(s.SCL),rgb=["B04","B03","B02"],valid=Number(s.dataMask)>0&&rgb.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0)&&(!Number.isFinite(scl)||![0,1,3,8,9,10,11].includes(Math.round(scl)));
+ if(!valid)return [0,0,0,0];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
 }`;
