@@ -157,7 +157,7 @@ $('autoAnalyze').onclick=async()=>{
    const fetchKeys=[...new Set([...selected,"NDVI","NDMI","NDRE"])];const [imageData,...indexData]=await Promise.all([requestMap(null),...fetchKeys.map(requestMap)]);const indexByKey=Object.fromEntries(fetchKeys.map((key,i)=>[key,indexData[i]]));
    mapArea.replaceChildren();
    const mapHost=document.createElement("div");mapHost.id="urFieldIndicatorMap";mapHost.className="field-map";mapHost.setAttribute("aria-label","خريطة تفاعلية بصورة Sentinel-2 وطبقات مكانية للمؤشرات");mapArea.append(mapHost);
-   const note=document.createElement("p");note.className="muted map-note";note.textContent="المشهد الفضائي: "+safeDate(imageData.date)+" — Sentinel‑2 L2A. طبقات المؤشرات تحسب قيمة كل بكسل مكانيًا؛ بدّل بينها من زر الطبقات. الدقة المصدرية حتى 10–20 مترًا، والتكبير لا يضيف تفاصيل جديدة.";mapArea.append(note);
+   const note=document.createElement("p");note.className="muted map-note";note.textContent="مشهد Sentinel‑2 L2A: "+safeDate(imageData.date)+"؛ صورة Esri المرجعية خلفية مكانية وقد يختلف تاريخها. طبقات المؤشرات تحسب قيمة كل بكسل مكانيًا؛ بدّل بينها من زر الطبقات. الدقة المصدرية حتى 10–20 مترًا، والتكبير لا يضيف تفاصيل جديدة.";mapArea.append(note);
    const map=L.map(mapHost,{zoomControl:true,scrollWheelZoom:false});
    const clipToField=async(item)=>{
     const img=new Image();img.src=item.image;await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error("تعذر تجهيز طبقة الصورة"))});
@@ -169,14 +169,15 @@ $('autoAnalyze').onclick=async()=>{
     return L.imageOverlay(canvas.toDataURL("image/png"),bounds,{opacity:1,interactive:false});
    };
    const streets=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"});
-   const satellite=await clipToField(imageData);satellite.addTo(map);
+   const esriImagery=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri and contributors"}).addTo(map);
+   const satellite=await clipToField(imageData);
    const boundary=L.geoJSON(data.geometry,{style:{color:"#ffffff",weight:3,fillOpacity:0}}).addTo(map);
-   for(const view of previewGrid.querySelectorAll(".ag-preview")){const key=view.dataset.index;try{const baseLayer=await clipToField(imageData),rasterLayer=await clipToField(indexByKey[key]);const base=document.createElement("img"),raster=document.createElement("img");base.alt="صورة القمر للحقل";base.src=baseLayer._url;raster.alt="طبقة "+key+" فوق الحقل";raster.className="ag-raster";raster.src=rasterLayer._url;view.replaceChildren(base,raster);view.title=key+" — اضغط للتكبير";view.tabIndex=0;view.onclick=()=>{mapSelectors[0].value=key;if(mapSelectors[1].value===key)mapSelectors[1].value=key==="NDRE"?"NDVI":"NDRE";mapButton.click();mapArea.scrollIntoView({behavior:"smooth",block:"center"})}}catch(_){view.textContent="تعذّر تحميل الطبقة"}}
+   for(const view of previewGrid.querySelectorAll(".ag-preview")){const key=view.dataset.index;try{view.replaceChildren();const mini=L.map(view,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false,keyboard:false});L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagery © Esri"}).addTo(mini);const rasterLayer=await clipToField(indexByKey[key]);rasterLayer.setOpacity(.82).addTo(mini);L.geoJSON(data.geometry,{style:{color:"#ffffff",weight:1.5,fillOpacity:0}}).addTo(mini);mini.fitBounds(boundary.getBounds(),{padding:[4,4],maxZoom:16});setTimeout(()=>mini.invalidateSize(),120);view.title=key+" — اضغط للتكبير";view.tabIndex=0;view.onclick=()=>{mapSelectors[0].value=key;if(mapSelectors[1].value===key)mapSelectors[1].value=key==="NDRE"?"NDVI":"NDRE";mapButton.click();mapArea.scrollIntoView({behavior:"smooth",block:"center"})}}catch(_){view.replaceChildren(Object.assign(document.createElement("span"),{className:"ag-preview-empty",textContent:"تعذّر تحميل الطبقة"}))}}
 
    const labels={NDVI:"الغطاء النباتي",NDMI:"رطوبة الغطاء النباتي",SAVI:"الغطاء مع تقليل أثر التربة",OSAVI:"الغطاء مع تصحيح التربة",MSAVI2:"الغطاء مع تقليل أثر التربة (MSAVI2)",EVI:"الغطاء النباتي المحسّن",GNDVI:"الغطاء باستخدام الأخضر",NDRE:"حافة الأحمر",MNDWI:"المياه السطحية",NBR:"الحرق/الاضطراب النباتي",MSI:"نسبة SWIR إلى NIR",CIgreen:"مؤشر الكلوروفيل الأخضر",NDRE2:"حافة أحمر بديلة (B8A/B06)",NDRE3:"حافة أحمر بديلة (B8A/B07)",CIrededge:"كلوروفيل حافة الأحمر",NIRv:"انعكاس NIR الموزون بـNDVI"};
    const overlays={};
    for(let i=0;i<selected.length;i++){const key=selected[i],layer=await clipToField(indexByKey[key]);layer.setOpacity(0.78);overlays[key+" — "+labels[key]]=layer;if(i===0)layer.addTo(map)}
-   L.control.layers({"صورة Sentinel‑2 الحديثة":satellite,"خريطة الشوارع":streets},overlays,{collapsed:false,position:"topright"}).addTo(map);
+   L.control.layers({"صورة فضائية مرجعية (Esri)":esriImagery,"خريطة الشوارع":streets},{"مشهد Sentinel‑2 الحديث":satellite,...overlays},{collapsed:false,position:"topright"}).addTo(map);
    boundary.bringToFront();map.fitBounds(boundary.getBounds(),{padding:[28,28],maxZoom:17});
    const legend=document.createElement("div");legend.className="map-legend";legend.innerHTML="<span>قيمة أعلى</span><i></i><span>قيمة أقل</span>";mapArea.append(legend);
    setTimeout(()=>map.invalidateSize(),120);mapButton.textContent="↻ تحديث صورة القمر وطبقات المؤشرات";
