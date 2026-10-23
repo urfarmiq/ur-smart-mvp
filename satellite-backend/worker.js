@@ -94,7 +94,7 @@ function evaluatePixel(s){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:3,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(!(Number(s.dataMask)>0)||(Number.isFinite(Number(s.SCL))&&[0,1,3,8,9,10,11].includes(Number(s.SCL))))return [90,90,90];
+ if(![s.B04,s.B03,s.B02].every(Number.isFinite))return [90,90,90];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02))];
 }`;
