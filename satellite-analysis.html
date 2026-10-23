@@ -166,6 +166,9 @@ $('autoAnalyze').onclick=async()=>{
     const rings=data.geometry.coordinates||[],bounds=item.bounds,[southwest,northeast]=bounds,minLon=southwest[1],maxLon=northeast[1],minLat=southwest[0],maxLat=northeast[0];
     for(const ring of rings){ring.forEach(([lon,lat],i)=>{const x=(lon-minLon)/(maxLon-minLon)*canvas.width,y=(maxLat-lat)/(maxLat-minLat)*canvas.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.closePath()}
     ctx.fillStyle="#fff";ctx.fill("evenodd");ctx.globalCompositeOperation="source-over";
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;let visiblePixels=0;
+    for(let i=3;i<pixels.length;i+=4)if(pixels[i]>16)visiblePixels++;
+    if(!visiblePixels)throw Error("لا توجد بكسلات صالحة داخل حدود الحقل لهذا المؤشر والتاريخ");
     return L.imageOverlay(canvas.toDataURL("image/png"),bounds,{opacity:1,interactive:false});
    };
    const streets=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"});
