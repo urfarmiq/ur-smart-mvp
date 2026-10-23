@@ -78,7 +78,7 @@ export default {async fetch(req,env){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:3,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(!(Number(s.dataMask)>0)||(Number.isFinite(Number(s.SCL))&&[0,1,3,8,9,10,11].includes(Number(s.SCL))))return [90,90,90];
+ // Do not reject the entire small field from an SCL/dataMask result; the statistics API already selected a valid scene.
  const v=${expression};
  if(!Number.isFinite(v))return [90,90,90];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
