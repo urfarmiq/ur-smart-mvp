@@ -179,7 +179,7 @@ $('autoAnalyze').onclick=async()=>{
    for(let i=0;i<selected.length;i++){const key=selected[i],layer=await clipToField(indexByKey[key]);layer.setOpacity(0.78);overlays[key+" — "+labels[key]]=layer;if(i===0)layer.addTo(map)}
    L.control.layers({"صورة فضائية مرجعية (Esri)":esriImagery,"خريطة الشوارع":streets},{"مشهد Sentinel‑2 الحديث":satellite,...overlays},{collapsed:false,position:"topright"}).addTo(map);
    boundary.bringToFront();map.fitBounds(boundary.getBounds(),{padding:[28,28],maxZoom:17});
-   const legend=document.createElement("div");legend.className="map-legend";legend.innerHTML="<span>قيمة أقل</span><i></i><span>قيمة أعلى · الرمادي = غيوم/بيانات غير صالحة</span>";mapArea.append(legend);
+   const legend=document.createElement("div");legend.className="map-legend";legend.innerHTML="<span>قيمة أقل</span><i></i><span>قيمة أعلى · الرمادي = قيمة طيفية غير صالحة</span>";mapArea.append(legend);
    setTimeout(()=>map.invalidateSize(),120);mapButton.textContent="↻ تحديث صورة القمر وطبقات المؤشرات";
   }catch(e){mapArea.textContent="تعذر تحميل مشهد القمر أو إنشاء الخريطة: "+e.message;mapButton.textContent="إعادة المحاولة"}
   finally{mapButton.disabled=false}
