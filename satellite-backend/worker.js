@@ -79,7 +79,7 @@ export default {async fetch(req,env){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- const scl=Number(s.SCL);const valid=Number(s.dataMask)>0&&(!Number.isFinite(scl)||![0,1,3,8,9,10,11].includes(Math.round(scl)));
+ const mask=Number(s.dataMask),scl=Number(s.SCL);const valid=(!Number.isFinite(mask)||mask>0)&&(!Number.isFinite(scl)||![0,1,3,8,9,10,11].includes(Math.round(scl)));
  if(!valid)return [0,0,0,0];
  const v=${expression};
  if(!(v===v&&v!==Infinity&&v!==-Infinity))return [0,0,0,0];
@@ -96,7 +96,7 @@ function evaluatePixel(s){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- const scl=Number(s.SCL);const valid=Number(s.dataMask)>0&&(!Number.isFinite(scl)||![0,1,3,8,9,10,11].includes(Math.round(scl)));
+ const mask=Number(s.dataMask),scl=Number(s.SCL);const valid=(!Number.isFinite(mask)||mask>0)&&(!Number.isFinite(scl)||![0,1,3,8,9,10,11].includes(Math.round(scl)));
  if(!valid||!Number.isFinite(s.B04)||!Number.isFinite(s.B03)||!Number.isFinite(s.B02))return [0,0,0,0];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
