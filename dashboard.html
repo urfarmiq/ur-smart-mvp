@@ -24,7 +24,8 @@ a{color:#176b45}
 .actions .edit{background:#e8f3e9;color:#176b45}
 .actions .del{background:#fbe9e7;color:#a12a1a}
 #cancelEdit{background:#e8f3e9;color:#176b45;display:none}
-.quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick a{display:flex;align-items:center;justify-content:center;min-height:80px;text-align:center;padding:15px;border-radius:14px;background:#e8f3e9;border:1px solid #c9dfce;font-size:17px;font-weight:800;text-decoration:none;color:#14573a}.quick a:hover{background:#d5ebdb}.hint{font-size:14px;color:#58715e}.card{box-shadow:0 6px 25px #173d2610}@media(max-width:550px){.quick{grid-template-columns:1fr}.actions{flex-wrap:wrap}} </style>
+.quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick a{display:flex;align-items:center;justify-content:center;min-height:80px;text-align:center;padding:15px;border-radius:14px;background:#e8f3e9;border:1px solid #c9dfce;font-size:17px;font-weight:800;text-decoration:none;color:#14573a}.quick a:hover{background:#d5ebdb}.hint{font-size:14px;color:#58715e}.card{box-shadow:0 6px 25px #173d2610}@media(max-width:550px){.quick{grid-template-columns:1fr}.actions{flex-wrap:wrap}} .crop-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0}.crop-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #cddbd0;border-radius:10px;background:#fff;font-weight:600;cursor:pointer}.crop-chip input{width:auto;margin:0;accent-color:#147346}.crop-chip:has(input:checked){border-color:#168447;background:#eaf5ed}#otherCropWrap[hidden]{display:none}
+</style>
 </head>
 <body>
 <header><strong>🌱 UR Smart — أور الزراعية الذكية</strong> <a href="./index.html" style="color:white;float:left;font-size:14px">الرئيسية ↩</a></header>
@@ -43,16 +44,7 @@ a{color:#176b45}
 <input id="fieldName" required maxlength="100" placeholder="مثال: حقل القمح">
 <label for="area">المساحة بالدونم العراقي</label>
 <input id="area" type="number" min="0.1" step="0.1" required>
-<label for="crop">المحصول</label>
-<select id="crop" required>
-<option value="">اختر المحصول</option>
-<option>قمح</option>
-<option>شعير</option>
-<option>ذرة</option><option>رز</option><option>بطاطا</option><option>بصل</option><option>باقلاء</option><option>برسيم</option><option>رمان</option><option>تين</option><option>عنب</option><option>زيتون</option>
-<option>طماطم</option>
-<option>نخيل</option>
-<option>أخرى</option>
-</select>
+<label>المحاصيل (يمكن اختيار أكثر من محصول)</label><div id="cropOptions" class="crop-options"></div><div id="otherCropWrap" hidden><label for="otherCropName">اكتب اسم المحصول الآخر</label><input id="otherCropName" placeholder="مثال: خيار أو باذنجان"></div><input id="crop" type="hidden">
 <label for="soil">نوع التربة</label>
 <select id="soil">
 <option value="">غير محدد</option>
@@ -96,7 +88,17 @@ const supabase=createClient(
 );
 
 const $=id=>document.getElementById(id);
+const cropOptions=["حنطة","قمح","شعير","ذرة","رز","بطاطا","بصل","باقلاء","برسيم","رمان","تين","عنب","زيتون","طماطم","نخيل","محصول آخر"];
+function cropValues(value){return String(value||'').split(/[،,]/).map(x=>x.trim()).filter(Boolean)}
+function setCrops(raw=''){
+ const box=$('cropOptions'),input=$('crop'),other=$('otherCropName'),wrap=$('otherCropWrap'),selected=cropValues(raw),unknown=selected.filter(x=>!cropOptions.includes(x));
+ box.replaceChildren(...cropOptions.map(name=>{const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.value=name;check.className='crop-choice';check.checked=name==='محصول آخر'?selected.includes(name)||unknown.length>0:selected.includes(name);label.className='crop-chip';label.append(check,document.createTextNode(name));return label}));
+ other.value=unknown.join('، ');wrap.hidden=!(selected.includes('محصول آخر')||unknown.length);
+ const sync=()=>{const checks=[...box.querySelectorAll('.crop-choice:checked')],names=checks.filter(x=>x.value!=='محصول آخر').map(x=>x.value),custom=checks.some(x=>x.value==='محصول آخر');wrap.hidden=!custom;if(custom&&other.value.trim())names.push(other.value.trim());input.value=names.join('، ')};box.querySelectorAll('.crop-choice').forEach(x=>x.addEventListener('change',sync));other.oninput=sync;sync()
+}
+
 const status=$('status');
+setCrops();
 const saveButton=$('saveButton');
 const cloudFields=$('cloudFields');
 const storageKey='ur-smart-fields';
@@ -139,7 +141,7 @@ function startEdit(item){
  editingId=item.id;
  $('fieldName').value=item.name||'';
  $('area').value=item.area_donum??'';
- $('crop').value=item.crop||'';
+ setCrops(item.crop||'');
  $('soil').value=item.soil||'';
  $('irrigation').value=item.irrigation||'';
  $('location').value=item.location||'';
