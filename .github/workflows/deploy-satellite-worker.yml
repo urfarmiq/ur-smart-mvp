@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-satellite-worker
+  cancel-in-progress: true
+
 jobs:
   deploy:
     name: Deploy production Worker
