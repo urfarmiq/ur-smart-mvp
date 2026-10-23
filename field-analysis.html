@@ -32,6 +32,7 @@ header,form,.no-print,footer,.intro,#entryPanel,#historyPanel{display:none!impor
 body{background:white}main{width:100%;margin:0}
 .panel{border:0;box-shadow:none}#report{display:block!important}
 }
+.crop-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0}.crop-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #cddbd0;border-radius:10px;background:#fff;font-weight:600;cursor:pointer}.crop-chip input{width:auto;margin:0;accent-color:#147346}.crop-chip:has(input:checked){border-color:#168447;background:#eaf5ed}#otherCropWrap[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -57,15 +58,7 @@ body{background:white}main{width:100%;margin:0}
 
 <div class="grid">
 <div>
-<label for="crop">المحصول</label>
-<select id="crop" required>
-<option value="">اختر المحصول</option>
-<option>الحنطة</option><option>القمح</option>
-<option>الشعير</option><option>الذرة</option>
-<option>البرسيم</option><option>الطماطم</option>
-<option>البطاطا</option><option>النخيل</option>
-<option>الزيتون</option><option>محصول آخر</option>
-</select>
+<label>المحاصيل (يمكن اختيار أكثر من محصول)</label><div id="cropOptions" class="crop-options"></div><div id="otherCropWrap" hidden><label for="otherCropName">اكتب اسم المحصول الآخر</label><input id="otherCropName" placeholder="مثال: خيار أو باذنجان"></div><input id="crop" type="hidden">
 </div>
 <div>
 <label for="area">المساحة بالدونم العراقي</label>
@@ -192,7 +185,17 @@ const supabase=createClient(
 );
 
 const $=id=>document.getElementById(id);
+const cropOptions=["الحنطة","القمح","الشعير","الذرة","الرز","البطاطا","البصل","الباقلاء","البرسيم","الرمان","التين","العنب","الزيتون","الطماطم","النخيل","محصول آخر"];
+function cropValues(value){return String(value||'').split(/[،,]/).map(x=>x.trim()).filter(Boolean)}
+function setCrops(raw=''){
+ const box=$('cropOptions'),input=$('crop'),other=$('otherCropName'),wrap=$('otherCropWrap'),selected=cropValues(raw),unknown=selected.filter(x=>!cropOptions.includes(x));
+ box.replaceChildren(...cropOptions.map(name=>{const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.value=name;check.className='crop-choice';check.checked=name==='محصول آخر'?selected.includes(name)||unknown.length>0:selected.includes(name);label.className='crop-chip';label.append(check,document.createTextNode(name));return label}));
+ other.value=unknown.join('، ');wrap.hidden=!(selected.includes('محصول آخر')||unknown.length);
+ const sync=()=>{const checks=[...box.querySelectorAll('.crop-choice:checked')],names=checks.filter(x=>x.value!=='محصول آخر').map(x=>x.value),custom=checks.some(x=>x.value==='محصول آخر');wrap.hidden=!custom;if(custom&&other.value.trim())names.push(other.value.trim());input.value=names.join('، ')};box.querySelectorAll('.crop-choice').forEach(x=>x.addEventListener('change',sync));other.oninput=sync;sync()
+}
+
 const status=$('status');
+setCrops();
 let session=null;
 let farm=null;
 let fields=[];
@@ -341,7 +344,7 @@ $('savedField').addEventListener('change',()=>{
  $('farm').value=f.name||'';
  const cropAliases={'قمح':'الحنطة','حنطة':'الحنطة'};
  const crop=cropAliases[f.crop]||f.crop;
- $('crop').value=[...$('crop').options].some(o=>o.value===crop)?crop:'';
+ setCrops(crop);
  $('area').value=f.area_donum??'';
  $('soil').value=[...$('soil').options].some(o=>o.value===f.soil)?f.soil:'';
  $('irrigation').value=[...$('irrigation').options].some(o=>o.value===f.irrigation)?f.irrigation:'';
@@ -492,9 +495,12 @@ $('getAdviceButton').addEventListener('click',async()=>{
   'الطماطم':{kc:[0.60,0.875,1.15,0.80],name:'الطماطم'},
   'البطاطا':{kc:[0.50,0.825,1.15,0.75],name:'البطاطا'}
  };
- const profile=profiles[crop]||null,stageIndex=stage==='بداية النمو'?0:stage==='النمو الخضري'?1:stage==='النضج'?3:2;
+ const crops=cropValues(crop),selectedProfiles=crops.map(name=>({name,profile:profiles[name]})).filter(x=>x.profile),profile=crops.length===1?(profiles[crops[0]]||null):null,stageIndex=stage==='بداية النمو'?0:stage==='النمو الخضري'?1:stage==='النضج'?3:2;
  let kc=null,stageLabel='';
- if(profile){
+ if(crops.length>1){
+  for(const item of selectedProfiles){const cropKc=item.profile.kc[stageIndex];reasons.push('لـ'+item.profile.name+' في مرحلة '+['البداية','التطور الخضري (قيمة وسطية تقريبية)','منتصف الموسم','النهاية'][stageIndex]+'، معامل Kc المرجعي ≈ '+cropKc.toFixed(2)+' (قيمة إرشادية).')}
+  const unknown=crops.filter(name=>!profiles[name]);if(unknown.length)reasons.push('المحاصيل التالية تحتاج بيانات صنف/عمر أو قياس ميداني قبل تقدير معاملها: '+unknown.join('، ')+'.');
+ }else if(profile){
   kc=profile.kc[stageIndex];stageLabel=['البداية','التطور الخضري (قيمة وسطية تقريبية)','منتصف الموسم','النهاية'][stageIndex];
   reasons.push('معامل المحصول Kc المرجعي لـ'+profile.name+' في مرحلة '+stageLabel+' ≈ '+kc.toFixed(2)+'؛ قيمة إرشادية تتغير مع المناخ والإدارة والصنف.');
  }else if(crop==='البرسيم'||crop==='النخيل'||crop==='الزيتون'||crop==='محصول آخر'){
@@ -502,10 +508,8 @@ $('getAdviceButton').addEventListener('click',async()=>{
  }
  if(weather){
   reasons.push('طقس قرب مركز الحقل (Open‑Meteo): ET₀ مرجعي آخر 7 أيام '+weather.pastEt0.toFixed(1)+' ملم، ومطر '+weather.pastRain.toFixed(1)+' ملم؛ المتوقع للأيام الثلاثة القادمة ET₀ '+weather.forecastEt0.toFixed(1)+' ملم ومطر '+weather.forecastRain.toFixed(1)+' ملم.');
-  if(kc!==null){
-   const etc=kc*weather.forecastEt0;
-   reasons.push('الطلب التبخري المرجعي المتوقع للمحصول خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (ETc = Kc × ET₀). هذا تقدير استهلاك جوي وليس جرعة ري صافية أو كمية تضخ للمزرعة.');
-  }
+  if(crops.length>1&&selectedProfiles.length){for(const item of selectedProfiles){const etc=item.profile.kc[stageIndex]*weather.forecastEt0;reasons.push('لـ'+item.profile.name+': ETc إرشادي خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (Kc × ET₀)، ولا يُجمع بين المحاصيل دون معرفة مساحة كل محصول.')}}
+  else if(kc!==null){const etc=kc*weather.forecastEt0;reasons.push('الطلب التبخري المرجعي المتوقع للمحصول خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (ETc = Kc × ET₀). هذا تقدير استهلاك جوي وليس جرعة ري صافية أو كمية تضخ للمزرعة.')}
   if(weather.forecastRain>=5)advice.push('هناك مطر متوقع بنحو '+weather.forecastRain.toFixed(1)+' ملم خلال 3 أيام؛ أعد فحص التربة بعد المطر قبل تحديد موعد الري، لأن التوقع لا يضمن المطر الفعلي ولا يحدد المطر الفعال.');
   if(weather.maxForecastTemp!==null&&weather.maxForecastTemp>=35)advice.push('الحرارة القصوى المتوقعة مرتفعة ('+weather.maxForecastTemp.toFixed(1)+'°م). افحص رطوبة منطقة الجذور وانتظام التوزيع، وقلّل تعرض النبات للإجهاد الحراري وفق الممارسات المحلية.');
  }else reasons.push('بيانات الطقس غير متاحة؛ لم يُحسب الطلب التبخري المتوقع.');
