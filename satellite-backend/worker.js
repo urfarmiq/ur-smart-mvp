@@ -8,7 +8,7 @@ function reply(body,status=200,origin=''){return new Response(JSON.stringify(bod
 const EVALSCRIPT=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:1}]};}
 function evaluatePixel(s){
- const good=s.dataMask===1&&![0,1,3,8,9,10,11].includes(s.SCL);
+ const good=Number(s.dataMask)>0&&Number.isFinite(s.SCL)&&![0,1,3,8,9,10,11].includes(Number(s.SCL));
  const r=(a,b)=>Math.abs(b)>1e-8?a/b:0;
  const ndvi=r(s.B08-s.B04,s.B08+s.B04),ndmi=r(s.B08-s.B11,s.B08+s.B11);
  const savi=r(1.5*(s.B08-s.B04),s.B08+s.B04+0.5),osavi=r(1.16*(s.B08-s.B04),s.B08+s.B04+0.16);
@@ -78,7 +78,7 @@ export default {async fetch(req,env){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
+ if(!(Number(s.dataMask)>0)||!Number.isFinite(s.SCL)||[0,1,3,8,9,10,11].includes(Number(s.SCL)))return [0,0,0,0];
  const v=${expression};
  if(!Number.isFinite(v))return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
@@ -94,7 +94,7 @@ function evaluatePixel(s){
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- if(s.dataMask!==1||[0,1,3,8,9,10,11].includes(s.SCL))return [0,0,0,0];
+ if(!(Number(s.dataMask)>0)||!Number.isFinite(s.SCL)||[0,1,3,8,9,10,11].includes(Number(s.SCL)))return [0,0,0,0];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
 }`;
