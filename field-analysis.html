@@ -112,6 +112,29 @@ body{background:white}main{width:100%;margin:0}
 </div>
 </section>
 
+<section class="panel" id="fieldContextPanel">
+<h2>🌦️ طقس الحقل وسجل الري</h2>
+<p class="muted">تُقرأ بيانات الطقس من إحداثيات حدود الحقل، وتُحفظ سجلات الري ومشاهد الأقمار في حسابك.</p>
+<button class="secondary" id="refreshFieldContext" type="button">تحديث الطقس والمؤشرات وسجل الري</button>
+<div id="fieldContextStatus" class="result" aria-live="polite">اختر حقلًا محفوظًا ثم حدّد رطوبة التربة في الموقع.</div>
+<div class="grid">
+<div class="result"><strong>الطقس حول الحقل</strong><div id="weatherContext">لم تُحمّل البيانات بعد.</div></div>
+<div class="result"><strong>آخر تحليل فضائي</strong><div id="satelliteContext">لم تُحمّل البيانات بعد.</div></div>
+</div>
+<h3>إضافة سجل ري</h3>
+<div class="grid">
+<div><label for="irrigatedAt">وقت الري</label><input id="irrigatedAt" type="datetime-local"></div>
+<div><label for="irrigationDepth">كمية الماء (ملم، إن عُرفت)</label><input id="irrigationDepth" type="number" min="0" max="1000" step="0.1" placeholder="مثال: 12"></div>
+</div>
+<div class="grid">
+<div><label for="irrigationDuration">المدة (دقيقة، اختيارية)</label><input id="irrigationDuration" type="number" min="1" max="10080" step="1"></div>
+<div><label for="irrigationMethod">طريقة الري</label><select id="irrigationMethod"><option>الري بالتنقيط</option><option>الري بالرش</option><option>الري السيحي</option><option>طريقة أخرى</option></select></div>
+</div>
+<label for="irrigationNote">ملاحظة (اختيارية)</label><input id="irrigationNote" maxlength="300" placeholder="ملاحظات عن الري أو حالة الحقل">
+<button class="primary" id="saveIrrigationLog" type="button">حفظ سجل الري</button>
+<div id="irrigationHistory" class="result">اختر حقلًا لعرض سجلات الري.</div>
+</section>
+
 <section class="panel" id="smartAdvisor">
 <h2>🌱 المساعد الزراعي الذكي</h2>
 <p class="muted">توصيات أولية مجانية تعتمد على قواعد إرشادية، دون API مدفوع.</p>
@@ -298,7 +321,7 @@ async function loadFields(){
  farm=farms[0];
 
  const {data,error}=await supabase.from('fields')
-  .select('id,name,crop,area_donum,farm_id')
+  .select('id,name,crop,area_donum,farm_id,soil,irrigation,location')
   .eq('farm_id',farm.id).order('created_at',{ascending:false});
  if(error)throw error;
  fields=data||[];
@@ -320,6 +343,8 @@ $('savedField').addEventListener('change',()=>{
  const crop=cropAliases[f.crop]||f.crop;
  $('crop').value=[...$('crop').options].some(o=>o.value===crop)?crop:'';
  $('area').value=f.area_donum??'';
+ $('soil').value=[...$('soil').options].some(o=>o.value===f.soil)?f.soil:'';
+ $('irrigation').value=[...$('irrigation').options].some(o=>o.value===f.irrigation)?f.irrigation:'';
  setStatus('تم تعبئة بيانات الحقل المحفوظ.');
 });
 
@@ -361,111 +386,144 @@ $('fieldForm').addEventListener('submit',async e=>{
  }
 });
 
+const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
+let fieldContext={weather:null,satellite:null,logs:[]},contextLoadToken=0;
+function setLocalDateTime(){const d=new Date(Date.now()-new Date().getTimezoneOffset()*60000);$('irrigatedAt').value=d.toISOString().slice(0,16)}
+function formatLocalDate(value){const d=new Date(value);return Number.isNaN(d.getTime())?'—':new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeStyle:'short'}).format(d)}
+async function getFieldCenter(fieldId){
+ const {data,error}=await supabase.from('field_boundaries').select('geometry').eq('field_id',fieldId).maybeSingle();
+ if(error)throw Error('تعذر قراءة حدود الحقل: '+error.message);
+ const geometry=data?.geometry?(typeof data.geometry==='string'?JSON.parse(data.geometry):data.geometry):null;
+ const ring=geometry?.coordinates?.[0];
+ if(geometry?.type!=='Polygon'||!Array.isArray(ring)||ring.length<4)throw Error('احفظ حدود الحقل على الخريطة أولًا حتى نحدد طقسه.');
+ const points=ring.slice(0,-1);
+ return points.reduce((sum,p)=>[sum[0]+Number(p[0]),sum[1]+Number(p[1])],[0,0]).map(v=>v/points.length);
+}
+async function loadFieldWeather(fieldId){
+ const [lon,lat]=await getFieldCenter(fieldId);
+ const url=new URL('https://api.open-meteo.com/v1/forecast');
+ url.search=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max',past_days:'7',forecast_days:'3',timezone:'auto'}).toString();
+ const response=await fetch(url);
+ if(!response.ok)throw Error('تعذر جلب توقعات الطقس.');
+ const data=await response.json(),daily=data.daily||{},dates=daily.time||[],rain=daily.precipitation_sum||[],et0=daily.et0_fao_evapotranspiration||[],temps=daily.temperature_2m_max||[];
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:data.timezone||'Asia/Baghdad',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ let pastRain=0,pastEt0=0,forecastRain=0,maxForecastTemp=null;
+ dates.forEach((day,i)=>{if(day<today){pastRain+=Number(rain[i])||0;pastEt0+=Number(et0[i])||0}else if(day>=today){forecastRain+=Number(rain[i])||0;const t=Number(temps[i]);if(Number.isFinite(t))maxForecastTemp=maxForecastTemp===null?t:Math.max(maxForecastTemp,t)}});
+ fieldContext.weather={pastRain,pastEt0,forecastRain,maxForecastTemp,updatedAt:new Date().toISOString(),source:'Open-Meteo'};
+ const box=$('weatherContext');box.replaceChildren();
+ const p=document.createElement('p');p.textContent='مطر آخر 7 أيام: '+pastRain.toFixed(1)+' ملم — ET₀ تقديري: '+pastEt0.toFixed(1)+' ملم.';
+ const q=document.createElement('p');q.textContent='مطر متوقع خلال الأيام الثلاثة المقبلة: '+forecastRain.toFixed(1)+' ملم'+(maxForecastTemp===null?'':(' — أعلى حرارة متوقعة: '+maxForecastTemp.toFixed(1)+'°م'))+'.';
+ const n=document.createElement('p');n.className='muted';n.textContent='بيانات نموذجية من Open‑Meteo للحالة الجوية قرب مركز الحقل، وليست قياسًا داخل المزرعة.';
+ box.append(p,q,n);return fieldContext.weather;
+}
+async function loadIrrigationLogs(fieldId){
+ const {data,error}=await supabase.from('field_irrigation_logs').select('id,irrigated_at,water_depth_mm,duration_minutes,method,notes').eq('field_id',fieldId).order('irrigated_at',{ascending:false}).limit(20);
+ if(error)throw Error('تعذر قراءة سجل الري: '+error.message);
+ fieldContext.logs=data||[];renderIrrigationLogs();return fieldContext.logs;
+}
+function renderIrrigationLogs(){
+ const box=$('irrigationHistory');box.replaceChildren();
+ if(!fieldContext.logs.length){box.textContent='لا توجد سجلات ري لهذا الحقل بعد.';return}
+ fieldContext.logs.forEach(log=>{const row=document.createElement('div');row.className='result';const info=document.createElement('p');info.textContent=formatLocalDate(log.irrigated_at)+' — '+(log.method||'طريقة غير محددة')+(log.water_depth_mm===null?'':(' — '+Number(log.water_depth_mm).toLocaleString('ar-IQ')+' ملم'))+(log.duration_minutes===null?'':(' — '+Number(log.duration_minutes).toLocaleString('ar-IQ')+' دقيقة'));row.append(info);if(log.notes){const note=document.createElement('p');note.className='muted';note.textContent=log.notes;row.append(note)}const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='حذف السجل';del.onclick=async()=>{if(!confirm('حذف سجل الري هذا؟'))return;const {error}=await supabase.from('field_irrigation_logs').delete().eq('id',log.id);if(error){$('fieldContextStatus').textContent='تعذر حذف السجل: '+error.message;return}await loadIrrigationLogs($('savedField').value)};row.append(del);box.append(row)});
+}
+async function loadSatelliteContext(fieldId){
+ const {data:{session:activeSession}}=await supabase.auth.getSession();if(!activeSession)throw Error('سجّل الدخول لتحميل تحليل القمر.');
+ const response=await fetch(SATELLITE_API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+activeSession.access_token},body:JSON.stringify({field_id:fieldId})});
+ const data=await response.json();if(!response.ok)throw Error(data.message||data.error||'تعذر تحميل التحليل الفضائي.');
+ fieldContext.satellite=data;
+ const box=$('satelliteContext');box.replaceChildren();
+ const indices=data.indices||{};
+ const p=document.createElement('p');p.textContent='المشهد: '+formatLocalDate(data.date)+' — NDVI: '+(Number.isFinite(Number(indices.NDVI))?Number(indices.NDVI).toFixed(3):'غير متاح')+' — NDMI: '+(Number.isFinite(Number(indices.NDMI))?Number(indices.NDMI).toFixed(3):'غير متاح')+'.';
+ const q=document.createElement('p');q.textContent='تغطية صالحة: '+(Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent).toFixed(1)+'%':'غير محددة')+' — عدد البكسلات: '+(Number(data.valid_pixels)||0)+'.';
+ const n=document.createElement('p');n.className='muted';n.textContent='المصدر Sentinel‑2 L2A، الدقة المصدرية الاسمية 20 مترًا؛ هذه قراءة طيفية وليست قياسًا مباشرًا لرطوبة التربة.';
+ box.append(p,q,n);
+ const record={field_id:fieldId,owner_id:activeSession.user.id,acquisition_date:String(data.date).slice(0,10),indices:data.indices||{},valid_pixels:Number(data.valid_pixels)||0,geometry_pixels:Number.isFinite(Number(data.geometry_pixels))?Number(data.geometry_pixels):null,coverage_percent:Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent):null,source:data.source||'Sentinel-2 L2A',weather_context:fieldContext.weather||null};
+ const {error}=await supabase.from('satellite_observations').upsert(record,{onConflict:'field_id,acquisition_date'});
+ if(error)throw Error('عُرض التحليل لكن تعذر حفظ سجل المشهد: '+error.message);
+ return data;
+}
+async function refreshFieldContext(){
+ const fieldId=$('savedField').value,token=++contextLoadToken,statusBox=$('fieldContextStatus');
+ if(!fieldId){statusBox.textContent='اختر حقلًا محفوظًا أولًا.';return}
+ statusBox.textContent='جارٍ تحديث الطقس والمؤشرات وسجل الري...';
+ $('weatherContext').textContent='جارٍ جلب الطقس...';$('satelliteContext').textContent='جارٍ جلب المشهد...';
+ fieldContext={weather:null,satellite:null,logs:[]};
+ const results=await Promise.allSettled([loadFieldWeather(fieldId),loadIrrigationLogs(fieldId)]);
+ if(token!==contextLoadToken)return;
+ const weatherResult=results[0],logsResult=results[1];
+ let satelliteResult;
+ try{satelliteResult=await loadSatelliteContext(fieldId)}catch(e){$('satelliteContext').textContent='غير متاح الآن: '+e.message}
+ if(token!==contextLoadToken)return;
+ const messages=[];
+ messages.push(weatherResult.status==='fulfilled'?'تم تحديث الطقس':'تعذر الطقس: '+weatherResult.reason.message);
+ messages.push(logsResult.status==='fulfilled'?'تم تحميل سجل الري':'تعذر سجل الري: '+logsResult.reason.message);
+ messages.push(satelliteResult?'تم تحديث بيانات Sentinel‑2 وحفظ المشهد':'لم يتوفر تحليل فضائي صالح لهذا الحقل الآن.');
+ statusBox.textContent=messages.join(' — ');
+}
+$('refreshFieldContext').addEventListener('click',refreshFieldContext);
+$('savedField').addEventListener('change',()=>{contextLoadToken++;fieldContext={weather:null,satellite:null,logs:[]};$('weatherContext').textContent='اختر الحقل ثم حدّث البيانات.';$('satelliteContext').textContent='اختر الحقل ثم حدّث البيانات.';$('irrigationHistory').textContent='اختر حقلًا لعرض سجلات الري.';});
+$('saveIrrigationLog').addEventListener('click',async()=>{
+ const fieldId=$('savedField').value;if(!fieldId||!session){$('fieldContextStatus').textContent='اختر حقلًا محفوظًا وسجّل الدخول أولًا.';return}
+ const when=$('irrigatedAt').value?new Date($('irrigatedAt').value):new Date();
+ const depth=$('irrigationDepth').value.trim(),duration=$('irrigationDuration').value.trim();
+ const record={field_id:fieldId,owner_id:session.user.id,irrigated_at:when.toISOString(),water_depth_mm:depth===''?null:Number(depth),duration_minutes:duration===''?null:Number(duration),method:$('irrigationMethod').value,notes:$('irrigationNote').value.trim()||null};
+ const button=$('saveIrrigationLog');button.disabled=true;button.textContent='جارٍ حفظ السجل...';
+ try{const {error}=await supabase.from('field_irrigation_logs').insert(record);if(error)throw error;$('irrigationDepth').value='';$('irrigationDuration').value='';$('irrigationNote').value='';setLocalDateTime();$('fieldContextStatus').textContent='تم حفظ سجل الري في حسابك.';await loadIrrigationLogs(fieldId)}
+ catch(e){$('fieldContextStatus').textContent='تعذر حفظ سجل الري: '+(e.message||e)}
+ finally{button.disabled=false;button.textContent='حفظ سجل الري'}
+});
+setLocalDateTime();
+
 $('getAdviceButton').addEventListener('click',async()=>{
- const crop=$('crop').value;
- const irrigation=$('irrigation').value;
- const soil=$('soil').value;
- const stage=$('growthStage').value;
- const symptoms=$('plantSymptoms').value;
- const moisture=$('soilMoisture').value;
- const result=$('adviceResult');
-
- if(!crop||!stage||!symptoms||!moisture){
-  result.style.display='block';
-  result.textContent='أكمل المحصول ومرحلة النمو وحالة النبات ورطوبة التربة أولًا.';
-  return;
+ const crop=$('crop').value,irrigation=$('irrigation').value,soil=$('soil').value,stage=$('growthStage').value,symptoms=$('plantSymptoms').value,moisture=$('soilMoisture').value,result=$('adviceResult');
+ if(!crop||!stage||!symptoms||!moisture){result.style.display='block';result.textContent='أكمل المحصول ومرحلة النمو وحالة النبات ورطوبة التربة أولًا.';return}
+ const advice=[],reasons=[];
+ if(moisture==='جافة'){advice.push('افحص رطوبة منطقة الجذور. إذا تأكد الجفاف، حدّد موعد الري وفق احتياج المحصول ومرحلة نموه.');reasons.push('رطوبة التربة مُدخلة يدويًا على أنها جافة؛ يلزم تأكيدها ميدانيًا.')}
+ else if(moisture==='مشبعة بالماء'){advice.push('افحص الصرف وتجمع المياه، ولا تضف ريًا جديدًا قبل التحقق من حالة الجذور.');reasons.push('رطوبة التربة مُدخلة على أنها مشبعة بالماء.')}
+ else if(moisture==='رطبة باعتدال'){advice.push('راقب رطوبة التربة والطقس قبل تحديد موعد الري التالي.')}
+ else{advice.push('تحقق من رطوبة التربة في منطقة الجذور قبل اتخاذ قرار الري.')}
+ if(symptoms==='اصفرار الأوراق'){advice.push('افحص عمر الأوراق ونمط الاصفرار والجذور والصرف. لا تضف سمادًا قبل تحديد السبب.')}
+ else if(symptoms==='ذبول'){advice.push('افحص رطوبة التربة والجذور ونظام الري؛ قد ينتج الذبول عن الجفاف أو تشبع التربة أو مرض.')}
+ else if(symptoms==='ضعف النمو'){advice.push('راجع انتظام الري والصرف والأعشاب والآفات. يمكن تحليل التربة إذا استمر ضعف النمو.')}
+ else if(symptoms==='بقع أو آفات ظاهرة'){advice.push('صوّر الأعراض من الجهتين وسجّل انتشارها. لا تستخدم مبيدًا قبل تشخيص السبب.')}
+ else advice.push('واصل متابعة نمو النبات وسجّل أي تغير في اللون أو النمو.');
+ if(irrigation==='الري بالتنقيط')advice.push('تحقق من نظافة المرشحات وانتظام تصريف النقاطات.');
+ else if(irrigation==='الري بالرش')advice.push('راقب تجانس توزيع الرش والتسربات وسرعة الرياح.');
+ else if(irrigation==='الري السيحي')advice.push('راقب تجانس وصول المياه وتجنب تجمعها لفترة طويلة.');
+ if(soil==='طينية')advice.push('التربة الطينية قد تحتفظ بالماء مدة أطول؛ راقب الصرف قبل تكرار الري.');
+ if(soil==='رملية')advice.push('التربة الرملية أسرع تصريفًا غالبًا؛ راقب رطوبة الجذور بانتظام.');
+ if(stage==='الإزهار'||stage==='تكوين الحبوب أو الثمار')advice.push('راقب توفر الماء في هذه المرحلة الحساسة وتجنب الإجهاد المائي دون الإفراط في الري.');
+ const sat=fieldContext.satellite,weather=fieldContext.weather,logs=fieldContext.logs||[];
+ if(sat){
+  const ndvi=Number(sat.indices?.NDVI),ndmi=Number(sat.indices?.NDMI),coverage=Number(sat.coverage_percent);
+  if(Number.isFinite(ndvi)){reasons.push('مشهد Sentinel‑2 بتاريخ '+String(sat.date).slice(0,10)+' أعطى NDVI='+ndvi.toFixed(3)+'.');if(ndvi<0.2)advice.push('قيمة NDVI منخفضة نسبيًا؛ افحص الغطاء النباتي ميدانيًا، مع مراعاة نوع المحصول ومرحلة نموه والتربة.');}
+  if(Number.isFinite(ndmi)){reasons.push('قراءة NDMI الطيفية '+ndmi.toFixed(3)+'؛ لا تمثل رطوبة التربة مباشرة.');if(ndmi<0)advice.push('إشارة NDMI سالبة في المشهد؛ افحص رطوبة منطقة الجذور قبل تقديم أو تأخير الري.');}
+  if(Number.isFinite(coverage))reasons.push('تغطية البكسلات الصالحة '+coverage.toFixed(1)+'%.');
  }
-
- const advice=[];
- if(moisture==='جافة'){
-  advice.push('افحص رطوبة منطقة الجذور. إذا تأكد الجفاف، حدّد موعد الري وفق احتياج المحصول ومرحلة نموه.');
- }else if(moisture==='مشبعة بالماء'){
-  advice.push('افحص الصرف وتجمع المياه، ولا تضف ريًا جديدًا قبل التحقق من حالة الجذور.');
- }else if(moisture==='رطبة باعتدال'){
-  advice.push('راقب رطوبة التربة والطقس قبل تحديد موعد الري التالي.');
- }else{
-  advice.push('تحقق من رطوبة التربة في منطقة الجذور قبل اتخاذ قرار الري.');
+ if(weather){
+  reasons.push('مطر آخر 7 أيام '+weather.pastRain.toFixed(1)+' ملم مقابل ET₀ نموذجي '+weather.pastEt0.toFixed(1)+' ملم.');
+  if(weather.forecastRain>=5)advice.push('توقعات الطقس تشير إلى مطر يقارب '+weather.forecastRain.toFixed(1)+' ملم خلال 3 أيام؛ راجع موعد الري ولا تروِ اعتمادًا على التوقع وحده.');
+  if(weather.maxForecastTemp!==null&&weather.maxForecastTemp>=35)advice.push('الحرارة القصوى المتوقعة مرتفعة؛ افحص النبات ورطوبة الجذور وفضّل الري في وقت أقل حرارة إذا ثبتت الحاجة.');
  }
-
- if(symptoms==='اصفرار الأوراق'){
-  advice.push('افحص عمر الأوراق ونمط الاصفرار والجذور والصرف. لا تضف سمادًا قبل تحديد السبب.');
- }else if(symptoms==='ذبول'){
-  advice.push('افحص رطوبة التربة والجذور ونظام الري؛ قد ينتج الذبول عن الجفاف أو تشبع التربة أو مرض.');
- }else if(symptoms==='ضعف النمو'){
-  advice.push('راجع انتظام الري والصرف والأعشاب والآفات. يمكن تحليل التربة إذا استمر ضعف النمو.');
- }else if(symptoms==='بقع أو آفات ظاهرة'){
-  advice.push('صوّر الأعراض من الجهتين وسجّل انتشارها. لا تستخدم مبيدًا قبل تشخيص السبب.');
- }else{
-  advice.push('واصل متابعة نمو النبات وسجّل أي تغير في اللون أو النمو.');
- }
-
- if(irrigation==='الري بالتنقيط'){
-  advice.push('تحقق من نظافة المرشحات وانتظام تصريف النقاطات.');
- }else if(irrigation==='الري بالرش'){
-  advice.push('راقب تجانس توزيع الرش والتسربات وسرعة الرياح.');
- }else if(irrigation==='الري السيحي'){
-  advice.push('راقب تجانس وصول المياه وتجنب تجمعها لفترة طويلة.');
- }
- if(soil==='طينية'){
-  advice.push('التربة الطينية قد تحتفظ بالماء مدة أطول؛ راقب الصرف قبل تكرار الري.');
- }
- if(soil==='رملية'){
-  advice.push('التربة الرملية أسرع تصريفًا غالبًا؛ راقب رطوبة الجذور بانتظام.');
- }
- if(stage==='الإزهار'||stage==='تكوين الحبوب أو الثمار'){
-  advice.push('راقب توفر الماء في هذه المرحلة الحساسة وتجنب الإجهاد المائي دون الإفراط في الري.');
- }
-
- result.replaceChildren();
- const title=document.createElement('h3');
- title.textContent='التوصية الزراعية الأولية';
- const info=document.createElement('p');
- info.textContent=`المحصول: ${crop} — مرحلة النمو: ${stage}`;
- const list=document.createElement('ol');
- advice.forEach(text=>{
-  const li=document.createElement('li');
-  li.textContent=text;
-  list.appendChild(li);
- });
- const disclaimer=document.createElement('p');
- disclaimer.className='muted';
- disclaimer.textContent='هذه إرشادات مجانية مبنية على قواعد عامة وليست تشخيصًا مؤكدًا أو تحليلًا مخبريًا. لا تعتمد عليها وحدها لتحديد جرعات الأسمدة أو المبيدات.';
- result.append(title,info,list,disclaimer);
- result.style.display='block';
-
- if(session&&farm){
-  const selected=fields.find(f=>f.id===$('savedField').value);
-  const saveStatus=document.createElement('p');
-  saveStatus.className='muted';
-  saveStatus.textContent='جارٍ حفظ التوصية...';
-  result.appendChild(saveStatus);
-
-  const {data,error}=await supabase.from('field_recommendations').insert({
-   owner_id:session.user.id,
-   farm_id:farm.id,
-   field_id:selected?selected.id:null,
-   crop,
-   growth_stage:stage,
-   plant_symptoms:symptoms,
-   soil_moisture:moisture,
-   recommendation:advice.join('\n\n'),
-   confidence:'إرشادات أولية'
-  }).select('id').single();
-
-  if(error){
-   saveStatus.textContent='ظهرت التوصية لكن تعذر حفظها: '+error.message;
-  }else{
-   saveStatus.textContent='تم حفظ التوصية بنجاح. رقم السجل: '+data.id;
-  }
- }else{
-  const p=document.createElement('p');
-  p.className='muted';
-  p.textContent='التوصية لم تُحفظ؛ سجّل الدخول لحفظها في حسابك.';
-  result.appendChild(p);
- }
+ if(logs.length){const last=logs[0],ageDays=Math.max(0,(Date.now()-new Date(last.irrigated_at).getTime())/86400000);reasons.push('آخر ري مسجل منذ '+ageDays.toFixed(1)+' يومًا'+(last.water_depth_mm===null?'':(' بكمية '+Number(last.water_depth_mm).toLocaleString('ar-IQ')+' ملم'))+'.');if(ageDays<1&&moisture==='جافة')advice.push('سجل الري يشير إلى ري خلال آخر 24 ساعة مع إدخال التربة كجافة؛ تحقق من وصول الماء وتجانسه قبل إعادة الري.')}
+ else if($('savedField').value)reasons.push('لا يوجد سجل ري محفوظ لهذا الحقل؛ أضف السجلات لتحسين متابعة التوصية.');
+ let confidence='منخفضة — بيانات ميدانية محدودة';
+ if(sat&&weather&&Number(sat.coverage_percent)>=70&&logs.length)confidence='متوسطة — مشهد فضائي وتوقعات طقس وسجل ري متاح، وتبقى الحاجة للفحص الميداني';
+ else if(sat&&weather)confidence='محدودة إلى متوسطة — المؤشرات والطقس متاحان، لكن يلزم سجل ري وقياس ميداني';
+ result.replaceChildren();const title=document.createElement('h3');title.textContent='التوصية الزراعية المرتبطة ببيانات الحقل';
+ const info=document.createElement('p');info.textContent='المحصول: '+crop+' — مرحلة النمو: '+stage;
+ const conf=document.createElement('p');conf.textContent='درجة الثقة: '+confidence;
+ const reasonTitle=document.createElement('strong');reasonTitle.textContent='الأسباب والبيانات المستخدمة';
+ const reasonList=document.createElement('ul');(reasons.length?reasons:['تعتمد القراءة على البيانات التي أدخلتها فقط؛ لم تتوفر بيانات فضائية أو طقس أو سجل ري لهذا التوليد.']).forEach(text=>{const li=document.createElement('li');li.textContent=text;reasonList.append(li)});
+ const list=document.createElement('ol');advice.forEach(text=>{const li=document.createElement('li');li.textContent=text;list.append(li)});
+ const disclaimer=document.createElement('p');disclaimer.className='muted';disclaimer.textContent='هذه أداة دعم قرار أولية بقواعد زراعية وليست تشخيصًا آليًا مؤكدًا. لا تحدد وحدها جرعات السماد أو المبيد أو كمية الري؛ تحقّق من رطوبة الجذور والظروف المحلية.';
+ result.append(title,info,conf,reasonTitle,reasonList,list,disclaimer);result.style.display='block';
+ if(session&&farm){const selected=fields.find(f=>f.id===$('savedField').value),saveStatus=document.createElement('p');saveStatus.className='muted';saveStatus.textContent='جارٍ حفظ التوصية...';result.append(saveStatus);
+  const {data,error}=await supabase.from('field_recommendations').insert({owner_id:session.user.id,farm_id:farm.id,field_id:selected?selected.id:null,crop,growth_stage:stage,plant_symptoms:symptoms,soil_moisture:moisture,recommendation:'درجة الثقة: '+confidence+'\n\nالأسباب: '+reasons.join(' | ')+'\n\n'+advice.join('\n\n'),confidence}).select('id').single();
+  if(error)saveStatus.textContent='ظهرت التوصية لكن تعذر حفظها: '+error.message;else saveStatus.textContent='تم حفظ التوصية بنجاح. رقم السجل: '+data.id;
+ }else{const p=document.createElement('p');p.className='muted';p.textContent='التوصية لم تُحفظ؛ سجّل الدخول لحفظها في حسابك.';result.append(p)}
  result.scrollIntoView({behavior:'smooth',block:'nearest'});
 });
-
 $('reportSearch').addEventListener('input',loadHistory);
 $('printButton').addEventListener('click',()=>window.print());
 $('newButton').addEventListener('click',()=>{
