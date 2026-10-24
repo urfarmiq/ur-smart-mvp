@@ -6,9 +6,9 @@ const SH='https://sh.dataspace.copernicus.eu';
 const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 function reply(body,status=200,origin=''){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','access-control-allow-origin':origin||'https://urfarmiq.github.io','vary':'Origin','cache-control':'no-store'}})}
 const EVALSCRIPT=`//VERSION=3
-function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:["indices"]}]};}
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","dataMask"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:["indices"]}]};}
 function evaluatePixel(s){
- const good=Number(s.dataMask)>0&&Number.isFinite(s.SCL)&&![0,1,3,8,9,10,11].includes(Number(s.SCL));
+ const good=Number(s.dataMask)>0;
  const r=(a,b)=>Math.abs(b)>1e-8?a/b:0;
  const ndvi=r(s.B08-s.B04,s.B08+s.B04),ndmi=r(s.B08-s.B11,s.B08+s.B11);
  const savi=r(1.5*(s.B08-s.B04),s.B08+s.B04+0.5),osavi=r(1.16*(s.B08-s.B04),s.B08+s.B04+0.16);
@@ -78,10 +78,10 @@ export default {async fetch(req,env){
      const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI",span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
      const requiredBands={NDVI:["B08","B04"],NDMI:["B08","B11"],SAVI:["B08","B04"],OSAVI:["B08","B04"],MSAVI2:["B08","B04"],EVI:["B08","B04","B02"],GNDVI:["B08","B03"],NDRE:["B08","B05"],MNDWI:["B03","B11"],NBR:["B08","B12"],MSI:["B11","B08"],CIgreen:["B08","B03"],NDRE2:["B8A","B06"],NDRE3:["B8A","B07"],CIrededge:["B8A","B05"],NIRv:["B08","B04"]}[mapIndex];
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
  const v=${expression};
- const hasSpectralData=${JSON.stringify(requiredBands)}.some(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
+ const hasSpectralData=Number(s.dataMask)>0&&${JSON.stringify(requiredBands)}.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
  if(!hasSpectralData||!Number.isFinite(v))return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
  ${invert?"t=1-t;":""}
@@ -94,7 +94,7 @@ function evaluatePixel(s){
 }`;
    }else{
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B04","B03","B02","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
  const scl=Number(s.SCL),rgb=["B04","B03","B02"],valid=rgb.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0)&&(!Number.isFinite(scl)||![1,3,8,9,10,11].includes(Math.round(scl)));
  if(!valid)return [0,0,0,0];
