@@ -81,8 +81,8 @@ export default {async fetch(req,env){
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
  const v=${expression};
- const dataValid=Number(s.dataMask)>0&&Number.isFinite(v);
- if(!dataValid)return [0,0,0,0];
+ const hasSpectralData=${JSON.stringify(requiredBands)}.some(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
+ if(!hasSpectralData||!Number.isFinite(v))return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
  ${invert?"t=1-t;":""}
  if("${mapIndex}"==="NDMI"){
