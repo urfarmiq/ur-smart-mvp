@@ -75,7 +75,7 @@ function clipIndicatorImage(item,geometry,index){
   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height),low=hexRgb($('mapLowColor').value),high=hexRgb($('mapHighColor').value),data=pixels.data;
   let validPixels=0;
   for(let p=0;p<data.length;p+=4){if(data[p+3]===0)continue;validPixels++;
-   let t=data[p]>=250?(index==='NDMI'?(data[p+1]-35)/370:(data[p+1]-55)/370):(1-data[p]/510);
+   let t=data[p]/255;
    t=Math.max(0,Math.min(1,t));if(index==='MSI')t=1-t;
    data[p]=Math.round(low[0]+(high[0]-low[0])*t);data[p+1]=Math.round(low[1]+(high[1]-low[1])*t);data[p+2]=Math.round(low[2]+(high[2]-low[2])*t);
   }
