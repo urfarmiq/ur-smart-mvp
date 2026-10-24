@@ -76,7 +76,7 @@ function clipIndicatorImage(item,geometry,index){
   let validPixels=0;
   for(let p=0;p<data.length;p+=4){if(data[p+3]===0)continue;validPixels++;
    let t=data[p]/255;
-   t=Math.max(0,Math.min(1,t));if(index==='MSI')t=1-t;
+   t=Math.max(0,Math.min(1,t));
    data[p]=Math.round(low[0]+(high[0]-low[0])*t);data[p+1]=Math.round(low[1]+(high[1]-low[1])*t);data[p+2]=Math.round(low[2]+(high[2]-low[2])*t);
   }
   if(!validPixels)throw Error('المشهد لا يحتوي بكسلات صالحة لهذا المؤشر؛ اختر تاريخًا آخر خاليًا من الغيوم.');
