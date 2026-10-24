@@ -17,3 +17,20 @@ test('indicator scripts request SCL and mask cloud pixels',()=>{
  assert.equal(context.evaluatePixel({B08:.6,B04:.2,dataMask:1,SCL:9})[3],0);
  assert.equal(context.evaluatePixel({B08:.6,B04:.2,dataMask:1,SCL:4})[3],255);
 });
+test('statistics use UTC calendar days matching image requests',async()=>{
+ const originalFetch=globalThis.fetch,requests=[];
+ const json=v=>new Response(JSON.stringify(v),{headers:{'content-type':'application/json'}});
+ globalThis.fetch=async(url,options)=>{
+  if(url.endsWith('/auth/v1/user'))return json({id:'owner'});
+  if(url.includes('/rest/v1/field_boundaries'))return json([{owner_id:'owner',area_m2:10000,geometry:{type:'Polygon',coordinates:[[[44,33],[44.001,33],[44.001,33.001],[44,33.001],[44,33]]]}}]);
+  if(url.includes('/openid-connect/token'))return json({access_token:'test-token'});
+  if(url.endsWith('/statistics/v1')){requests.push(JSON.parse(options.body));return json({data:[{interval:{from:'2026-10-23T00:00:00Z'},outputs:{indices:{bands:{B0:{stats:{mean:.5,sampleCount:10,noDataCount:0}},B1:{stats:{mean:.2}}}}}}],geometryPixelCount:10});}
+  throw Error('Unexpected upstream request');
+ };
+ try{
+  const r=await worker.fetch(new Request('https://worker.test',{method:'POST',headers:{Authorization:'Bearer test'},body:JSON.stringify({field_id:'11111111-1111-4111-8111-111111111111'})}),{SENTINEL_CLIENT_ID:'test',SENTINEL_CLIENT_SECRET:'test',SUPABASE_URL:'https://supabase.test',SUPABASE_PUBLISHABLE_KEY:'public'});
+  assert.equal(r.status,200);const result=await r.json();assert.equal(result.date,'2026-10-23T00:00:00Z');
+  assert.match(requests[0].aggregation.timeRange.from,/T00:00:00\.000Z$/);
+  assert.equal(requests[0].aggregation.aggregationInterval.lastIntervalBehavior,'SHORTEN');
+ }finally{globalThis.fetch=originalFetch;}
+});
