@@ -116,7 +116,19 @@ $('loadIndicatorMap').onclick=async()=>{const button=$('loadIndicatorMap'),field
  const pct=scene?.coverage_percent==null?'':(' — تغطية صالحة '+Number(scene.coverage_percent).toFixed(1)+'%');
  indicatorError('✓ ظهرت طبقة '+index+' على الخريطة بتاريخ '+chosenDate+(Number.isFinite(value)?' — متوسط الحقل '+value.toFixed(3):'')+' — دقة المصدر '+(image.resolution_m||20)+' م'+pct+'. غيّر المؤشر أو التاريخ ثم اضغط تحميل لتحديث الطبقة.');
  setTimeout(()=>{$('map').scrollIntoView({behavior:'smooth',block:'center'});map.invalidateSize()},150);
- }catch(e){indicatorError('تعذر تحميل المؤشر على الخريطة: '+e.message)}finally{button.disabled=false;button.textContent='🛰️ تحديث طبقة المؤشر على الخريطة'}}
+ }catch(e){
+ if(String(e.message||e).includes('المشهد لا يحتوي بكسلات صالحة')){
+  const chosen=$('mapSceneDate').value,scene=indicatorStats?.series?.find(s=>String(s.date).slice(0,10)===chosen),raw=Number(scene?.indices?.[index]??scene?.[index.toLowerCase()]??(index==='NDVI'?scene?.ndvi:index==='NDMI'?scene?.ndmi:NaN));
+  const ranges={NDVI:[-0.2,0.8],NDMI:[-0.5,0.5],SAVI:[-0.2,0.8],OSAVI:[-0.2,0.8],MSAVI2:[-0.2,0.8],EVI:[-0.2,1],GNDVI:[-0.2,0.8],NDRE:[-0.2,0.8],MNDWI:[-0.8,0.8],NBR:[-1,1],MSI:[0,2],CIgreen:[0,4],NDRE2:[-0.2,0.8],NDRE3:[-0.2,0.8],CIrededge:[0,4],NIRv:[0,0.5]}[index];
+  if(Number.isFinite(raw)&&ranges){
+   const t=Math.max(0,Math.min(1,(raw-ranges[0])/(ranges[1]-ranges[0]))),lo=hexRgb($('mapLowColor').value),hi=hexRgb($('mapHighColor').value),color='#'+lo.map((v,i)=>Math.round(v+(hi[i]-v)*t).toString(16).padStart(2,'0')).join('');
+   if(indicatorLayer)map.removeLayer(indicatorLayer);if(indicatorBoundary){map.removeLayer(indicatorBoundary);indicatorBoundary=null}if(shape)shape.setStyle({fillOpacity:0});
+   indicatorLayer=L.geoJSON(indicatorGeometry,{style:{color:'#fff',weight:3,fillColor:color,fillOpacity:.58}}).addTo(map).bringToFront();
+   map.fitBounds(indicatorLayer.getBounds(),{padding:[25,25],maxZoom:18});indicatorLegend(index);
+   indicatorError('⚠️ ظهر لون متوسط '+index+' للحقل ('+raw.toFixed(3)+') لأن الصورة الطيفية التفصيلية لم تصل. هذا اللون يمثل متوسط الحقل ولا يوضح اختلاف القيم داخله.');
+  }else indicatorError('تعذر تحميل المؤشر على الخريطة: '+e.message);
+ }else indicatorError('تعذر تحميل المؤشر على الخريطة: '+e.message)
+ }finally{button.disabled=false;button.textContent='🛰️ تحديث طبقة المؤشر على الخريطة'}}
 $('cloudField').addEventListener('change',()=>{indicatorStats=null;lastIndicatorImage=null;lastIndicatorIndex=null;indicatorRenderToken++;if(shape)shape.setStyle({fillOpacity:.22});if(indicatorLayer){map.removeLayer(indicatorLayer);indicatorLayer=null}if(indicatorBoundary){map.removeLayer(indicatorBoundary);indicatorBoundary=null}if(indicatorLegendControl){map.removeControl(indicatorLegendControl);indicatorLegendControl=null}const sel=$('mapSceneDate');sel.replaceChildren(new Option('حمّل المشاهد أولًا',''));$('indicatorLegend').hidden=true;indicatorError('اضغط تحميل لجلب أحدث المشهد والمؤشر لهذا الحقل.')});
 
 $('refreshCloud').onclick=refreshCloud;
