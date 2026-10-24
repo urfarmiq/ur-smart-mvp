@@ -81,10 +81,8 @@ export default {async fetch(req,env){
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"],units:["REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","REFLECTANCE","DN","DN"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
  const v=${expression};
- if(!(v===v&&v!==Infinity&&v!==-Infinity))return [0,0,0,0];
- const scl=Number(s.SCL);
- if(Number.isFinite(scl)&&[0,1,3,8,9,10,11].includes(Math.round(scl)))return [0,0,0,0];
- if(!(v===v&&v!==Infinity&&v!==-Infinity))return [0,0,0,0];
+ const dataValid=Number(s.dataMask)>0&&Number.isFinite(v);
+ if(!dataValid)return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
  ${invert?"t=1-t;":""}
  if("${mapIndex}"==="NDMI"){
