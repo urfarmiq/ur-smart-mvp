@@ -404,20 +404,26 @@ async function getFieldCenter(fieldId){
 }
 async function loadFieldWeather(fieldId){
  const [lon,lat]=await getFieldCenter(fieldId);
+ if(!Number.isFinite(lon)||!Number.isFinite(lat)||Math.abs(lat)>90||Math.abs(lon)>180)throw Error('إحداثيات حدود الحقل غير صالحة للطقس.');
  const url=new URL('https://api.open-meteo.com/v1/forecast');
- url.search=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max',past_days:'7',forecast_days:'3',timezone:'auto'}).toString();
- const response=await fetch(url);
- if(!response.ok)throw Error('تعذر جلب توقعات الطقس.');
- const data=await response.json(),daily=data.daily||{},dates=daily.time||[],rain=daily.precipitation_sum||[],et0=daily.et0_fao_evapotranspiration||[],temps=daily.temperature_2m_max||[];
- const today=new Intl.DateTimeFormat('en-CA',{timeZone:data.timezone||'Asia/Baghdad',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ url.search=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max',past_days:'7',forecast_days:'7',timezone:'auto'}).toString();
+ const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data.error)throw Error(data.reason||'تعذر جلب توقعات الطقس ('+response.status+').');
+ const daily=data.daily||{},dates=daily.time||[],rain=daily.precipitation_sum||[],et0=daily.et0_fao_evapotranspiration||[],temps=daily.temperature_2m_max||[];
+ if(!dates.length)throw Error('وصل رد الطقس دون توقعات يومية.');
+ const timezone=data.timezone||'Asia/Baghdad';
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  let pastRain=0,pastEt0=0,forecastRain=0,forecastEt0=0,maxForecastTemp=null;
- dates.forEach((day,i)=>{if(day<today){pastRain+=Number(rain[i])||0;pastEt0+=Number(et0[i])||0}else if(day>=today){forecastRain+=Number(rain[i])||0;forecastEt0+=Number(et0[i])||0;const t=Number(temps[i]);if(Number.isFinite(t))maxForecastTemp=maxForecastTemp===null?t:Math.max(maxForecastTemp,t)}});
- fieldContext.weather={pastRain,pastEt0,forecastRain,forecastEt0,maxForecastTemp,updatedAt:new Date().toISOString(),source:'Open-Meteo'};
+ dates.forEach((day,i)=>{const r=rain[i],e=et0[i],t=temps[i];if(day<today){if(r!==null&&Number.isFinite(Number(r)))pastRain+=Number(r);if(e!==null&&Number.isFinite(Number(e)))pastEt0+=Number(e)}else{if(r!==null&&Number.isFinite(Number(r)))forecastRain+=Number(r);if(e!==null&&Number.isFinite(Number(e)))forecastEt0+=Number(e);if(t!==null&&Number.isFinite(Number(t)))maxForecastTemp=maxForecastTemp===null?Number(t):Math.max(maxForecastTemp,Number(t))}});
+ fieldContext.weather={pastRain,pastEt0,forecastRain,forecastEt0,maxForecastTemp,updatedAt:new Date().toISOString(),source:'Open-Meteo',timezone};
  const box=$('weatherContext');box.replaceChildren();
  const p=document.createElement('p');p.textContent='مطر آخر 7 أيام: '+pastRain.toFixed(1)+' ملم — ET₀ المرجعي: '+pastEt0.toFixed(1)+' ملم.';
- const q=document.createElement('p');q.textContent='خلال الأيام الثلاثة المقبلة: مطر متوقع '+forecastRain.toFixed(1)+' ملم — ET₀ مرجعي '+forecastEt0.toFixed(1)+' ملم'+(maxForecastTemp===null?'':(' — أعلى حرارة '+maxForecastTemp.toFixed(1)+'°م'))+'.';
- const n=document.createElement('p');n.className='muted';n.textContent='بيانات نموذجية من Open‑Meteo للحالة الجوية قرب مركز الحقل، وليست قياسًا داخل المزرعة.';
- box.append(p,q,n);return fieldContext.weather;
+ const q=document.createElement('p');q.textContent='توقع 7 أيام: مطر '+forecastRain.toFixed(1)+' ملم — ET₀ مرجعي '+forecastEt0.toFixed(1)+' ملم'+(maxForecastTemp===null?'':(' — أعلى حرارة '+maxForecastTemp.toFixed(1)+'°م'))+'.';
+ const list=document.createElement('ul');list.className='weather-days';
+ dates.forEach((day,i)=>{if(day<today)return;const li=document.createElement('li'),dateLabel=new Intl.DateTimeFormat('ar-IQ',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'}).format(new Date(day+'T12:00:00Z'));const r=rain[i],e=et0[i],t=temps[i];li.textContent=dateLabel+': مطر '+(r===null||!Number.isFinite(Number(r))?'—':Number(r).toFixed(1)+' ملم')+'، ET₀ '+(e===null||!Number.isFinite(Number(e))?'—':Number(e).toFixed(1)+' ملم')+(t===null||!Number.isFinite(Number(t))?'':'، عظمى '+Number(t).toFixed(1)+'°م');list.append(li)});
+ const n=document.createElement('p');n.className='muted';n.textContent='المصدر Open‑Meteo؛ توقع نموذجي قرب مركز الحقل ('+timezone+').' ;
+ box.append(p,q,list,n);return fieldContext.weather;
 }
 async function loadIrrigationLogs(fieldId){
  const {data,error}=await supabase.from('field_irrigation_logs').select('id,irrigated_at,water_depth_mm,duration_minutes,method,notes').eq('field_id',fieldId).order('irrigated_at',{ascending:false}).limit(20);
