@@ -6,9 +6,9 @@ const SH='https://sh.dataspace.copernicus.eu';
 const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 function reply(body,status=200,origin=''){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','access-control-allow-origin':origin||'https://urfarmiq.github.io','vary':'Origin','cache-control':'no-store'}})}
 const EVALSCRIPT=`//VERSION=3
-function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","dataMask"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:["indices"]}]};}
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:["indices"]}]};}
 function evaluatePixel(s){
- const good=Number(s.dataMask)>0;
+ const good=Number(s.dataMask)>0&&Number.isFinite(Number(s.SCL))&&![0,1,3,8,9,10,11].includes(Number(s.SCL));
  const r=(a,b)=>Math.abs(b)>1e-8?a/b:0;
  const ndvi=r(s.B08-s.B04,s.B08+s.B04),ndmi=r(s.B08-s.B11,s.B08+s.B11);
  const savi=r(1.5*(s.B08-s.B04),s.B08+s.B04+0.5),osavi=r(1.16*(s.B08-s.B04),s.B08+s.B04+0.16);
@@ -81,16 +81,16 @@ export default {async fetch(req,env){
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
  const v=${expression};
- const hasSpectralData=Number(s.dataMask)>0&&${JSON.stringify(requiredBands)}.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
+ const hasSpectralData=Number(s.dataMask)>0&&![0,1,3,8,9,10,11].includes(Number(s.SCL))&&${JSON.stringify(requiredBands)}.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
  if(!hasSpectralData||!Number.isFinite(v))return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
  const gray=Math.round(t*255);return [gray,gray,gray,255];
 }`;
    }else{
      script=`//VERSION=3
-function setup(){return {input:[{bands:["B04","B03","B02","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
+function setup(){return {input:[{bands:["B04","B03","B02","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- const rgb=["B04","B03","B02"],valid=Number(s.dataMask)>0&&rgb.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
+ const scl=Number(s.SCL),rgb=["B04","B03","B02"],valid=Number(s.dataMask)>0&&![0,1,3,8,9,10,11].includes(scl)&&rgb.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
  if(!valid)return [0,0,0,0];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
