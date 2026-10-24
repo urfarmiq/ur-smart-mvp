@@ -33,11 +33,11 @@ a{color:#176b45}
 <section class="card">
 <h1>لوحة المزارع</h1>
 <p id="welcome">جارٍ التحقق من تسجيل الدخول...</p>
-<div id="status">جارٍ الاتصال...</div>
+<p id="fieldSummary" aria-live="polite"></p><div id="status" role="status">جارٍ الاتصال...</div>
 <button id="logout">تسجيل الخروج</button>
 </section>
 
-<section class="card"><h2>🌾 شنو تريد تسوي اليوم؟</h2><p class="hint">اضغط على الخدمة اللي تحتاجها:</p><div class="quick"><a href="#fieldForm">➕ أضف حقل جديد</a><a href="./field-map.html">🗺️ حدد أرضك على الخريطة</a><a href="./satellite-analysis.html">🛰️ افحص حالة الزرع</a><a href="./field-analysis.html">📋 سوّي تقرير لحقلك</a></div></section><section class="card">
+<section class="card"><h2>🌾 شنو تريد تسوي اليوم؟</h2><p class="hint">اضغط على الخدمة اللي تحتاجها:</p><div class="quick"><a href="./operations.html">📒 سجل العمليات والمستشعرات</a><a href="#fieldForm">➕ أضف حقل جديد</a><a href="./field-map.html">🗺️ حدد أرضك على الخريطة</a><a href="./satellite-analysis.html">🛰️ افحص حالة الزرع</a><a href="./field-analysis.html">📋 سوّي تقرير لحقلك</a></div></section><section class="card">
 <h2 id="formTitle">إضافة حقل زراعي</h2>
 <form id="fieldForm">
 <label for="fieldName">اسم الحقل</label>
@@ -132,6 +132,7 @@ function renderLocalFields(){
 function resetForm(){
  editingId=null;
  $('fieldForm').reset();
+ setCrops();
  $('formTitle').textContent='إضافة حقل زراعي';
  saveButton.textContent=SAVE_LABEL;
  $('cancelEdit').style.display='none';
@@ -153,7 +154,7 @@ function startEdit(item){
 
 async function deleteField(item){
  if(!confirm('هل تريد حذف الحقل "'+item.name+'"؟')) return;
- const {error}=await supabase.from('fields').delete().eq('id',item.id);
+ const {error}=await supabase.from('fields').delete().eq('id',item.id).eq('farm_id',farmId).select('id').single();
  if(error){showError('تعذر حذف الحقل: ',error);return;}
  if(editingId===item.id) resetForm();
  status.textContent='تم حذف الحقل.';
@@ -177,6 +178,7 @@ async function loadCloudFields(){
   return;
  }
  fields=data||[];
+ $('fieldSummary').textContent=`${fields.length} حقول — المساحة الإجمالية: ${fields.reduce((sum,f)=>sum+Number(f.area_donum||0),0).toLocaleString('ar-IQ')} دونم عراقي`;
  cloudFields.replaceChildren();
  if(!fields.length){
   cloudFields.textContent='لم تتم إضافة حقول بعد. استخدم النموذج أعلاه لإضافة أول حقل.';
@@ -271,7 +273,7 @@ $('fieldForm').addEventListener('submit',async event=>{
  saveButton.textContent='جارٍ الحفظ...';
  let error;
  if(editingId){
-  ({error}=await supabase.from('fields').update(payload).eq('id',editingId));
+  ({error}=await supabase.from('fields').update(payload).eq('id',editingId).eq('farm_id',farmId).select('id').single());
  }else{
   ({error}=await supabase.from('fields').insert({...payload,farm_id:farmId}));
  }
@@ -302,8 +304,9 @@ $('logout').addEventListener('click',async()=>{
 });
 
 renderLocalFields();
-await initialize();
+try{await initialize();}catch(error){showError('تعذر تشغيل اللوحة: ',error);}
 </script>
 <nav style="max-width:700px;margin:0 auto 24px;padding:16px;background:#e8f3e9;border-radius:12px"><a href="./field-map.html" style="font-weight:bold">🗺️ فتح خريطة الحقول ورسم الحدود وحساب المساحة بالدونم العراقي ←</a><p><a href="./satellite-analysis.html" style="font-weight:bold">🛰️ مركز التحليل الفضائي وحساب NDVI وNDMI من بيانات طيفية ←</a></p></nav>
 </body>
 </html>
+

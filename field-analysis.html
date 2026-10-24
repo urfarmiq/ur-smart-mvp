@@ -593,6 +593,7 @@ $('reportSearch').addEventListener('input',loadHistory);
 $('printButton').addEventListener('click',()=>window.print());
 $('newButton').addEventListener('click',()=>{
  $('fieldForm').reset();
+ setCrops();
  $('savedField').value='';
  $('report').style.display='none';
  $('fieldForm').scrollIntoView({behavior:'smooth'});
