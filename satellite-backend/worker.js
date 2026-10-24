@@ -75,7 +75,7 @@ export default {async fetch(req,env){
    let script;
    if(mapIndex){
      if(!indexExpressions[mapIndex])return reply({error:"Unsupported map indicator"},400,allowed);
-     const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=mapIndex==="MSI",span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
+     const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=false,span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
      const requiredBands={NDVI:["B08","B04"],NDMI:["B08","B11"],SAVI:["B08","B04"],OSAVI:["B08","B04"],MSAVI2:["B08","B04"],EVI:["B08","B04","B02"],GNDVI:["B08","B03"],NDRE:["B08","B05"],MNDWI:["B03","B11"],NBR:["B08","B12"],MSI:["B11","B08"],CIgreen:["B08","B03"],NDRE2:["B8A","B06"],NDRE3:["B8A","B07"],CIrededge:["B8A","B05"],NIRv:["B08","B04"]}[mapIndex];
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
@@ -84,19 +84,13 @@ function evaluatePixel(s){
  const hasSpectralData=Number(s.dataMask)>0&&${JSON.stringify(requiredBands)}.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
  if(!hasSpectralData||!Number.isFinite(v))return [0,0,0,0];
  let t=Math.max(0,Math.min(1,${scaleExpression}));
- ${invert?"t=1-t;":""}
- if("${mapIndex}"==="NDMI"){
-  if(t<0.5){const u=t*2;return [255,Math.round(35+185*u),Math.round(45-5*u),255]}
-  const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(220-100*u),Math.round(40+215*u),255]
- }
- if(t<0.5){const u=t*2;return [255,Math.round(55+185*u),Math.round(45-5*u),255]}
- const u=(t-0.5)*2;return [Math.round(255*(1-u)),Math.round(240-55*u),Math.round(40+145*u),255];
+ const gray=Math.round(t*255);return [gray,gray,gray,255];
 }`;
    }else{
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B04","B03","B02","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
- const scl=Number(s.SCL),rgb=["B04","B03","B02"],valid=rgb.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0)&&(!Number.isFinite(scl)||![1,3,8,9,10,11].includes(Math.round(scl)));
+ const rgb=["B04","B03","B02"],valid=Number(s.dataMask)>0&&rgb.every(k=>Number.isFinite(Number(s[k]))&&Number(s[k])>0);
  if(!valid)return [0,0,0,0];
  const tone=v=>Math.max(0,Math.min(1,2.5*v-0.07))*255;
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
