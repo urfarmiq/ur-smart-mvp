@@ -15,7 +15,10 @@
 <script type="module">
 import {loadRasterImage,colorizeRaster,collectRasters} from './satellite-raster.mjs';
 import {attachPixelProbe} from './satellite-pixel-probe.mjs';
+import {createAdvisorHandoff} from './advisor-handoff.mjs';
 const $=id=>document.getElementById(id);
+const numberOrNaN=value=>value===null||value===undefined||typeof value==='boolean'||typeof value==='string'&&!value.trim()?NaN:Number(value);
+let analysisRequestGeneration=0;
 // Set to the deployed Cloudflare Worker HTTPS URL once the satellite backend is configured.
 const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
 const activeIndicatorMaps=new Set();
@@ -28,15 +31,17 @@ $('autoAnalyze').onclick=async()=>{
  if(!fieldId){box.textContent='اختر حقلًا محفوظًا أولًا.';return}
  if(!client||!user){box.textContent='سجّل الدخول أولًا.';return}
  if(!SATELLITE_API_URL){box.textContent='التحليل التلقائي غير مفعّل بعد: يجب نشر خادم Sentinel-2 وربطه بالمنصة. لن نعرض قراءات وهمية.';return}
+ const option=$('field').selectedOptions[0],analyzedField={name:option.textContent,crop:option.dataset.crop||null,area_donum:numberOrNaN(option.dataset.areaDonum),soil:option.dataset.soil||null,irrigation:option.dataset.irrigation||null};
+ const analysisGeneration=++analysisRequestGeneration;
  const button=$('autoAnalyze');disposeIndicatorMaps();button.disabled=true;box.textContent='جارٍ طلب أحدث تحليل فضائي متاح...';
  try{
  const {data:{session}}=await client.auth.getSession();if(!session)throw Error('انتهت جلسة تسجيل الدخول');
  const res=await fetch(SATELLITE_API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:fieldId})});
- const data=await res.json();if(!res.ok){const msg={'Insufficient satellite coverage for a reliable field average':'التغطية الفضائية الصالحة غير كافية لإعطاء نتيجة موثوقة. حاول لاحقًا أو تأكد من حدود الحقل.','No valid pixels found in the last 65 days':'لم تتوفر بكسلات صالحة خلال آخر 65 يومًا. يجري البحث في نافذة أوسع.', 'No valid cloud-free pixels found in the last 65 days':'لا توجد بكسلات خالية من الغيوم خلال 65 يومًا؛ جرّب التحقق من الحدود أو أعد المحاولة لاحقًا.', 'No valid cloud-free pixels found in the last 180 days':'لم نجد بكسلات صالحة خالية من الغيوم خلال 180 يومًا. تحقق من حدود الحقل أو أعد المحاولة بعد مرور مشهد أوضح.','Field boundary unavailable for this account':'ارسم حدود الحقل واحفظها أولًا.','Session expired':'انتهت جلسة الدخول. سجّل الدخول مرة ثانية.'};throw Error(msg[data.error]||(data.error?data.error+(data.details?' — '+data.details:''):'تعذر التحليل'))}
+ const data=await res.json();if(analysisGeneration!==analysisRequestGeneration)return;if(!res.ok){const msg={'Insufficient satellite coverage for a reliable field average':'التغطية الفضائية الصالحة غير كافية لإعطاء نتيجة موثوقة. حاول لاحقًا أو تأكد من حدود الحقل.','No valid pixels found in the last 65 days':'لم تتوفر بكسلات صالحة خلال آخر 65 يومًا. يجري البحث في نافذة أوسع.', 'No valid cloud-free pixels found in the last 65 days':'لا توجد بكسلات خالية من الغيوم خلال 65 يومًا؛ جرّب التحقق من الحدود أو أعد المحاولة لاحقًا.', 'No valid cloud-free pixels found in the last 180 days':'لم نجد بكسلات صالحة خالية من الغيوم خلال 180 يومًا. تحقق من حدود الحقل أو أعد المحاولة بعد مرور مشهد أوضح.','Field boundary unavailable for this account':'ارسم حدود الحقل واحفظها أولًا.','Session expired':'انتهت جلسة الدخول. سجّل الدخول مرة ثانية.'};throw Error(msg[data.error]||(data.error?data.error+(data.details?' — '+data.details:''):'تعذر التحليل'))}
  if(!Number.isFinite(data.ndvi)||!Number.isFinite(data.ndmi))throw Error('النتيجة الفضائية غير صالحة');
  box.replaceChildren();
  const safeDate=(value)=>{if(!value)return 'غير متاح';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):new Intl.DateTimeFormat('ar-IQ',{year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}).format(d)};
- const rawPixels=data.valid_pixels;const pixels=rawPixels===null||rawPixels===undefined?NaN:Number(rawPixels);const rawGeometry=data.geometry_pixels;const geometryPixels=rawGeometry===null||rawGeometry===undefined?NaN:Number(rawGeometry);const coverage=Number(data.coverage_percent);
+ const rawPixels=data.valid_pixels;const pixels=rawPixels===null||rawPixels===undefined?NaN:Number(rawPixels);const rawGeometry=data.geometry_pixels;const geometryPixels=rawGeometry===null||rawGeometry===undefined?NaN:Number(rawGeometry);const coverage=numberOrNaN(data.coverage_percent);
  const areaM2=Number($('field').selectedOptions[0]?.dataset.areaM2);const expected=Number.isFinite(areaM2)&&areaM2>0?areaM2/400:null;
  const sampleNote=Number.isFinite(pixels)?(Number.isFinite(geometryPixels)&&geometryPixels>0?'البكسلات الصالحة: '+pixels+' من '+geometryPixels+' بكسلًا ضمن حدود الحقل'+(Number.isFinite(coverage)?' ('+coverage.toFixed(1)+'% تغطية).':'.'):'عدد البكسلات الصالحة: '+pixels+'. '+(expected?'المساحة تعادل اسميًا نحو '+Math.round(expected)+' بكسلًا بدقة 20 متر.':''))+(pixels<3?' العينة صغيرة جدًا ولا تكفي لتقييم الحقل كاملًا.':''):'لم ترد بيانات كافية عن البكسلات الصالحة.';
  const title=document.createElement('h3');title.textContent='نتائج Sentinel-2 الفعلية';
@@ -46,9 +51,9 @@ $('autoAnalyze').onclick=async()=>{
  const quality=document.createElement('p');quality.className='notice';quality.textContent=sampleNote;
  const interpretation=document.createElement('p');interpretation.textContent=Number.isFinite(pixels)&&pixels<3?'⚠️ العينة الفضائية صغيرة جدًا لتقييم الحقل بالكامل. يُفضّل إعادة التحليل عند توفر بكسلات صالحة أكثر أو مشهد أقل غيوماً. لا يمكن استنتاج نقص المياه أو الأسمدة من هذه العينة.':'قراءة NDVI '+(data.ndvi<0.2?'منخفضة':data.ndvi<0.5?'متوسطة':'مرتفعة')+' نسبيًا. NDMI '+(data.ndmi<0?'سالب':data.ndmi<0.2?'موجب منخفض':'موجب')+'. لا يُستنتج العطش أو نقص السماد من هذين المؤشرين دون نوع المحصول ومرحلة نموه وقياسات أرضية.';
  const actions=document.createElement('div');actions.className='grid';
- const copy=document.createElement('button');copy.className='secondary';copy.textContent='📋 نسخ نتيجة التحليل';copy.onclick=async()=>{const report=[title.textContent,'الحقل: '+$('field').selectedOptions[0].textContent,numbers.textContent,meta.textContent,sampleNote,interpretation.textContent,advisorList.innerText,weatherPanel.innerText,warning.textContent].join('\n');try{await navigator.clipboard.writeText(report);copy.textContent='✓ تم نسخ التقرير'}catch(e){copy.textContent='تعذر النسخ، استخدم تحديد النص'}};
+ const copy=document.createElement('button');copy.className='secondary';copy.textContent='📋 نسخ نتيجة التحليل';copy.onclick=async()=>{const report=[title.textContent,'الحقل: '+analyzedField.name,numbers.textContent,meta.textContent,sampleNote,interpretation.textContent,advisorList.innerText,weatherPanel.innerText,warning.textContent].join('\n');try{await navigator.clipboard.writeText(report);copy.textContent='✓ تم نسخ التقرير'}catch(e){copy.textContent='تعذر النسخ، استخدم تحديد النص'}};
  const print=document.createElement('button');print.className='secondary';print.textContent='🖨️ طباعة / حفظ PDF';print.onclick=()=>window.print();actions.append(copy,print);
- const historyKey='ur-smart-satellite-history-v1';const record={field_id:fieldId,field_name:$('field').selectedOptions[0].textContent,ndvi:data.ndvi,ndmi:data.ndmi,date:data.date||'',valid_pixels:Number.isFinite(pixels)?pixels:null,geometry_pixels:Number.isFinite(geometryPixels)?geometryPixels:null,coverage_percent:Number.isFinite(coverage)?coverage:null,source:data.source||'Sentinel-2',saved_at:new Date().toISOString()};
+ const historyKey='ur-smart-satellite-history-v1';const record={field_id:fieldId,field_name:analyzedField.name,ndvi:data.ndvi,ndmi:data.ndmi,date:data.date||'',valid_pixels:Number.isFinite(pixels)?pixels:null,geometry_pixels:Number.isFinite(geometryPixels)?geometryPixels:null,coverage_percent:Number.isFinite(coverage)?coverage:null,source:data.source||'Sentinel-2',saved_at:new Date().toISOString()};
  let history=[];try{history=JSON.parse(localStorage.getItem(historyKey)||'[]');if(!Array.isArray(history))history=[];history=history.filter(x=>!(x.field_id===record.field_id&&x.date===record.date));history.unshift(record);localStorage.setItem(historyKey,JSON.stringify(history.slice(0,100)))}catch(e){history=[record]}
  const past=history.filter(x=>x.field_id===fieldId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  const historyTitle=document.createElement('h4');historyTitle.textContent='📈 سجل الرصد والمقارنة (محفوظ على هذا الجهاز)';
@@ -70,9 +75,9 @@ $('autoAnalyze').onclick=async()=>{
  const advisorTitle=document.createElement("h3");advisorTitle.textContent="🤖 مساعد أور الزراعي الذكي";
  const advisorLead=document.createElement("p");advisorLead.textContent="إرشاد آلي أولي يربط نتائج Sentinel‑2 بجودة العينة والمحصول المسجل، ويقترح ما يستحق التحقق ميدانيًا.";
  const advisorList=document.createElement("ul");
- const cropName=$("field").selectedOptions[0]?.dataset.crop||"غير محدد";
+ const cropName=analyzedField.crop||"غير محدد";
  const addAdvice=(text)=>{const li=document.createElement("li");li.textContent=text;advisorList.append(li)};
- const sampleCount=Number(data.valid_pixels),coverageValue=Number(data.coverage_percent),hasCoverage=Number.isFinite(coverageValue);
+ const sampleCount=numberOrNaN(data.valid_pixels),coverageValue=numberOrNaN(data.coverage_percent),hasCoverage=Number.isFinite(coverageValue);
  if(!Number.isFinite(sampleCount)||sampleCount<3||(hasCoverage&&coverageValue<25)){
    addAdvice("العينة المكانية محدودة ("+(Number.isFinite(sampleCount)?sampleCount:"غير متاح")+" بكسلات صالحة"+(hasCoverage?"، تغطية "+coverageValue.toFixed(1)+"%":"")+"). لا تعمم القراءة على الحقل. أعد التحليل عند توفر مشهد صافٍ أكثر، وتحقق من حدود الحقل.");
    addAdvice("نفّذ جولة ميدانية قبل أي قرار: افحص توزيع النباتات والغيوم/الظلال وقياس رطوبة التربة قرب الجذور.");
@@ -92,7 +97,7 @@ $('autoAnalyze').onclick=async()=>{
  ["طبقة المؤشر الأولى","طبقة المؤشر الثانية"].forEach((labelText,i)=>{const wrap=document.createElement("div"),label=document.createElement("label"),select=document.createElement("select");label.textContent=labelText;Object.keys(names).forEach(key=>select.add(new Option(key+" — "+names[key],key)));select.value=i===0?"NDVI":"NDMI";wrap.append(label,select);mapControls.append(wrap);mapSelectors.push(select)});
  const mapSeries=(Array.isArray(data.series)&&data.series.length?data.series:[data]).filter(x=>x.date).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  const sceneWrap=document.createElement("div"),sceneLabel=document.createElement("label"),sceneSelect=document.createElement("select");sceneLabel.textContent="تاريخ المشهد / الخريطة الزمنية";sceneSelect.setAttribute("aria-label","اختيار تاريخ مشهد الأقمار الصناعية");
- mapSeries.forEach(s=>{const date=String(s.date).slice(0,10),quality=Number.isFinite(Number(s.coverage_percent))?" — تغطية "+Number(s.coverage_percent).toFixed(1)+"%":"";sceneSelect.add(new Option(safeDate(s.date)+quality,s.date))});
+ mapSeries.forEach(s=>{const date=String(s.date).slice(0,10),quality=Number.isFinite(numberOrNaN(s.coverage_percent))?" — تغطية "+Number(s.coverage_percent).toFixed(1)+"%":"";sceneSelect.add(new Option(safeDate(s.date)+quality,s.date))});
  sceneSelect.value=mapSeries.find(x=>String(x.date)===String(data.date))?.date||mapSeries[0]?.date||"";
  sceneWrap.append(sceneLabel,sceneSelect);mapControls.append(sceneWrap);
  const mapButton=document.createElement("button");mapButton.className="secondary";mapButton.textContent="🗺️ عرض الصورة الحديثة والمؤشرات على الخريطة";
@@ -104,7 +109,7 @@ $('autoAnalyze').onclick=async()=>{
  const waterDepth=document.createElement("input");waterDepth.type="number";waterDepth.min="0";waterDepth.step="0.1";waterDepth.placeholder="عمق ماء الري (ملم)";const duration=document.createElement("input");duration.type="number";duration.min="1";duration.step="1";duration.placeholder="مدة الري (دقيقة)";
  const method=document.createElement("select");["غير محدد","تنقيط","رش","سيحي","مضخة/خرطوم","أخرى"].forEach(v=>method.add(new Option(v,v)));const notes=document.createElement("input");notes.placeholder="ملاحظة عن الري (اختياري)";
  irrigationForm.append(irrigatedAt,waterDepth,duration,method,notes);const saveIrrigation=document.createElement("button");saveIrrigation.className="secondary";saveIrrigation.textContent="＋ تسجيل رية";const irrigationList=document.createElement("div");irrigationList.className="muted";irrigationList.textContent="جارٍ تحميل سجل الري...";irrigationPanel.append(irrigationTitle,irrigationHint,irrigationForm,saveIrrigation,irrigationList);
- let weatherData=null,irrigationLogs=[],currentRecommendation=null;
+ let weatherData=null,weatherFetchedAt=null,irrigationLogs=[],currentRecommendation=null;
  const weatherByDate=new Map();
  function fieldCenter(geometry){const ring=geometry?.coordinates?.[0]||[];const pts=ring.slice(0,-1);if(!pts.length)throw Error("لا توجد إحداثيات صالحة للحقل");const sum=pts.reduce((a,p)=>[a[0]+Number(p[0]),a[1]+Number(p[1])],[0,0]);return [sum[0]/pts.length,sum[1]/pts.length]}
  function weatherForDate(date){return weatherByDate.get(String(date).slice(0,10))||null}
@@ -114,42 +119,46 @@ $('autoAnalyze').onclick=async()=>{
   const scene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||mapSeries[0];if(!scene)return;
   const d=String(scene.date).slice(0,10),ref=Date.parse(d+"T00:00:00Z"),weatherRows=weatherData?.daily?.time||[];
   const prior=weatherRows.map((day,i)=>({day,i})).filter(x=>{const t=Date.parse(x.day+"T00:00:00Z");return t<ref&&t>=ref-7*86400000});
-  const sum=(key,rows)=>rows.map(x=>Number(weatherData.daily[key]?.[x.i])).filter(Number.isFinite).reduce((a,b)=>a+b,0);
-  const rain=sum("precipitation_sum",prior),eto=sum("et0_fao_evapotranspiration",prior),weatherCount=prior.length;
-  const currentDay=new Date().toISOString().slice(0,10),forecast=String(scene.date).slice(0,10)>=currentDay?weatherRows.map((day,i)=>({day,i})).filter(x=>x.day>=currentDay&&x.day<=new Date(Date.now()+3*86400000).toISOString().slice(0,10)):[];
-  const forecastRain=sum("precipitation_sum",forecast);
-  const relevant=irrigationLogs.filter(x=>Date.parse(x.irrigated_at)<=ref+86400000).sort((a,b)=>Date.parse(b.irrigated_at)-Date.parse(a.irrigated_at));
+  const completePrior=prior.filter(x=>[weatherData.daily.precipitation_sum?.[x.i],weatherData.daily.et0_fao_evapotranspiration?.[x.i]].every(v=>Number.isFinite(numberOrNaN(v))&&numberOrNaN(v)>=0));
+  const sum=(key,rows)=>rows.length?rows.map(x=>numberOrNaN(weatherData.daily[key]?.[x.i])).filter(Number.isFinite).reduce((a,b)=>a+b,0):NaN;
+  const rain=sum("precipitation_sum",completePrior),eto=sum("et0_fao_evapotranspiration",completePrior),weatherCount=completePrior.length;
+  const currentDay=new Date().toISOString().slice(0,10),forecast=String(scene.date).slice(0,10)>=currentDay?weatherRows.map((day,i)=>({day,i})).filter(x=>x.day>=currentDay).slice(0,3):[];
+  const forecastComplete=forecast.length===3&&forecast.every(x=>Number.isFinite(numberOrNaN(weatherData.daily.precipitation_sum?.[x.i])));
+  const forecastRain=forecastComplete?sum("precipitation_sum",forecast):NaN;
+  const relevant=irrigationLogs.filter(x=>Date.parse(x.irrigated_at)<ref+86400000&&Date.parse(x.irrigated_at)<=Date.now()).sort((a,b)=>Date.parse(b.irrigated_at)-Date.parse(a.irrigated_at));
   const lastIrr= relevant[0]||null,daysSince=lastIrr?Math.max(0,(ref-Date.parse(lastIrr.irrigated_at))/86400000):Infinity;
-  const val=Number((scene.indices||{})["NDMI"]??scene.ndmi),ndvi=Number((scene.indices||{})["NDVI"]??scene.ndvi),coverage=scene.coverage_percent==null?NaN:Number(scene.coverage_percent),sceneAge=Math.max(0,(Date.now()-ref)/86400000);
+  const val=numberOrNaN((scene.indices||{})["NDMI"]??scene.ndmi),ndvi=numberOrNaN((scene.indices||{})["NDVI"]??scene.ndvi),coverage=scene.coverage_percent==null?NaN:Number(scene.coverage_percent),sceneAge=Math.max(0,(Date.now()-ref)/86400000);
   let score=40; if(Number.isFinite(coverage)){score+=coverage>=60?20:coverage>=25?10:-15} else score-=10;
   score+=weatherCount>=5?15:weatherCount>0?7:-15;score+=lastIrr?(daysSince<=7?10:3):-12;score+=sceneAge<=5?10:sceneAge<=12?5:-8;score=Math.max(20,Math.min(90,score));
   const reasons=[];
   reasons.push("مشهد "+safeDate(scene.date)+"؛ NDMI "+(Number.isFinite(val)?val.toFixed(3):"غير متاح")+" وNDVI "+(Number.isFinite(ndvi)?ndvi.toFixed(3):"غير متاح")+".");
-  reasons.push("خلال الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1):"غير متاح")+" ملم، وتبخر مرجعي ET₀ "+(weatherCount?eto.toFixed(1):"غير متاح")+" ملم.");
+  reasons.push("الطقس السابق للمشهد ("+weatherCount+" أيام مكتملة من 7): مطر "+(weatherCount?rain.toFixed(1):"غير متاح")+" ملم، وتبخر مرجعي ET₀ "+(weatherCount?eto.toFixed(1):"غير متاح")+" ملم.");
   reasons.push(lastIrr?"آخر رية مسجلة قبل/قرب المشهد: "+safeDate(lastIrr.irrigated_at)+(lastIrr.water_depth_mm!==null?", عمق "+Number(lastIrr.water_depth_mm).toFixed(1)+" ملم":"")+".":"لا توجد رية مسجلة قبل تاريخ المشهد؛ هذا يخفض الثقة.");
-  reasons.push("المطر المتوقع خلال الأيام الثلاثة القادمة: "+(forecast.length?forecastRain.toFixed(1):"غير متاح")+" ملم. تغطية البكسلات الصالحة: "+(Number.isFinite(coverage)?coverage.toFixed(1)+"%":"غير متاحة")+".");
+  reasons.push("المطر المتوقع خلال الأيام الثلاثة القادمة: "+(forecastComplete?forecastRain.toFixed(1):"غير متاح")+" ملم. تغطية البكسلات الصالحة: "+(Number.isFinite(coverage)?coverage.toFixed(1)+"%":"غير متاحة")+".");
   let advice="المعطيات لا تكفي لجدولة رية أو إضافة سماد. افحص رطوبة التربة عند عمق الجذور وتجانس توزيع الماء قبل اتخاذ القرار.";
-  if(Number.isFinite(val)&&val<0&&weatherCount>=5&&rain<5&&eto-rain>=15&&(!lastIrr||daysSince>3)){
+  if(Number.isFinite(val)&&val<0&&weatherCount===7&&rain<5&&eto-rain>=15&&(!lastIrr||daysSince>3)){
    advice="توجد إشارة جفاف محتملة: NDMI سالب مع مطر قليل وتبخر مرجعي أعلى. افحص رطوبة التربة اليوم؛ إذا كانت دون المجال المناسب للمحصول ومرحلة نموه، نفّذ رية محسوبة وراقب الحقل.";
   }else if(Number.isFinite(val)&&val<0&&lastIrr&&daysSince<=3){
    advice="رُصد NDMI سالب رغم وجود رية حديثة. لا تكرر الري تلقائيًا؛ افحص رطوبة منطقة الجذور، وتصريف الحقل، وانتظام وصول الماء قبل تعديل برنامج الري.";
   }else if((rain>=15||forecastRain>=15||Number.isFinite(val)&&val>=0.15)&&(!lastIrr||daysSince<=3)){
    advice="لا تظهر إشارة كافية لإضافة رية فورية من هذه البيانات. راجع رطوبة الجذور بعد المطر/الري، ثم تابع المؤشر في المشهد التالي.";
   }
-  weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecast.length?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: ";const weatherLink=document.createElement("a");weatherLink.href="https://open-meteo.com/";weatherLink.target="_blank";weatherLink.rel="noopener noreferrer";weatherLink.textContent="Open‑Meteo";weatherText.append(weatherLink," (تقديرات نموذجية).");
+  if(sceneAge>7)advice="هذا مشهد تاريخي أقدم من 7 أيام؛ لا يُصدر منه قرار ري لليوم. أعد قياس رطوبة الجذور وحدّث المشهد والطقس، ثم ناقش التقرير مع المساعد.";
+  else if(!Number.isFinite(coverage)||coverage<25||!Number.isFinite(numberOrNaN(scene.valid_pixels))||numberOrNaN(scene.valid_pixels)<3)advice="جودة العينة غير كافية أو غير مكتملة؛ تحقق ميدانيًا من حالة الجذور ولا تعمم المتوسط الفضائي على الحقل.";
+  weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecastComplete?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: ";const weatherLink=document.createElement("a");weatherLink.href="https://open-meteo.com/";weatherLink.target="_blank";weatherLink.rel="noopener noreferrer";weatherLink.textContent="Open‑Meteo";weatherText.append(weatherLink," (تقديرات نموذجية).");
   recommendationText.textContent=advice;recommendationReason.replaceChildren();reasons.forEach(t=>{const li=document.createElement("li");li.textContent=t;recommendationReason.append(li)});
   confidence.textContent="الثقة التشغيلية: "+score+"% — تقدير اكتمال وحداثة البيانات، وليست احتمالًا إحصائيًا لصحة التشخيص.";
-  const cropName=$("field").selectedOptions[0]?.dataset.crop||"محصول غير محدد";currentRecommendation={crop:cropName,scene,advice,reasons,score,weather:{rain_mm_7d:weatherCount?rain:null,et0_mm_7d:weatherCount?eto:null,forecast_rain_mm_3d:forecast.length?forecastRain:null},lastIrrigation:lastIrr};
+  const cropName=analyzedField.crop||"محصول غير محدد";currentRecommendation={crop:cropName,scene,advice,reasons,score,weather:{rain_mm_7d:weatherCount?rain:null,et0_mm_7d:weatherCount?eto:null,forecast_rain_mm_3d:forecastComplete?forecastRain:null},lastIrrigation:lastIrr};
  }
  async function loadWeather(){
-  try{const [lon,lat]=fieldCenter(data.geometry);const q=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:"precipitation_sum,et0_fao_evapotranspiration,temperature_2m_mean,temperature_2m_max",timezone:"auto",past_days:"65",forecast_days:"3"});const r=await fetch("https://api.open-meteo.com/v1/forecast?"+q.toString(),{signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error("HTTP "+r.status);weatherData=await r.json();(weatherData.daily?.time||[]).forEach((day,i)=>weatherByDate.set(day,{date:day,precipitation_mm:weatherData.daily.precipitation_sum?.[i]??null,et0_mm:weatherData.daily.et0_fao_evapotranspiration?.[i]??null,tmax_c:weatherData.daily.temperature_2m_max?.[i]??null,tmean_c:weatherData.daily.temperature_2m_mean?.[i]??null}));renderWeatherAdvice()}catch(e){weatherText.textContent="تعذر جلب الطقس المرتبط بموقع الحقل: "+e.message;weatherData=null;renderWeatherAdvice()}
+  try{const [lon,lat]=fieldCenter(data.geometry);const q=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:"precipitation_sum,et0_fao_evapotranspiration,temperature_2m_mean,temperature_2m_max",timezone:"auto",past_days:"65",forecast_days:"3"});const r=await fetch("https://api.open-meteo.com/v1/forecast?"+q.toString(),{signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error("HTTP "+r.status);weatherData=await r.json();weatherFetchedAt=new Date().toISOString();(weatherData.daily?.time||[]).forEach((day,i)=>weatherByDate.set(day,{date:day,precipitation_mm:weatherData.daily.precipitation_sum?.[i]??null,et0_mm:weatherData.daily.et0_fao_evapotranspiration?.[i]??null,tmax_c:weatherData.daily.temperature_2m_max?.[i]??null,tmean_c:weatherData.daily.temperature_2m_mean?.[i]??null}));renderWeatherAdvice()}catch(e){weatherText.textContent="تعذر جلب الطقس المرتبط بموقع الحقل: "+e.message;weatherData=null;renderWeatherAdvice()}
  }
  async function saveObservationHistory(){
   const rows=mapSeries.map(s=>({field_id:fieldId,owner_id:user.id,acquisition_date:String(s.date).slice(0,10),indices:s.indices||{NDVI:s.ndvi,NDMI:s.ndmi},valid_pixels:s.valid_pixels??null,geometry_pixels:s.geometry_pixels??null,coverage_percent:s.coverage_percent??null,source:data.source||"Sentinel-2 L2A",weather_context:weatherForDate(s.date)}));
   if(!rows.length)return;const {error}=await client.from("satellite_observations").upsert(rows,{onConflict:"field_id,acquisition_date"});if(error)throw error;
  }
  saveIrrigation.onclick=async()=>{saveIrrigation.disabled=true;try{const depth=waterDepth.value===""?null:Number(waterDepth.value),mins=duration.value===""?null:Number(duration.value);if(depth===null&&mins===null)throw Error("أدخل عمق الماء أو مدة الري على الأقل");const {error}=await client.from("field_irrigation_logs").insert({field_id:fieldId,owner_id:user.id,irrigated_at:new Date(irrigatedAt.value).toISOString(),water_depth_mm:depth,duration_minutes:mins,method:method.value,notes:notes.value||null});if(error)throw error;notes.value="";waterDepth.value="";duration.value="";await loadIrrigationLogs();renderWeatherAdvice();saveIrrigation.textContent="✓ تم تسجيل الرية";setTimeout(()=>saveIrrigation.textContent="＋ تسجيل رية",1800)}catch(e){irrigationList.textContent="تعذر حفظ سجل الري: "+e.message}finally{saveIrrigation.disabled=false}};
- saveRecommendation.onclick=async()=>{if(!currentRecommendation)return;saveRecommendation.disabled=true;try{const c=currentRecommendation;const field=$("field").selectedOptions[0];const symptom="Sentinel‑2 "+String(c.scene.date).slice(0,10)+"; NDVI "+Number(c.scene.ndvi).toFixed(3)+"; NDMI "+Number(c.scene.ndmi).toFixed(3)+"; weather "+JSON.stringify(c.weather)+"; "+c.reasons.join(" ");const {error}=await client.from("field_recommendations").insert({owner_id:user.id,farm_id:field.dataset.farmId||null,field_id:fieldId,crop:c.crop,growth_stage:null,plant_symptoms:symptom,soil_moisture:Number.isFinite(Number(c.scene.ndmi))?"NDMI "+Number(c.scene.ndmi).toFixed(3):null,recommendation:c.advice,confidence:c.score+"% ثقة تشغيلية"});if(error)throw error;saveRecommendation.textContent="✓ حُفظت التوصية";setTimeout(()=>saveRecommendation.textContent="حفظ التوصية في سجل الحقل",2000)}catch(e){saveRecommendation.textContent="تعذر الحفظ: "+e.message}finally{saveRecommendation.disabled=false}};
+ saveRecommendation.onclick=async()=>{if(!currentRecommendation)return;saveRecommendation.disabled=true;try{const c=currentRecommendation;const fieldIdForSave=fieldId;const symptom="Sentinel‑2 "+String(c.scene.date).slice(0,10)+"; NDVI "+Number(c.scene.ndvi).toFixed(3)+"; NDMI "+Number(c.scene.ndmi).toFixed(3)+"; weather "+JSON.stringify(c.weather)+"; "+c.reasons.join(" ");const {error}=await client.from("field_recommendations").insert({owner_id:user.id,farm_id:option.dataset.farmId||null,field_id:fieldIdForSave,crop:c.crop,growth_stage:null,plant_symptoms:symptom,soil_moisture:Number.isFinite(Number(c.scene.ndmi))?"NDMI "+Number(c.scene.ndmi).toFixed(3):null,recommendation:c.advice,confidence:c.score+"% ثقة تشغيلية"});if(error)throw error;saveRecommendation.textContent="✓ حُفظت التوصية";setTimeout(()=>saveRecommendation.textContent="حفظ التوصية في سجل الحقل",2000)}catch(e){saveRecommendation.textContent="تعذر الحفظ: "+e.message}finally{saveRecommendation.disabled=false}};
  mapButton.onclick=async()=>{
   if(!mapArea.isConnected||mapButton.disabled)return;
   const selected=mapSelectors.map(x=>x.value),scene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||mapSeries[0];
@@ -213,7 +222,11 @@ $('autoAnalyze').onclick=async()=>{
   finally{mapButton.disabled=false}
  };
  sceneSelect.onchange=()=>{renderWeatherAdvice();mapButton.click()};
-  const dashboard=document.createElement("section");dashboard.className="ag-dashboard";
+ const handoff=createAdvisorHandoff({getContext:()=>{
+  const selectedScene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||data;
+  return {field:analyzedField,satellite:{...selectedScene,source:data.source,resolution_m:data.resolution_m,series:mapSeries},weather:weatherData?{...weatherData,source:'Open-Meteo',fetched_at:weatherFetchedAt}:null,irrigationLogs};
+ }});
+ const dashboard=document.createElement("section");dashboard.className="ag-dashboard";
  const dashHeading=document.createElement("div"),dashTitle=document.createElement("h3"),dashIntro=document.createElement("p");dashTitle.textContent="🛰️ لوحة تحليل الحقل";dashIntro.className="ag-dashboard-intro";dashIntro.textContent="طبقات المؤشرات مرسومة مكانيًا فوق مشهد Sentinel‑2 داخل حدود الحقل. اضغط على خريطة مصغرة لتكبيرها.";dashHeading.append(dashTitle,dashIntro);
  const mapLayout=document.createElement("div");mapLayout.className="ag-map-layout";
  const mainMapCard=document.createElement("section");mainMapCard.className="ag-map-main";const mainMapTitle=document.createElement("h4");mainMapTitle.textContent="صورة القمر وطبقات الحقل";mainMapCard.append(mainMapTitle,mapControls,mapButton,mapArea);
@@ -228,7 +241,7 @@ $('autoAnalyze').onclick=async()=>{
  const caveat=document.createElement("p");caveat.className="notice";caveat.textContent="القيم متوسطات للبكسلات الصالحة. CIgreen مؤشر كلوروفيل طيفي وليس SPAD، وMSI ليس قياسًا مباشرًا لرطوبة التربة. لا تتوفر LST من Sentinel‑2.";
  const summaryWrap=document.createElement("div");summaryWrap.className="ag-summary-grid";summaryWrap.append(summary,weatherPanel);
  dashboard.append(dashHeading,mapLayout,metricGrid,summaryWrap,caveat);
- box.append(title,dashboard,numbers,meta,quality,interpretation,warning,indexTitle,indexTable,indexNote,advisor,actions,irrigationPanel,historyTitle,historyNote,historyList);
+ box.append(title,dashboard,numbers,meta,quality,interpretation,warning,indexTitle,indexTable,indexNote,advisor,handoff,actions,irrigationPanel,historyTitle,historyNote,historyList);
 setTimeout(()=>mapButton.click(),0);
  // Map images must not wait for weather, irrigation, or history storage.
  void (async()=>{
@@ -249,17 +262,19 @@ async function refresh(){
  const select=$('field');select.replaceChildren();select.add(new Option('اختر حقلًا',''));
  try{
  const {data:{user:u},error:authError}=await client.auth.getUser();if(authError||!u){$('status').textContent='سجّل الدخول من لوحة المزارع أولًا.';return}
- user=u;const {data,error}=await client.from('fields').select('id,name,crop,area_donum,farm_id,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');
+ user=u;const {data,error}=await client.from('fields').select('id,name,crop,area_donum,farm_id,soil,irrigation,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');
  if(error)throw error;
- (data||[]).forEach(f=>{const option=new Option(f.name,f.id);option.dataset.crop=f.crop||'';option.dataset.areaDonum=f.area_donum??'';option.dataset.farmId=f.farm_id||'';select.add(option)});
+ (data||[]).forEach(f=>{const option=new Option(f.name,f.id);option.dataset.crop=f.crop||'';option.dataset.areaDonum=f.area_donum??'';option.dataset.farmId=f.farm_id||'';option.dataset.soil=f.soil||'';option.dataset.irrigation=f.irrigation||'';select.add(option)});
  $('status').textContent='متصل بحساب المزارع. اختر حقلًا للمتابعة.';
  }catch(e){$('status').textContent='تعذر تحميل الحقول: '+e.message}
 }
 $('refresh').onclick=refresh;
 $('field').onchange=async()=>{
+ analysisRequestGeneration++;disposeIndicatorMaps();$('autoResult').replaceChildren();
  const id=$('field').value;const box=$('boundary');if(!id){box.textContent='اختر حقلًا أولًا.';return}
  box.textContent='جارٍ تحميل حدود الحقل...';
  const {data,error}=await client.from('field_boundaries').select('area_m2,perimeter_m,updated_at').eq('field_id',id).maybeSingle();
+ if($('field').value!==id)return;
  if(error){box.textContent='تعذر تحميل الحدود: '+error.message;return}
  if(!data){delete $('field').selectedOptions[0].dataset.areaM2;box.textContent='لا توجد حدود محفوظة لهذا الحقل. يمكنك رسمها من صفحة الخريطة.';return}
  const area=Number(data.area_m2),perimeter=Number(data.perimeter_m);$('field').selectedOptions[0].dataset.areaM2=String(area);

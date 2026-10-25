@@ -175,6 +175,7 @@ body{background:white}main{width:100%;margin:0}
 <footer class="muted" style="text-align:center;padding:20px">© 2026 UR Smart — أور الزراعية الذكية</footer>
 
 <script type="module">
+import {createAdvisorHandoff} from './advisor-handoff.mjs';
 (async()=>{
 try{
 const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
@@ -390,7 +391,20 @@ $('fieldForm').addEventListener('submit',async e=>{
 });
 
 const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
-let fieldContext={weather:null,satellite:null,series:[],logs:[]},contextLoadToken=0;
+let fieldContext={fieldId:null,requestToken:0,updatedAt:null,weather:null,satellite:null,series:[],logs:[]},contextLoadToken=0;
+function contextIsCurrent(fieldId,token){return token===contextLoadToken&&$('savedField').value===fieldId&&fieldContext.fieldId===fieldId;}
+function finiteNumber(value){if(value===null||value===undefined||typeof value==='boolean'||typeof value==='string'&&!value.trim())return null;const number=Number(value);return Number.isFinite(number)?number:null;}
+function mmText(value){return Number.isFinite(value)?value.toFixed(1):'غير متاح';}
+function summarizeWeather(data,today){
+ const daily=data.daily||{},dates=daily.time||[];
+ const rows=dates.map((date,i)=>({date,precipitation_mm:finiteNumber(daily.precipitation_sum?.[i]),et0_mm:finiteNumber(daily.et0_fao_evapotranspiration?.[i]),tmax_c:finiteNumber(daily.temperature_2m_max?.[i])}));
+ const day=86400000,midnight=Date.parse(today+'T00:00:00Z'),pastStart=new Date(midnight-7*day).toISOString().slice(0,10),forecastEnd=new Date(midnight+3*day).toISOString().slice(0,10);
+ const past=rows.filter(r=>r.date>=pastStart&&r.date<today),forecast=rows.filter(r=>r.date>=today&&r.date<forecastEnd);
+ const count=(list,key)=>list.filter(r=>r[key]!==null).length;
+ const total=(list,key,expected)=>list.length===expected&&count(list,key)===expected?list.reduce((n,r)=>n+r[key],0):null;
+ const temperatures=forecast.map(r=>r.tmax_c).filter(Number.isFinite);
+ return {pastRain:total(past,'precipitation_mm',7),pastEt0:total(past,'et0_mm',7),forecastRain:total(forecast,'precipitation_mm',3),forecastEt0:total(forecast,'et0_mm',3),maxForecastTemp:temperatures.length?Math.max(...temperatures):null,pastDaysRequested:7,forecastDaysRequested:3,referenceDate:today,completeness:{pastRainDays:count(past,'precipitation_mm'),pastEt0Days:count(past,'et0_mm'),forecastRainDays:count(forecast,'precipitation_mm'),forecastEt0Days:count(forecast,'et0_mm'),forecastTemperatureDays:temperatures.length},daily:rows};
+}
 function setLocalDateTime(){const d=new Date(Date.now()-new Date().getTimezoneOffset()*60000);$('irrigatedAt').value=d.toISOString().slice(0,16)}
 function formatLocalDate(value){const d=new Date(value);return Number.isNaN(d.getTime())?'—':new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeStyle:'short'}).format(d)}
 async function getFieldCenter(fieldId){
@@ -402,57 +416,62 @@ async function getFieldCenter(fieldId){
  const points=ring.slice(0,-1);
  return points.reduce((sum,p)=>[sum[0]+Number(p[0]),sum[1]+Number(p[1])],[0,0]).map(v=>v/points.length);
 }
-async function loadFieldWeather(fieldId){
+async function loadFieldWeather(fieldId,token=contextLoadToken){
  const [lon,lat]=await getFieldCenter(fieldId);
+ if(!contextIsCurrent(fieldId,token))return null;
  if(!Number.isFinite(lon)||!Number.isFinite(lat)||Math.abs(lat)>90||Math.abs(lon)>180)throw Error('إحداثيات حدود الحقل غير صالحة للطقس.');
  const url=new URL('https://api.open-meteo.com/v1/forecast');
  url.search=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max',past_days:'7',forecast_days:'7',timezone:'auto'}).toString();
  const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
  const data=await response.json().catch(()=>({}));
+ if(!contextIsCurrent(fieldId,token))return null;
  if(!response.ok||data.error)throw Error(data.reason||'تعذر جلب توقعات الطقس ('+response.status+').');
- const daily=data.daily||{},dates=daily.time||[],rain=daily.precipitation_sum||[],et0=daily.et0_fao_evapotranspiration||[],temps=daily.temperature_2m_max||[];
- if(!dates.length)throw Error('وصل رد الطقس دون توقعات يومية.');
+ if(!data.daily?.time?.length)throw Error('وصل رد الطقس دون توقعات يومية.');
  const timezone=data.timezone||'Asia/Baghdad';
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- let pastRain=0,pastEt0=0,forecastRain=0,forecastEt0=0,maxForecastTemp=null;
- dates.forEach((day,i)=>{const r=rain[i],e=et0[i],t=temps[i];if(day<today){if(r!==null&&Number.isFinite(Number(r)))pastRain+=Number(r);if(e!==null&&Number.isFinite(Number(e)))pastEt0+=Number(e)}else{if(r!==null&&Number.isFinite(Number(r)))forecastRain+=Number(r);if(e!==null&&Number.isFinite(Number(e)))forecastEt0+=Number(e);if(t!==null&&Number.isFinite(Number(t)))maxForecastTemp=maxForecastTemp===null?Number(t):Math.max(maxForecastTemp,Number(t))}});
- fieldContext.weather={pastRain,pastEt0,forecastRain,forecastEt0,maxForecastTemp,updatedAt:new Date().toISOString(),source:'Open-Meteo',timezone};
+ const weather={...summarizeWeather(data,today),fieldId,updatedAt:new Date().toISOString(),source:'Open-Meteo',timezone};
+ fieldContext.weather=weather;fieldContext.updatedAt=weather.updatedAt;
  const box=$('weatherContext');box.replaceChildren();
- const p=document.createElement('p');p.textContent='مطر آخر 7 أيام: '+pastRain.toFixed(1)+' ملم — ET₀ المرجعي: '+pastEt0.toFixed(1)+' ملم.';
- const q=document.createElement('p');q.textContent='توقع 7 أيام: مطر '+forecastRain.toFixed(1)+' ملم — ET₀ مرجعي '+forecastEt0.toFixed(1)+' ملم'+(maxForecastTemp===null?'':(' — أعلى حرارة '+maxForecastTemp.toFixed(1)+'°م'))+'.';
+ const p=document.createElement('p');p.textContent='مطر آخر 7 أيام: '+mmText(weather.pastRain)+' ملم — ET₀ المرجعي: '+mmText(weather.pastEt0)+' ملم.';
+ const q=document.createElement('p');q.textContent='توقع 3 أيام (من اليوم): مطر '+mmText(weather.forecastRain)+' ملم — ET₀ مرجعي '+mmText(weather.forecastEt0)+' ملم'+(weather.maxForecastTemp===null?'':(' — أعلى حرارة متاحة '+weather.maxForecastTemp.toFixed(1)+'°م'))+'. لا تُجمع فترة ناقصة على أنها مكتملة.';
  const list=document.createElement('ul');list.className='weather-days';
- dates.forEach((day,i)=>{if(day<today)return;const li=document.createElement('li'),dateLabel=new Intl.DateTimeFormat('ar-IQ',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'}).format(new Date(day+'T12:00:00Z'));const r=rain[i],e=et0[i],t=temps[i];li.textContent=dateLabel+': مطر '+(r===null||!Number.isFinite(Number(r))?'—':Number(r).toFixed(1)+' ملم')+'، ET₀ '+(e===null||!Number.isFinite(Number(e))?'—':Number(e).toFixed(1)+' ملم')+(t===null||!Number.isFinite(Number(t))?'':'، عظمى '+Number(t).toFixed(1)+'°م');list.append(li)});
- const n=document.createElement('p');n.className='muted';n.textContent='المصدر Open‑Meteo؛ توقع نموذجي قرب مركز الحقل ('+timezone+').' ;
- box.append(p,q,list,n);return fieldContext.weather;
+ weather.daily.forEach(row=>{if(row.date<today)return;const li=document.createElement('li'),dateLabel=new Intl.DateTimeFormat('ar-IQ',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'}).format(new Date(row.date+'T12:00:00Z'));li.textContent=dateLabel+': مطر '+mmText(row.precipitation_mm)+' ملم، ET₀ '+mmText(row.et0_mm)+' ملم'+(row.tmax_c===null?'':'، عظمى '+row.tmax_c.toFixed(1)+'°م');list.append(li)});
+ const n=document.createElement('p');n.className='muted';n.textContent='المصدر Open‑Meteo؛ توقع نموذجي قرب مركز الحقل ('+timezone+'). تُعرض الأيام السبعة منفصلة، لكن حساب التوصية يستخدم الأيام الثلاثة الأولى فقط.';
+ box.append(p,q,list,n);return weather;
 }
-async function loadIrrigationLogs(fieldId){
+async function loadIrrigationLogs(fieldId,token=contextLoadToken){
  const {data,error}=await supabase.from('field_irrigation_logs').select('id,irrigated_at,water_depth_mm,duration_minutes,method,notes').eq('field_id',fieldId).order('irrigated_at',{ascending:false}).limit(20);
+ if(!contextIsCurrent(fieldId,token))return null;
  if(error)throw Error('تعذر قراءة سجل الري: '+error.message);
- fieldContext.logs=data||[];renderIrrigationLogs();return fieldContext.logs;
+ fieldContext.logs=data||[];fieldContext.updatedAt=new Date().toISOString();renderIrrigationLogs();return fieldContext.logs;
 }
 function renderIrrigationLogs(){
  const box=$('irrigationHistory');box.replaceChildren();
  if(!fieldContext.logs.length){box.textContent='لا توجد سجلات ري لهذا الحقل بعد.';return}
  fieldContext.logs.forEach(log=>{const row=document.createElement('div');row.className='result';const info=document.createElement('p');info.textContent=formatLocalDate(log.irrigated_at)+' — '+(log.method||'طريقة غير محددة')+(log.water_depth_mm===null?'':(' — '+Number(log.water_depth_mm).toLocaleString('ar-IQ')+' ملم'))+(log.duration_minutes===null?'':(' — '+Number(log.duration_minutes).toLocaleString('ar-IQ')+' دقيقة'));row.append(info);if(log.notes){const note=document.createElement('p');note.className='muted';note.textContent=log.notes;row.append(note)}const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='حذف السجل';del.onclick=async()=>{if(!confirm('حذف سجل الري هذا؟'))return;const {error}=await supabase.from('field_irrigation_logs').delete().eq('id',log.id);if(error){$('fieldContextStatus').textContent='تعذر حذف السجل: '+error.message;return}await loadIrrigationLogs($('savedField').value)};row.append(del);box.append(row)});
 }
-async function loadSatelliteContext(fieldId){
+async function loadSatelliteContext(fieldId,token=contextLoadToken){
  const {data:{session:activeSession}}=await supabase.auth.getSession();if(!activeSession)throw Error('سجّل الدخول لتحميل تحليل القمر.');
- const response=await fetch(SATELLITE_API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+activeSession.access_token},body:JSON.stringify({field_id:fieldId})});
- const data=await response.json();if(!response.ok)throw Error(data.message||data.error||'تعذر تحميل التحليل الفضائي.');
- fieldContext.satellite=data;
+ if(!contextIsCurrent(fieldId,token))return null;
+ const response=await fetch(SATELLITE_API_URL,{method:'POST',signal:AbortSignal.timeout(90000),headers:{'Content-Type':'application/json','Authorization':'Bearer '+activeSession.access_token},body:JSON.stringify({field_id:fieldId})});
+ const data=await response.json();if(!contextIsCurrent(fieldId,token))return null;if(!response.ok)throw Error(data.message||data.error||'تعذر تحميل التحليل الفضائي.');
+ if(data.field_id&&data.field_id!==fieldId)throw Error('رد المؤشرات لا يخص الحقل المختار.');
+ fieldContext.satellite=data;fieldContext.updatedAt=new Date().toISOString();
  const box=$('satelliteContext');box.replaceChildren();
  const indices=data.indices||{};
- const p=document.createElement('p');p.textContent='المشهد: '+formatLocalDate(data.date)+' — NDVI: '+(Number.isFinite(Number(indices.NDVI))?Number(indices.NDVI).toFixed(3):'غير متاح')+' — NDMI: '+(Number.isFinite(Number(indices.NDMI))?Number(indices.NDMI).toFixed(3):'غير متاح')+'.';
- const q=document.createElement('p');q.textContent='تغطية صالحة: '+(Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent).toFixed(1)+'%':'غير محددة')+' — عدد البكسلات: '+(Number(data.valid_pixels)||0)+'.';
+ const p=document.createElement('p');p.textContent='المشهد: '+formatLocalDate(data.date)+' — NDVI: '+(finiteNumber(indices.NDVI)!==null?finiteNumber(indices.NDVI).toFixed(3):'غير متاح')+' — NDMI: '+(finiteNumber(indices.NDMI)!==null?finiteNumber(indices.NDMI).toFixed(3):'غير متاح')+'.';
+ const q=document.createElement('p');q.textContent='تغطية صالحة: '+(finiteNumber(data.coverage_percent)!==null?finiteNumber(data.coverage_percent).toFixed(1)+'%':'غير محددة')+' — عدد البكسلات: '+(finiteNumber(data.valid_pixels)??'غير متاح')+'.';
  const n=document.createElement('p');n.className='muted';n.textContent='المصدر Sentinel‑2 L2A، الدقة المصدرية الاسمية 20 مترًا؛ هذه قراءة طيفية وليست قياسًا مباشرًا لرطوبة التربة.';
  box.append(p,q,n);
- const record={field_id:fieldId,owner_id:activeSession.user.id,acquisition_date:String(data.date).slice(0,10),indices:data.indices||{},valid_pixels:Number(data.valid_pixels)||0,geometry_pixels:Number.isFinite(Number(data.geometry_pixels))?Number(data.geometry_pixels):null,coverage_percent:Number.isFinite(Number(data.coverage_percent))?Number(data.coverage_percent):null,source:data.source||'Sentinel-2 L2A',weather_context:fieldContext.weather||null};
+ const record={field_id:fieldId,owner_id:activeSession.user.id,acquisition_date:String(data.date).slice(0,10),indices:data.indices||{},valid_pixels:finiteNumber(data.valid_pixels),geometry_pixels:finiteNumber(data.geometry_pixels),coverage_percent:finiteNumber(data.coverage_percent),source:data.source||'Sentinel-2 L2A',weather_context:fieldContext.weather||null};
  const {error}=await supabase.from('satellite_observations').upsert(record,{onConflict:'field_id,acquisition_date'});
+ if(!contextIsCurrent(fieldId,token))return null;
  if(error)throw Error('عُرض التحليل لكن تعذر حفظ سجل المشهد: '+error.message);
  return data;
 }
-async function loadSatelliteHistory(fieldId){
+async function loadSatelliteHistory(fieldId,token=contextLoadToken){
  const {data,error}=await supabase.from('satellite_observations').select('acquisition_date,indices,coverage_percent,valid_pixels').eq('field_id',fieldId).order('acquisition_date',{ascending:false}).limit(4);
+ if(!contextIsCurrent(fieldId,token))return null;
  if(error)throw Error('تعذر قراءة تاريخ المؤشرات: '+error.message);
  fieldContext.series=(data||[]).filter(row=>row.indices&&row.acquisition_date);
  return fieldContext.series;
@@ -462,13 +481,13 @@ async function refreshFieldContext(){
  if(!fieldId){statusBox.textContent='اختر حقلًا محفوظًا أولًا.';return}
  statusBox.textContent='جارٍ تحديث الطقس والمؤشرات وسجل الري...';
  $('weatherContext').textContent='جارٍ جلب الطقس...';$('satelliteContext').textContent='جارٍ جلب المشهد...';
- fieldContext={weather:null,satellite:null,series:[],logs:[]};
- const results=await Promise.allSettled([loadFieldWeather(fieldId),loadIrrigationLogs(fieldId)]);
- if(token!==contextLoadToken)return;
+ fieldContext={fieldId,requestToken:token,updatedAt:null,weather:null,satellite:null,series:[],logs:[]};
+ const results=await Promise.allSettled([loadFieldWeather(fieldId,token),loadIrrigationLogs(fieldId,token)]);
+ if(!contextIsCurrent(fieldId,token))return;
  const weatherResult=results[0],logsResult=results[1];
  let satelliteResult;
- try{satelliteResult=await loadSatelliteContext(fieldId);try{await loadSatelliteHistory(fieldId)}catch(historyError){fieldContext.series=[];console.warn('تعذر تحميل سجل المؤشرات السابق:',historyError)}}catch(e){$('satelliteContext').textContent='غير متاح الآن: '+e.message}
- if(token!==contextLoadToken)return;
+ try{satelliteResult=await loadSatelliteContext(fieldId,token);if(!contextIsCurrent(fieldId,token))return;try{await loadSatelliteHistory(fieldId,token)}catch(historyError){if(!contextIsCurrent(fieldId,token))return;fieldContext.series=[];console.warn('تعذر تحميل سجل المؤشرات السابق:',historyError)}}catch(e){if(!contextIsCurrent(fieldId,token))return;$('satelliteContext').textContent='غير متاح الآن: '+e.message}
+ if(!contextIsCurrent(fieldId,token))return;
  const messages=[];
  messages.push(weatherResult.status==='fulfilled'?'تم تحديث الطقس':'تعذر الطقس: '+weatherResult.reason.message);
  messages.push(logsResult.status==='fulfilled'?'تم تحميل سجل الري':'تعذر سجل الري: '+logsResult.reason.message);
@@ -476,7 +495,7 @@ async function refreshFieldContext(){
  statusBox.textContent=messages.join(' — ');
 }
 $('refreshFieldContext').addEventListener('click',refreshFieldContext);
-$('savedField').addEventListener('change',()=>{contextLoadToken++;fieldContext={weather:null,satellite:null,logs:[]};$('weatherContext').textContent='اختر الحقل ثم حدّث البيانات.';$('satelliteContext').textContent='اختر الحقل ثم حدّث البيانات.';$('irrigationHistory').textContent='اختر حقلًا لعرض سجلات الري.';});
+$('savedField').addEventListener('change',()=>{contextLoadToken++;fieldContext={fieldId:$('savedField').value||null,requestToken:contextLoadToken,updatedAt:null,weather:null,satellite:null,series:[],logs:[]};$('weatherContext').textContent='اختر الحقل ثم حدّث البيانات.';$('satelliteContext').textContent='اختر الحقل ثم حدّث البيانات.';$('irrigationHistory').textContent='اختر حقلًا لعرض سجلات الري.';});
 $('saveIrrigationLog').addEventListener('click',async()=>{
  const fieldId=$('savedField').value;if(!fieldId||!session){$('fieldContextStatus').textContent='اختر حقلًا محفوظًا وسجّل الدخول أولًا.';return}
  const when=$('irrigatedAt').value?new Date($('irrigatedAt').value):new Date();
@@ -492,7 +511,8 @@ setLocalDateTime();
 $('getAdviceButton').addEventListener('click',async()=>{
  const crop=$('crop').value,irrigation=$('irrigation').value,soil=$('soil').value,stage=$('growthStage').value,symptoms=$('plantSymptoms').value,moisture=$('soilMoisture').value,result=$('adviceResult');
  if(!crop||!stage||!symptoms||!moisture){result.style.display='block';result.textContent='أكمل المحصول ومرحلة النمو وحالة النبات ورطوبة التربة أولًا.';return}
- const advice=[],reasons=[],sat=fieldContext.satellite,weather=fieldContext.weather,logs=fieldContext.logs||[];
+ const context=fieldContext.fieldId===$('savedField').value?fieldContext:{weather:null,satellite:null,series:[],logs:[]};
+ const advice=[],reasons=[],sat=context.satellite,weather=context.weather,logs=(context.logs||[]).filter(log=>Number.isFinite(Date.parse(log.irrigated_at))&&Date.parse(log.irrigated_at)<=Date.now());
  const profiles={
   'الحنطة':{kc:[0.70,0.925,1.15,0.325],name:'القمح الشتوي على تربة غير متجمدة'},
   'القمح':{kc:[0.70,0.925,1.15,0.325],name:'القمح الشتوي على تربة غير متجمدة'},
@@ -513,10 +533,10 @@ $('getAdviceButton').addEventListener('click',async()=>{
   reasons.push('لم يُستخدم معامل Kc ثابت لهذا المحصول: احتياجه يتغير كثيرًا حسب عدد الحشات/عمر الأشجار والغطاء الأرضي وطريقة الإدارة؛ لذلك لا نحسب ETc رقميًا كي لا نعرض تقديرًا مضللًا.');
  }
  if(weather){
-  reasons.push('طقس قرب مركز الحقل (Open‑Meteo): ET₀ مرجعي آخر 7 أيام '+weather.pastEt0.toFixed(1)+' ملم، ومطر '+weather.pastRain.toFixed(1)+' ملم؛ المتوقع للأيام الثلاثة القادمة ET₀ '+weather.forecastEt0.toFixed(1)+' ملم ومطر '+weather.forecastRain.toFixed(1)+' ملم.');
-  if(crops.length>1&&selectedProfiles.length){for(const item of selectedProfiles){const etc=item.profile.kc[stageIndex]*weather.forecastEt0;reasons.push('لـ'+item.profile.name+': ETc إرشادي خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (Kc × ET₀)، ولا يُجمع بين المحاصيل دون معرفة مساحة كل محصول.')}}
-  else if(kc!==null){const etc=kc*weather.forecastEt0;reasons.push('الطلب التبخري المرجعي المتوقع للمحصول خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (ETc = Kc × ET₀). هذا تقدير استهلاك جوي وليس جرعة ري صافية أو كمية تضخ للمزرعة.')}
-  if(weather.forecastRain>=5)advice.push('هناك مطر متوقع بنحو '+weather.forecastRain.toFixed(1)+' ملم خلال 3 أيام؛ أعد فحص التربة بعد المطر قبل تحديد موعد الري، لأن التوقع لا يضمن المطر الفعلي ولا يحدد المطر الفعال.');
+  reasons.push('طقس قرب مركز الحقل (Open‑Meteo): ET₀ مرجعي آخر 7 أيام '+mmText(weather.pastEt0)+' ملم، ومطر '+mmText(weather.pastRain)+' ملم؛ المتوقع للأيام الثلاثة القادمة ET₀ '+mmText(weather.forecastEt0)+' ملم ومطر '+mmText(weather.forecastRain)+' ملم.');
+  if(Number.isFinite(weather.forecastEt0)&&crops.length>1&&selectedProfiles.length){for(const item of selectedProfiles){const etc=item.profile.kc[stageIndex]*weather.forecastEt0;reasons.push('لـ'+item.profile.name+': ETc إرشادي خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (Kc × ET₀)، ولا يُجمع بين المحاصيل دون معرفة مساحة كل محصول.')}}
+  else if(kc!==null&&Number.isFinite(weather.forecastEt0)){const etc=kc*weather.forecastEt0;reasons.push('الطلب التبخري المرجعي المتوقع للمحصول خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (ETc = Kc × ET₀). هذا تقدير استهلاك جوي وليس جرعة ري صافية أو كمية تضخ للمزرعة.')}
+  if(Number.isFinite(weather.forecastRain)&&weather.forecastRain>=5)advice.push('هناك مطر متوقع بنحو '+mmText(weather.forecastRain)+' ملم خلال 3 أيام؛ أعد فحص التربة بعد المطر قبل تحديد موعد الري، لأن التوقع لا يضمن المطر الفعلي ولا يحدد المطر الفعال.');
   if(weather.maxForecastTemp!==null&&weather.maxForecastTemp>=35)advice.push('الحرارة القصوى المتوقعة مرتفعة ('+weather.maxForecastTemp.toFixed(1)+'°م). افحص رطوبة منطقة الجذور وانتظام التوزيع، وقلّل تعرض النبات للإجهاد الحراري وفق الممارسات المحلية.');
  }else reasons.push('بيانات الطقس غير متاحة؛ لم يُحسب الطلب التبخري المتوقع.');
  if(moisture==='جافة'){
@@ -542,15 +562,15 @@ $('getAdviceButton').addEventListener('click',async()=>{
  if(soil==='رملية')reasons.push('التربة الرملية غالبًا أسرع تصريفًا؛ افحص رطوبة منطقة الجذور بوتيرة أقرب، مع مراعاة العمق والمحصول.');
  if(stage==='الإزهار'||stage==='تكوين الحبوب أو الثمار')advice.push('المحصول في مرحلة حساسة نسبيًا؛ تجنب تعطيشًا أو تغدقًا مفاجئًا، واجعل قرار الري بعد فحص رطوبة الجذور والطقس.');
  if(sat){
-  const indices=sat.indices||{},ndvi=Number(indices.NDVI),ndmi=Number(indices.NDMI),coverage=Number(sat.coverage_percent);
+  const indices=sat.indices||{},ndvi=finiteNumber(indices.NDVI),ndmi=finiteNumber(indices.NDMI),coverage=finiteNumber(sat.coverage_percent);
   reasons.push('آخر مشهد Sentinel‑2 بتاريخ '+String(sat.date||'').slice(0,10)+': NDVI '+(Number.isFinite(ndvi)?ndvi.toFixed(3):'غير متاح')+'، NDMI '+(Number.isFinite(ndmi)?ndmi.toFixed(3):'غير متاح')+'، تغطية صالحة '+(Number.isFinite(coverage)?coverage.toFixed(1)+'%':'غير محددة')+'.');
-  const series=fieldContext.series||[],currentDate=String(sat.date||'').slice(0,10),prev=series.find(row=>row.acquisition_date!==currentDate);
-  const sceneAgeDays=currentDate?Math.max(0,(Date.now()-new Date(currentDate+'T12:00:00').getTime())/86400000):Infinity;
+  const series=context.series||[],currentDate=String(sat.date||'').slice(0,10),prev=series.find(row=>row.acquisition_date<currentDate);
+  const sceneAgeDays=currentDate?Math.max(0,(Date.now()-new Date(currentDate+'T12:00:00Z').getTime())/86400000):Infinity;
   if(Number.isFinite(sceneAgeDays)&&sceneAgeDays>30)reasons.push('المشهد الفضائي أقدم من 30 يومًا؛ اعتبره سياقًا تاريخيًا لا وصفًا لحالة اليوم.');
   let comparablePrev=null;
   if(prev){const gap=Math.abs((new Date(currentDate)-new Date(prev.acquisition_date))/86400000);if(Number.isFinite(gap)&&gap<=60)comparablePrev=prev;}
   if(comparablePrev){
-   const pndvi=Number(comparablePrev.indices?.NDVI),pndmi=Number(comparablePrev.indices?.NDMI);
+   const pndvi=finiteNumber(comparablePrev.indices?.NDVI),pndmi=finiteNumber(comparablePrev.indices?.NDMI);
    if(Number.isFinite(ndvi)&&Number.isFinite(pndvi)){const delta=ndvi-pndvi;reasons.push('مقارنة بالمشهد السابق ('+comparablePrev.acquisition_date+'): تغير NDVI '+(delta>=0?'+':'')+delta.toFixed(3)+'.');if(delta<0)advice.push('NDVI أقل من المشهد السابق؛ افحص هذه المنطقة ميدانيًا قبل أي إجراء، مع مراعاة اختلاف مرحلة النمو أو تاريخ الزراعة بين المشهدين.');}
    if(Number.isFinite(ndmi)&&Number.isFinite(pndmi)){const delta=ndmi-pndmi;reasons.push('مقارنة بالمشهد السابق ('+comparablePrev.acquisition_date+'): تغير NDMI '+(delta>=0?'+':'')+delta.toFixed(3)+'. وهو تغير طيفي نسبي وليس قياسًا مباشرًا لرطوبة التربة.');if(delta<0)advice.push('NDMI أقل من المشهد السابق؛ افحص رطوبة منطقة الجذور وانتظام الري، ولا تعتبر التغير وحده دليل جفاف.');}
   }else{
@@ -563,8 +583,8 @@ $('getAdviceButton').addEventListener('click',async()=>{
   reasons.push('آخر ري مسجل منذ '+ageDays.toFixed(1)+' يومًا'+(last.water_depth_mm===null?'':(' بعمق مسجل '+Number(last.water_depth_mm).toLocaleString('ar-IQ')+' ملم'))+'.');
   if(ageDays<1&&moisture==='جافة')advice.push('يوجد ري مسجل خلال آخر 24 ساعة مع بقاء التربة مدخلة كجافة؛ افحص وصول الماء وتجانس البلل وعمق الجذور قبل إعادة الري.');
  }else if($('savedField').value)reasons.push('لا يوجد سجل ري لهذا الحقل؛ أضف سجلات بتاريخ وعمق الماء (ملم) لتحسين المقارنة.');
- const sceneFreshnessDays=sat?.date?((Date.now()-new Date(String(sat.date).slice(0,10)+'T12:00:00').getTime())/86400000):Infinity;
- const hasSatellite=!!sat&&Number(sat.coverage_percent)>=70&&Number(sat.valid_pixels)>=10&&Number.isFinite(sceneFreshnessDays)&&sceneFreshnessDays>=0&&sceneFreshnessDays<=30,hasWeather=!!weather,hasHistory=(fieldContext.series||[]).some(row=>row.acquisition_date!==String(sat?.date||'').slice(0,10)&&Math.abs((new Date(String(sat?.date||''))-new Date(row.acquisition_date))/86400000)<=60),hasFieldInput=moisture!=='غير معروفة',hasLogs=logs.length>0;
+ const sceneFreshnessDays=sat?.date?((Date.now()-new Date(String(sat.date).slice(0,10)+'T12:00:00Z').getTime())/86400000):Infinity;
+ const hasSatellite=!!sat&&finiteNumber(sat.coverage_percent)>=70&&finiteNumber(sat.valid_pixels)>=10&&Number.isFinite(sceneFreshnessDays)&&sceneFreshnessDays>=0&&sceneFreshnessDays<=30,hasWeather=!!weather&&[weather.pastRain,weather.pastEt0,weather.forecastRain,weather.forecastEt0].every(Number.isFinite),hasHistory=(context.series||[]).some(row=>row.acquisition_date<String(sat?.date||'').slice(0,10)&&Math.abs((new Date(String(sat?.date||''))-new Date(row.acquisition_date))/86400000)<=60),hasFieldInput=moisture!=='غير معروفة',hasLogs=logs.length>0;
  let confidence='منخفضة — الاعتماد الأكبر على مدخلات عامة أو مشهد واحد.';
  if(hasSatellite&&hasWeather&&hasHistory&&hasFieldInput&&hasLogs)confidence='متوسطة — مناسبة لتحديد أولوية الفحص فقط؛ لا تكفي لجرعة ري أو سماد.';
  else if(hasSatellite&&hasWeather&&hasFieldInput)confidence='منخفضة إلى متوسطة — تتوفر بيانات فضائية وطقس ومدخل ميداني، لكن سجل المقارنة أو الري محدود.';
@@ -599,6 +619,12 @@ $('newButton').addEventListener('click',()=>{
  $('fieldForm').scrollIntoView({behavior:'smooth'});
 });
 
+const handoff=createAdvisorHandoff({getContext:()=>{
+ const context=fieldContext.fieldId===$('savedField').value?fieldContext:null;
+ const satellite=context?.satellite;
+ return {field:{name:$('farm').value.trim(),crop:$('crop').value,area_donum:$('area').value,soil:$('soil').value,irrigation:$('irrigation').value},satellite:satellite?{...satellite,series:context.series}:null,weather:context?.weather?{...context.weather,reference_date:context.weather.referenceDate,fetched_at:context.weather.updatedAt}:null,irrigationLogs:context?.logs||[],observations:{growthStage:$('growthStage').value,soilMoisture:$('soilMoisture').value,symptoms:$('plantSymptoms').value,notes:$('notes').value}};
+}});
+document.querySelector('main').append(handoff);
 await loadFields();
 
 }catch(error){
