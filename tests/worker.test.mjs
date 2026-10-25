@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 const source=await readFile(new URL('../satellite-backend/worker.js',import.meta.url),'utf8');
-const worker=(await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))).default;
+const worker=(await import('../satellite-backend/worker.js')).default;
 test('worker rejects unauthorized origin and missing configuration',async()=>{
  let r=await worker.fetch(new Request('https://worker.test',{method:'POST',headers:{Origin:'https://other.test'}}),{});assert.equal(r.status,403);
  r=await worker.fetch(new Request('https://worker.test',{method:'POST'}),{});assert.equal(r.status,503);
@@ -33,4 +33,11 @@ test('statistics use UTC calendar days matching image requests',async()=>{
   assert.match(requests[0].aggregation.timeRange.from,/T00:00:00\.000Z$/);
   assert.equal(requests[0].aggregation.aggregationInterval.lastIntervalBehavior,'SHORTEN');
  }finally{globalThis.fetch=originalFetch;}
+});
+
+test('Gemini endpoints are independent of Sentinel credentials and preserve CORS',async()=>{
+ const r=await worker.fetch(new Request('https://worker.test/advice/status',{headers:{Origin:'https://urfarmiq.github.io'}}),{});
+ assert.equal(r.status,200);assert.equal((await r.json()).available,false);assert.equal(r.headers.get('access-control-allow-origin'),'https://urfarmiq.github.io');
+ const denied=await worker.fetch(new Request('https://worker.test/advice/status',{headers:{Origin:'https://other.test'}}),{});assert.equal(denied.status,403);
+ const post=await worker.fetch(new Request('https://worker.test/advice',{method:'POST',body:'{}'}),{});assert.equal(post.status,503);assert.ok((await post.json()).code.startsWith('GEMINI_'));
 });

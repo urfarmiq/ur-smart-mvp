@@ -21,6 +21,8 @@ function createClient(){return {auth:{getUser:async()=>({data:{user:{id:'test-us
 '''.replace('FIELD',json.dumps(field)).replace('BOUNDARY',json.dumps(boundary))
 stats={'field_id':FIELD,'geometry':GEOMETRY,'ndvi':.5,'ndmi':.2,'date':'2026-10-23T00:00:00Z','valid_pixels':10,'geometry_pixels':10,'coverage_percent':100,'indices':{'NDVI':.5,'NDMI':.2,'NDRE':.3},'resolution_m':20,'series':[{'date':'2026-10-23T00:00:00Z','indices':{'NDVI':.5,'NDMI':.2,'NDRE':.3},'ndvi':.5,'ndmi':.2,'valid_pixels':10,'coverage_percent':100}]}
 
+ADVICE_MODE={'value':'ready','requests':[]}
+RECOMMENDATION={'summary':'توصية اختبار <img src=x onerror=alert(1)>','evidence':['مؤشرات مؤرخة'],'missing_data':['تحليل التربة والماء'],'irrigation':['افحص رطوبة الجذور'],'fertilization':['راجع تحليل التربة'],'follow_up':['سجل الفحص'],'limitations':['إرشادي'] }
 def route_request(route):
     u=urlparse(route.request.url)
     if u.hostname=='ur-smart.test':
@@ -32,7 +34,13 @@ def route_request(route):
     if '@supabase/supabase-js' in u.path:
         route.fulfill(body=mock+('export {createClient};' if u.path.endswith('/+esm') else 'window.supabase={createClient};'),content_type='text/javascript');return
     if u.hostname and u.hostname.endswith('workers.dev'):
+        if u.path=='/advice/status':
+            route.fulfill(json={'available':ADVICE_MODE['value']!='setup','model':'gemini-3.5-flash-lite'});return
         payload=route.request.post_data_json or {}
+        if u.path=='/advice':
+            ADVICE_MODE['requests'].append(payload)
+            if ADVICE_MODE['value']=='quota':route.fulfill(status=429,json={'code':'FREE_QUOTA_EXHAUSTED'});return
+            route.fulfill(json={'provider':'Google Gemini','model':'gemini-3.5-flash-lite','generated_at':'2026-10-25T12:00:00Z','recommendation':RECOMMENDATION});return
         if payload.get('action')=='imagery':
             if payload.get('map_index')=='NDRE':route.fulfill(status=502,json={'error':'Fixture unavailable NDRE'});return
             route.fulfill(json={'image':IMAGE,'bounds':[[33,44],[33.01,44.01]],'index':payload.get('map_index'),'date':payload.get('map_date'),'resolution_m':20});return
@@ -113,7 +121,7 @@ with sync_playwright() as p:
         handoff.locator('select').nth(0).select_option('الإزهار')
         handoff.locator('select').nth(1).select_option('جافة')
         handoff.get_by_role('button',name='تجهيز تقرير لمناقشته مع ChatGPT').click()
-        prompt=handoff.locator('textarea[id$="-preview"]').input_value()
+        prompt=handoff.locator('textarea[id^="ur-advisor-"][id$="-preview"]').input_value()
         report=json.loads(prompt[prompt.index('{'):])
         assert report['field']['name']=='حقل اختبار'
         assert report['observations']['growth_stage']=='الإزهار'
@@ -121,11 +129,30 @@ with sync_playwright() as p:
         assert report['weather'] is None
         assert 'field_id' not in report and 'geometry' not in report
         assert FIELD not in prompt and 'fixture-only' not in prompt and 'sb_publishable_' not in prompt
-        assert handoff.get_by_role('link').get_attribute('href')=='https://chatgpt.com/'
+        assert handoff.get_by_role('link',name='فتح ChatGPT ثم لصق التقرير').get_attribute('href')=='https://chatgpt.com/'
+        gemini=handoff.locator('.gemini-advisor')
+        gemini.get_by_role('button',name='مراجعة البيانات قبل إرسالها إلى Gemini').click()
+        assert gemini.get_by_role('button',name='طلب توصية Gemini').is_disabled()
+        assert 'حقل اختبار' not in gemini.locator('.gemini-preview').input_value()
+        gemini.locator('input[type="checkbox"]').check()
+        gemini.get_by_role('button',name='طلب توصية Gemini').click()
+        page.wait_for_function("document.querySelector('.gemini-result').textContent.includes('توصية اختبار')")
+        assert gemini.locator('.gemini-result img').count()==0
+        assert 'fixture-only' not in json.dumps(ADVICE_MODE['requests'][-1]['report'])
+        assert FIELD==ADVICE_MODE['requests'][-1]['field_id']
+        ADVICE_MODE['value']='quota'
+        gemini.get_by_role('button',name='طلب توصية Gemini').click()
+        page.wait_for_function("document.querySelector('.gemini-status').textContent.includes('حد الاستخدام المجاني')")
+        ADVICE_MODE['value']='setup'
+        gemini.get_by_role('button',name='تحديث حالة المساعد').click()
+        page.wait_for_function("document.querySelector('.gemini-availability').textContent.includes('غير مفعّل')")
+        assert gemini.get_by_role('button',name='طلب توصية Gemini').is_disabled()
+        ADVICE_MODE['value']='ready'
+
         # Clipboard fallback keeps the report available for manual copy.
         page.evaluate("()=>{navigator.clipboard.writeText=async()=>{throw Error('fixture clipboard blocked')};}")
         handoff.get_by_role('button',name='نسخ التقرير للمحادثة').click()
-        assert 'انسخه يدويًا' in handoff.locator('[role="status"]').inner_text()
+        assert 'انسخه يدويًا' in handoff.locator(':scope > [role="status"]').inner_text()
         assert not errors,errors
         page.screenshot(path=f'/tmp/ur-satellite-{ "mobile" if mobile else "desktop"}.png',full_page=True)
         print(('Mobile' if mobile else 'Desktop')+': real Leaflet renders raster fixtures on both pages, repeat refresh works, partial failure and weather failure retain images; pixel hover/touch, nodata, outside mask and active-layer readings pass.')
@@ -137,7 +164,7 @@ with sync_playwright() as p:
         page.fill('#notes','ملاحظة اختبار ميداني')
         handoff=page.locator('.advisor-handoff')
         handoff.get_by_role('button',name='تجهيز تقرير لمناقشته مع ChatGPT').click()
-        prompt=handoff.locator('textarea[id$="-preview"]').input_value()
+        prompt=handoff.locator('textarea[id^="ur-advisor-"][id$="-preview"]').input_value()
         report=json.loads(prompt[prompt.index('{'):])
         assert report['field']['name']=='حقل اختبار'
         assert report['observations']['growth_stage']=='الإزهار'

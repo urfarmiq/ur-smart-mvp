@@ -1,3 +1,4 @@
+import {handleGeminiAdvice,geminiStatus} from './gemini-advisor.mjs';
 // UR Smart Sentinel-2 analytics gateway (Cloudflare Worker).
 // Required secrets: SENTINEL_CLIENT_ID, SENTINEL_CLIENT_SECRET.
 // Required variable: SUPABASE_URL. Optional: SUPABASE_PUBLISHABLE_KEY, ALLOWED_ORIGIN.
@@ -37,6 +38,9 @@ export default {async fetch(req,env){
  const allowed=env.ALLOWED_ORIGIN||'https://urfarmiq.github.io';
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':allowed,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','access-control-max-age':'86400','vary':'Origin'}});
  if(origin&&origin!==allowed)return reply({error:'Origin not allowed'},403,allowed);
+ const path=new URL(req.url).pathname;
+ if(path==='/advice/status'&&req.method==='GET')return reply(geminiStatus(env),200,allowed);
+ if(path==='/advice')return handleGeminiAdvice(req,env,{reply,origin:allowed});
  if(req.method!=='POST')return reply({error:'POST only'},405,allowed);
  try{
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);

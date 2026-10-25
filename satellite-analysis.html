@@ -16,6 +16,7 @@
 import {loadRasterImage,colorizeRaster,collectRasters} from './satellite-raster.mjs';
 import {attachPixelProbe} from './satellite-pixel-probe.mjs';
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
+import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
 const $=id=>document.getElementById(id);
 const numberOrNaN=value=>value===null||value===undefined||typeof value==='boolean'||typeof value==='string'&&!value.trim()?NaN:Number(value);
 let analysisRequestGeneration=0;
@@ -224,8 +225,9 @@ $('autoAnalyze').onclick=async()=>{
  sceneSelect.onchange=()=>{renderWeatherAdvice();mapButton.click()};
  const handoff=createAdvisorHandoff({getContext:()=>{
   const selectedScene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||data;
-  return {field:analyzedField,satellite:{...selectedScene,source:data.source,resolution_m:data.resolution_m,series:mapSeries},weather:weatherData?{...weatherData,source:'Open-Meteo',fetched_at:weatherFetchedAt}:null,irrigationLogs};
+  return {fieldId,field:analyzedField,satellite:{...selectedScene,source:data.source,resolution_m:data.resolution_m,series:mapSeries},weather:weatherData?{...weatherData,source:'Open-Meteo',fetched_at:weatherFetchedAt}:null,irrigationLogs};
  }});
+ handoff.append(createGeminiAdvisor({getContext:()=>handoff.getAdvisorContext(),getSession:async()=>{const {data,error}=await client.auth.getSession();if(error)throw error;return data.session;},endpoint:SATELLITE_API_URL}));
  const dashboard=document.createElement("section");dashboard.className="ag-dashboard";
  const dashHeading=document.createElement("div"),dashTitle=document.createElement("h3"),dashIntro=document.createElement("p");dashTitle.textContent="🛰️ لوحة تحليل الحقل";dashIntro.className="ag-dashboard-intro";dashIntro.textContent="طبقات المؤشرات مرسومة مكانيًا فوق مشهد Sentinel‑2 داخل حدود الحقل. اضغط على خريطة مصغرة لتكبيرها.";dashHeading.append(dashTitle,dashIntro);
  const mapLayout=document.createElement("div");mapLayout.className="ag-map-layout";

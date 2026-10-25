@@ -6,7 +6,8 @@ on:
     branches:
       - main
     paths:
-      - "satellite-backend/worker.js"
+      - "satellite-backend/**"
+      - "advisor-handoff.mjs"
       - ".github/workflows/deploy-satellite-worker.yml"
 
 permissions:
@@ -33,3 +34,4 @@ jobs:
           workingDirectory: satellite-backend
           wranglerVersion: "4"
           command: deploy worker.js --name ur-smart-satellite --compatibility-date 2026-10-22 --keep-vars
+

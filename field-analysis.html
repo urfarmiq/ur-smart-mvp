@@ -176,6 +176,7 @@ body{background:white}main{width:100%;margin:0}
 
 <script type="module">
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
+import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
 (async()=>{
 try{
 const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
@@ -622,8 +623,9 @@ $('newButton').addEventListener('click',()=>{
 const handoff=createAdvisorHandoff({getContext:()=>{
  const context=fieldContext.fieldId===$('savedField').value?fieldContext:null;
  const satellite=context?.satellite;
- return {field:{name:$('farm').value.trim(),crop:$('crop').value,area_donum:$('area').value,soil:$('soil').value,irrigation:$('irrigation').value},satellite:satellite?{...satellite,series:context.series}:null,weather:context?.weather?{...context.weather,reference_date:context.weather.referenceDate,fetched_at:context.weather.updatedAt}:null,irrigationLogs:context?.logs||[],observations:{growthStage:$('growthStage').value,soilMoisture:$('soilMoisture').value,symptoms:$('plantSymptoms').value,notes:$('notes').value}};
+ return {fieldId:$('savedField').value,field:{name:$('farm').value.trim(),crop:$('crop').value,area_donum:$('area').value,soil:$('soil').value,irrigation:$('irrigation').value},satellite:satellite?{...satellite,series:context.series}:null,weather:context?.weather?{...context.weather,reference_date:context.weather.referenceDate,fetched_at:context.weather.updatedAt}:null,irrigationLogs:context?.logs||[],observations:{growthStage:$('growthStage').value,soilMoisture:$('soilMoisture').value,symptoms:$('plantSymptoms').value,notes:$('notes').value}};
 }});
+handoff.append(createGeminiAdvisor({getContext:()=>handoff.getAdvisorContext(),getSession:async()=>{const {data,error}=await supabase.auth.getSession();if(error)throw error;return data.session;},endpoint:SATELLITE_API_URL}));
 document.querySelector('main').append(handoff);
 await loadFields();
 
