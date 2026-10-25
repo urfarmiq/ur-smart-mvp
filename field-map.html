@@ -16,6 +16,7 @@
 <section class="panel" id="indicatorPanel"><h2>🛰️ التحليل الفضائي على خريطة الحقل</h2><p>احفظ حدود الحقل في حسابك أولًا من زر «حفظ الحدود في حسابي»، ثم اختر الحقل المحفوظ وحمّل المشهد. ستظهر طبقة المؤشر داخل حدوده مباشرةً فوق صورة القمر.</p><label for="mapIndicator">المؤشر الطيفي</label><select id="mapIndicator"><option value="NDVI">NDVI — الغطاء النباتي</option><option value="NDMI">NDMI — رطوبة الغطاء النباتي</option><option value="SAVI">SAVI — الغطاء مع تقليل أثر التربة</option><option value="OSAVI">OSAVI — الغطاء مع تصحيح التربة</option><option value="MSAVI2">MSAVI2 — الغطاء مع تقليل أثر التربة</option><option value="EVI">EVI — الغطاء المحسّن</option><option value="GNDVI">GNDVI — الغطاء باستخدام الأخضر</option><option value="NDRE">NDRE — حافة الأحمر</option><option value="MNDWI">MNDWI — المياه السطحية</option><option value="NBR">NBR — الحرق/الاضطراب</option><option value="MSI">MSI — نسبة SWIR إلى NIR</option><option value="CIgreen">CIgreen — الكلوروفيل الأخضر</option><option value="NDRE2">NDRE2 — حافة أحمر بديلة</option><option value="NDRE3">NDRE3 — حافة أحمر بديلة</option><option value="CIrededge">CIrededge — كلوروفيل حافة الأحمر</option><option value="NIRv">NIRv — انعكاس NIR الموزون</option></select><label for="mapSceneDate">تاريخ المشهد الفضائي</label><select id="mapSceneDate"><option value="">حمّل المشاهد أولًا</option></select><div class="color-fields"><div><label for="mapLowColor">لون القيمة الأقل</label><input id="mapLowColor" type="color" value="#cf3c32" aria-label="لون القيم الأقل للمؤشر"></div><div><label for="mapHighColor">لون القيمة الأعلى</label><input id="mapHighColor" type="color" value="#168b49" aria-label="لون القيم الأعلى للمؤشر"></div></div><p class="color-help">اختر اللونين اللذين تريدهما ثم اضغط تحديث الطبقة.</p><button id="loadIndicatorMap" class="primary wide" type="button">🛰️ تحميل المشهد وطبقة المؤشر على الخريطة</button><div id="indicatorStatus" class="notice" role="status" aria-live="polite">اختر حقلًا محفوظًا في حسابك. لن تظهر قراءة قبل نجاح الاتصال بالقمر الصناعي.</div><div class="map-legend" id="indicatorLegend" hidden><span id="legendLow">قيمة أقل</span><i id="legendRamp"></i><span id="legendHigh">قيمة أعلى</span></div><div class="notice">المؤشر طبقة بكسلية مشتقة من Sentinel‑2 وليست متوسطًا مصبوغًا على الحقل كله. الألوان توضح اختلاف القيم مكانيًا؛ الغيوم والظل قد تترك أجزاء بلا بيانات. الدقة المصدرية 10–20 مترًا ولا يزيدها التكبير.</div></section><section class="panel"><h2>📏 قياس الحقل</h2><div class="notice">الدونم العراقي = 2500 م². حساب المساحة يستخدم إحداثيات WGS84 وإسقاطًا محليًا مناسبًا للحقول الصغيرة. إذا اختلفت المساحة عن سند الأرض، راجع الحدود ونقاط الزوايا؛ دقة الصورة وتحديد النقاط تؤثر في النتيجة. قياس الخريطة تقديري وليس مسحًا رسميًا. لا تستنتج توصيات ري أو تسميد من شكل الصورة وحده. يمكنك حفظ نسخة على الجهاز أو حفظ الحدود في حسابك عبر Supabase.</div></section></aside></div></main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script type="module">
 import {loadRasterImage,pickSceneDate} from './satellite-raster.mjs';
+import {attachPixelProbe} from './satellite-pixel-probe.mjs';
 (function(){
 const $=id=>document.getElementById(id), map=L.map('map',{tap:false}).setView([32.75,45.3],12);
 const cropOptions=["حنطة","قمح","شعير","ذرة","رز","بطاطا","بصل","باقلاء","برسيم","رمان","تين","عنب","زيتون","طماطم","نخيل","محصول آخر"];
@@ -59,6 +60,7 @@ const cloudClient=window.supabase?.createClient('https://ynsmhtsktbubxfhsekjq.su
 const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
 let indicatorGeometry=null,indicatorLayer=null,indicatorBoundary=null,indicatorStats=null,indicatorLegendControl=null,lastIndicatorImage=null,lastIndicatorIndex=null,indicatorRenderToken=0;
 let cloudUser=null,cloudFields=[];
+attachPixelProbe({map,L,getLayers:()=>indicatorLayer?.pixelSample&&map.hasLayer(indicatorLayer)?[indicatorLayer.pixelSample]:[]});
 function clearIndicatorOverlay(){if(indicatorLayer){map.removeLayer(indicatorLayer);indicatorLayer=null}if(indicatorBoundary){map.removeLayer(indicatorBoundary);indicatorBoundary=null}if(indicatorLegendControl){map.removeControl(indicatorLegendControl);indicatorLegendControl=null}$("indicatorLegend").hidden=true}
 $("indicatorJump").onclick=()=>{$("indicatorPanel").scrollIntoView({behavior:"smooth",block:"center"});if(cloudUser&&$("cloudField").value)setTimeout(()=>$("loadIndicatorMap").click(),450);else indicatorError("اختر حقلًا محفوظًا من حسابك وسجّل الدخول، ثم اضغط تحديث طبقة المؤشر.")};
 async function refreshCloud(){const out=$('cloudStatus'),select=$('cloudField');select.replaceChildren();select.add(new Option('اختر حقلًا محفوظًا',''));if(!cloudClient){out.textContent='تعذر تحميل مكتبة الاتصال.';return}try{const {data:{user},error:authError}=await cloudClient.auth.getUser();if(authError||!user){cloudUser=null;out.textContent='سجّل الدخول أولًا من لوحة المزارع.';return}cloudUser=user;const {data,error}=await cloudClient.from('fields').select('id,name,farm_id,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');if(error)throw error;cloudFields=data||[];cloudFields.forEach(f=>select.add(new Option(f.name,f.id)));out.textContent=cloudFields.length?'اختر الحقل ثم احفظ حدوده أو افتحها.':'لا توجد حقول في حسابك. أضف حقلًا من لوحة المزارع.'}catch(e){out.textContent='تعذر تحميل الحقول: '+e.message}}
@@ -75,6 +77,7 @@ async function clipIndicatorImage(item,geometry,index){
   if(!canvas.width||!canvas.height)throw Error('صورة المؤشر فارغة.');
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height),low=hexRgb($('mapLowColor').value),high=hexRgb($('mapHighColor').value),data=pixels.data;
+  const rawPixels=new Uint8ClampedArray(data);
   let validPixels=0;
   for(let p=0;p<data.length;p+=4){if(data[p+3]===0)continue;validPixels++;
    let t=data[p]/255;
@@ -90,7 +93,9 @@ async function clipIndicatorImage(item,geometry,index){
   const masked=ctx.getImageData(0,0,canvas.width,canvas.height).data;let inside=0;for(let p=3;p<masked.length;p+=4)if(masked[p]>0)inside++;
   if(!inside)throw Error('طبقة المؤشر لا تتقاطع مع حدود الحقل؛ أعد حفظ حدود الحقل من الخريطة.');
   if(!map.getPane('indicatorRasterPane')){const pane=map.createPane('indicatorRasterPane');pane.style.zIndex='550';pane.style.pointerEvents='none'}
-  return L.imageOverlay(canvas.toDataURL('image/png'),bounds,{pane:'indicatorRasterPane',opacity:.98,interactive:false});
+  const layer=L.imageOverlay(canvas.toDataURL('image/png'),bounds,{pane:'indicatorRasterPane',opacity:.98,interactive:false});
+  layer.pixelSample={index,date:item.date,width:canvas.width,height:canvas.height,pixels:rawPixels,bounds,geometry,resolution_m:item.resolution_m};
+  return layer;
 }
 async function recolorCachedIndicator(){
  if(!lastIndicatorImage||!indicatorGeometry||!lastIndicatorIndex)return;
@@ -112,11 +117,11 @@ $('loadIndicatorMap').onclick=async()=>{const button=$('loadIndicatorMap'),field
  const scene=indicatorStats.series?.find(s=>String(s.date).slice(0,10)===chosenDate);const value=Number(scene?.indices?.[index]??scene?.[index.toLowerCase()]??(index==='NDVI'?scene?.ndvi:index==='NDMI'?scene?.ndmi:NaN));
  indicatorError('جارٍ إنشاء طبقة '+index+' لمشهد '+chosenDate+'...');
  const image=await workerPost({field_id:fieldId,action:'imagery',map_date:chosenDate,map_index:index});lastIndicatorImage=image;lastIndicatorIndex=index;indicatorRenderToken++;const layer=await clipIndicatorImage(image,indicatorGeometry,index);
- if(indicatorLayer)map.removeLayer(indicatorLayer);if(shape)shape.setStyle({fillOpacity:0});indicatorLayer=layer.addTo(map).bringToFront();
+ if(indicatorLayer)map.removeLayer(indicatorLayer);drawing=false;$('draw').classList.remove('active');$('draw').textContent='✏️ بدء الرسم';if(shape)shape.setStyle({fillOpacity:0});indicatorLayer=layer.addTo(map).bringToFront();
  if(!map.getPane('indicatorBoundaryPane')){const boundaryPane=map.createPane('indicatorBoundaryPane');boundaryPane.style.zIndex='560';boundaryPane.style.pointerEvents='none'}if(indicatorBoundary)map.removeLayer(indicatorBoundary);indicatorBoundary=L.geoJSON(indicatorGeometry,{pane:'indicatorBoundaryPane',style:{color:'#fff',weight:3,fillOpacity:0}}).addTo(map);
  map.fitBounds(indicatorBoundary.getBounds(),{padding:[25,25],maxZoom:18});indicatorLegend(index);
  const pct=scene?.coverage_percent==null?'':(' — تغطية صالحة '+Number(scene.coverage_percent).toFixed(1)+'%');
- indicatorError('✓ ظهرت طبقة '+index+' على الخريطة بتاريخ '+chosenDate+(Number.isFinite(value)?' — متوسط الحقل '+value.toFixed(3):'')+' — دقة المصدر '+(image.resolution_m||20)+' م'+pct+'. غيّر المؤشر أو التاريخ ثم اضغط تحميل لتحديث الطبقة.');
+ indicatorError('✓ ظهرت طبقة '+index+' على الخريطة بتاريخ '+chosenDate+(Number.isFinite(value)?' — متوسط الحقل '+value.toFixed(3):'')+' — دقة المصدر '+(image.resolution_m||20)+' م'+pct+'. حرّك الماوس أو المس الحقل لقراءة البكسل؛ غيّر المؤشر أو التاريخ ثم اضغط تحميل لتحديث الطبقة.');
  setTimeout(()=>{$('map').scrollIntoView({behavior:'smooth',block:'center'});map.invalidateSize()},150);
  }catch(e){
  indicatorError('تعذر تحميل الصورة الفعلية للمؤشر: '+e.message+' — جرّب تاريخًا آخر من قائمة المشاهد.');
