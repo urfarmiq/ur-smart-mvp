@@ -32,6 +32,12 @@ jobs:
           python3 tests/check_pages.py
           python3 -m py_compile tests/browser_satellite.py tests/browser_management.py
 
+      - name: Check Cloudflare deployment access
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node satellite-backend/check-deploy-access.mjs
+
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:

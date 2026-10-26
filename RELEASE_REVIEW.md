@@ -40,3 +40,5 @@
 ## الملفات التي تغيّرت في المراجعة
 
 `dashboard.html`، `auth.html`، `field-map.html`، `field-analysis.html`، `satellite-analysis.html`، `satellite-staging-test.html`، `advisor-handoff.mjs`، `gemini-advisor-ui.mjs`، `tests/browser_satellite.py`، `tests/browser_management.py`، `tests/field-context.test.mjs`، `tests/gemini-advisor-ui.test.mjs`، `tests/dashboard-state.test.mjs`، `tests/satellite-advice.test.mjs`، `.github/workflows/deploy-satellite-worker.yml`، `.github/workflows/validate.yml`، `satellite-backend/README.md`، `README.md`، وهذا الملف. لا تتضمن القائمة ملفات المراجعات السابقة.
+
+أُضيف أيضًا `satellite-backend/check-deploy-access.mjs` لفحص طلبات قراءة إعدادات Cloudflare عند تعذر النشر بعد تعديل العامل من لوحة التحكم. لا يطبع القيم أو المفاتيح أو بيانات الربط، ولا يغيّر إعدادات العامل.
