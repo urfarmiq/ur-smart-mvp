@@ -37,7 +37,17 @@
 
 التوصيات الدقيقة للجرعات تحتاج بيانات رطوبة منطقة الجذور وكفاءة الري ومرحلة النمو وتحاليل تربة وماء مؤرخة وتاريخ الإضافات. المؤشرات الطيفية لا تقيس NPK أو رطوبة التربة مباشرة، والنتائج لا تطبّق عمليات زراعية تلقائيًا.
 
-## الملفات التي تغيّرت في المراجعة
+## نتيجة النشر والتدخل المتبقي
+
+نجح نشر GitHub Pages والتحقق الآلي. فُحصت ملفات HTML والوحدات الثمانية التي تغيرت عبر HTTP من الموقع العام، وطابقت الملفات المختبرة حرفيًا. استمر `/advice/status` بإظهار أن إعدادات Gemini متاحة دون إعدادات ناقصة.
+
+لم تنجح إعادة نشر العامل الخلفي في هذه المراجعة، وبقي الإصدار السابق دون تغيير. بعد تعديل الإعدادات من لوحة Cloudflare يحاول Wrangler قراءة بيانات المسارات والنطاقات؛ أظهر [فحص الوصول](https://github.com/urfarmiq/ur-smart-mvp/actions/runs/40274608871) رفض هذين الطلبين بـHTTP 403 ورمز 10000، بينما نجحت قراءات الخدمة والبيئة والربط والنطاق الفرعي والجدولة. ليست هذه مشكلة كتابة GitHub ولا خطأ مفتاح Gemini.
+
+توجد تقارير مطابقة في Wrangler: [16390](https://github.com/cloudflare/workers-sdk/issues/16390) و[16436](https://github.com/cloudflare/workers-sdk/issues/16436). لا تؤكد الوثائق أن إضافة صلاحية واحدة تحل هذه الطلبات القديمة.
+
+الخطوة العملية من صاحب الحساب: مراجعة رمز النشر في Cloudflare، أو إنشاء بديل بقالب **Edit Cloudflare Workers** مقيد بالحساب المقصود، ثم استبدال سر GitHub Actions المسمى `CLOUDFLARE_API_TOKEN` فقط. لا حاجة لتغيير `CLOUDFLARE_ACCOUNT_ID` أو `GEMINI_API_KEY`. بعد ذلك يجب إعادة تشغيل فحص الوصول والنشر والتحقق من نجاحه؛ تغيير الرمز ليس نجاحًا مثبتًا بحد ذاته. لا توضع قيمة أي رمز في المستودع أو المحادثة.
+
+## قائمة الملفات المعدلة
 
 `dashboard.html`، `auth.html`، `field-map.html`، `field-analysis.html`، `satellite-analysis.html`، `satellite-staging-test.html`، `advisor-handoff.mjs`، `gemini-advisor-ui.mjs`، `tests/browser_satellite.py`، `tests/browser_management.py`، `tests/field-context.test.mjs`، `tests/gemini-advisor-ui.test.mjs`، `tests/dashboard-state.test.mjs`، `tests/satellite-advice.test.mjs`، `.github/workflows/deploy-satellite-worker.yml`، `.github/workflows/validate.yml`، `satellite-backend/README.md`، `README.md`، وهذا الملف. لا تتضمن القائمة ملفات المراجعات السابقة.
 
