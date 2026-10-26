@@ -72,8 +72,9 @@ export function createGeminiAdvisor({getContext,getSession,endpoint,fetchImpl=gl
  const status=element('p','جهّز التقرير للمراجعة قبل طلب التوصية.');status.className='gemini-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const result=element('div');result.className='gemini-result';result.setAttribute('aria-live','polite');
  previewWrap.append(label,preview,disclosure,consentLabel,send);section.append(title,lead,availability,refresh,prepare,previewWrap,status,result);
- let available=false,busy=false,prepared=null,statusGeneration=0;
+ let available=false,busy=false,prepared=null,statusGeneration=0,contextGeneration=0;
  const identity=context=>String(context?.fieldId||'')+'\n'+String(context?.report?.satellite?.date||'').slice(0,10);
+ const requestIsCurrent=request=>request.generation===contextGeneration&&identity(getContext())===request.identity;
  function sync(){send.disabled=!available||busy||!prepared||!consent.checked;prepare.disabled=busy;refresh.disabled=busy;consent.disabled=busy;}
  async function checkStatus(){
   const generation=++statusGeneration;refresh.disabled=true;availability.textContent='جارٍ فحص جاهزية المساعد…';
@@ -86,9 +87,10 @@ export function createGeminiAdvisor({getContext,getSession,endpoint,fetchImpl=gl
   }catch{if(generation!==statusGeneration)return;available=false;availability.textContent='تعذر التحقق من جاهزية الخادم. حدّث الحالة لاحقًا؛ يمكنك مراجعة التقرير الآن.';}
   finally{clearTimeout(timeout);if(generation===statusGeneration)sync();}
  }
- function invalidate(message){prepared=null;consent.checked=false;result.replaceChildren();status.textContent=message;sync();}
+ function invalidate(message){contextGeneration++;prepared=null;consent.checked=false;preview.value='';previewWrap.hidden=true;result.replaceChildren();status.textContent=message;sync();}
+ section.invalidateContext=(message='تغيّر الحقل أو المشهد. راجع تقريرًا جديدًا قبل طلب التوصية.')=>invalidate(message);
  prepare.onclick=()=>{
-  try{const context=getContext();if(!FIELD_ID.test(context?.fieldId||''))throw Error('اختر حقلًا محفوظًا في حسابك أولًا.');prepared={fieldId:context.fieldId,identity:identity(context),report:prepareGeminiReport(context.report)};preview.value=JSON.stringify(prepared.report,null,2);previewWrap.hidden=false;consent.checked=false;result.replaceChildren();status.textContent='راجع البيانات والملاحظات. أعد تجهيزها إذا غيّرت الحقل أو تاريخ المشهد، ثم وافق على الإرسال.';sync();}
+  try{const context=getContext();if(!FIELD_ID.test(context?.fieldId||''))throw Error('اختر حقلًا محفوظًا في حسابك أولًا.');prepared={fieldId:context.fieldId,identity:identity(context),generation:contextGeneration,report:prepareGeminiReport(context.report)};preview.value=JSON.stringify(prepared.report,null,2);previewWrap.hidden=false;consent.checked=false;result.replaceChildren();status.textContent='راجع البيانات والملاحظات. أعد تجهيزها إذا غيّرت الحقل أو تاريخ المشهد، ثم وافق على الإرسال.';sync();}
   catch(error){invalidate(error.message||'تعذر تجهيز بيانات الحقل.');}
  };
  consent.onchange=sync;
@@ -97,19 +99,19 @@ export function createGeminiAdvisor({getContext,getSession,endpoint,fetchImpl=gl
   if(busy||!prepared||!consent.checked||!available)return;
   const request=prepared;let controller,timeout;
   try{
-   if(identity(getContext())!==request.identity){invalidate('تغيّر الحقل أو المشهد. راجع التقرير الجديد قبل الإرسال.');return;}
+   if(!requestIsCurrent(request)){invalidate('تغيّر الحقل أو المشهد. راجع التقرير الجديد قبل الإرسال.');return;}
    busy=true;sync();result.replaceChildren();status.textContent='جارٍ طلب التوصية من Gemini…';
    const session=await getSession();
-   if(identity(getContext())!==request.identity){invalidate('تغيّر الحقل أو المشهد؛ لم تُرسل البيانات.');return;}
+   if(!requestIsCurrent(request)){invalidate('تغيّر الحقل أو المشهد؛ لم تُرسل البيانات.');return;}
    controller=new AbortController();timeout=setTimeout(()=>controller.abort(),45000);
    const response=await requestGeminiAdvice({endpoint:base,fieldId:request.fieldId,report:request.report,session,signal:controller.signal,fetchImpl});
-   if(identity(getContext())!==request.identity||!section.isConnected){invalidate('تغيّر الحقل أو المشهد أثناء الطلب. لم تُعرض التوصية القديمة؛ جهّز التقرير الجديد.');return;}
+   if(!requestIsCurrent(request)||!section.isConnected){invalidate('تغيّر الحقل أو المشهد أثناء الطلب. لم تُعرض التوصية القديمة؛ جهّز التقرير الجديد.');return;}
    result.append(element('h4','توصية Gemini'),element('p',response.recommendation.summary));
    const meta=element('p',[response.provider,response.model,response.generated_at].filter(Boolean).join(' · '));meta.style.fontSize='12px';result.append(meta);
    for(const [key,heading] of RESPONSE_SECTIONS){const rows=response.recommendation[key];if(!rows.length)continue;result.append(element('strong',heading));const list=element('ul');for(const row of rows)list.append(element('li',row));result.append(list);}
    status.textContent='ظهرت التوصية للمراجعة. لم تُطبّق أي عملية ري أو تسميد تلقائيًا.';
   }catch(error){
-   let changed=false;try{changed=identity(getContext())!==request.identity;}catch{changed=true;}
+   let changed=false;try{changed=!requestIsCurrent(request);}catch{changed=true;}
    if(changed)invalidate('تغيّر الحقل أو المشهد. راجع التقرير الجديد قبل طلب التوصية.');
    else status.textContent=error?.name==='AbortError'?'انتهت مهلة طلب التوصية. أعد المحاولة لاحقًا.':error?.message||'تعذر طلب التوصية.';
   }finally{clearTimeout(timeout);busy=false;sync();}

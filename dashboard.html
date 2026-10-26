@@ -80,7 +80,7 @@ a{color:#176b45}
 </main>
 
 <script type="module">
-import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
 
 const supabase=createClient(
 'https://ynsmhtsktbubxfhsekjq.supabase.co',
@@ -116,15 +116,28 @@ function renderLocalFields(){
  const box=$('localFields');
  box.replaceChildren();
  let items=[];
- try{items=JSON.parse(localStorage.getItem(storageKey)||'[]')}catch{}
+ try{
+  items=JSON.parse(localStorage.getItem(storageKey)||'[]');
+  if(!Array.isArray(items)) throw new Error('تنسيق غير صالح');
+ }catch{
+  box.textContent='تعذر قراءة الحقول القديمة على هذا الجهاز. لم تتغير البيانات المحفوظة، ويمكنك متابعة استخدام الحقول السحابية.';
+  return;
+ }
  if(!items.length){
   box.textContent='لا توجد حقول قديمة محفوظة على هذا الجهاز.';
   return;
  }
- items.forEach(item=>{
+ const rows=items.filter(item=>item&&typeof item==='object'&&!Array.isArray(item));
+ if(rows.length!==items.length){
+  const notice=document.createElement('p');
+  notice.textContent='تعذر عرض بعض الحقول القديمة بسبب تنسيقها. لم تتغير البيانات المحفوظة.';
+  box.appendChild(notice);
+ }
+ const text=(value,fallback)=>typeof value==='string'&&value.trim()?value:typeof value==='number'&&Number.isFinite(value)?String(value):fallback;
+ rows.forEach(item=>{
   const p=document.createElement('p');
   p.className='field';
-  p.textContent=item.name+' — '+item.area+' دونم — '+item.crop;
+  p.textContent=text(item.name,'حقل بلا اسم')+' — '+text(item.area,'مساحة غير محددة')+' دونم — '+text(item.crop,'محصول غير محدد');
   box.appendChild(p);
  });
 }

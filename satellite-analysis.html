@@ -19,6 +19,8 @@ import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
 const $=id=>document.getElementById(id);
 const numberOrNaN=value=>value===null||value===undefined||typeof value==='boolean'||typeof value==='string'&&!value.trim()?NaN:Number(value);
+function sceneIndex(scene,name){const value=scene?.indices?.[name];return numberOrNaN(value===undefined?scene?.[name.toLowerCase()]:value);}
+function formatSceneIndex(scene,name){const value=sceneIndex(scene,name);return Number.isFinite(value)?value.toFixed(3):'غير متاح';}
 let analysisRequestGeneration=0;
 // Set to the deployed Cloudflare Worker HTTPS URL once the satellite backend is configured.
 const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
@@ -61,10 +63,10 @@ $('autoAnalyze').onclick=async()=>{
  const historyNote=document.createElement('p');historyNote.className='muted';historyNote.textContent='حُفظت قياسات هذه السلسلة والطقس المرتبط بها في سجل الحقل السحابي، بينما يحتفظ هذا الجهاز بملخص التحليلات الحديثة. المقارنة مؤشر متابعة وليست تشخيصًا مؤكدًا.';
  const historyList=document.createElement('div');historyList.style.overflowX='auto';
  const table=document.createElement('table');table.style.cssText='width:100%;border-collapse:collapse;text-align:right;font-size:14px';table.innerHTML='<thead><tr><th>التاريخ</th><th>NDVI</th><th>NDMI</th><th>بكسلات</th></tr></thead>';
- const tbody=document.createElement('tbody');past.slice(0,8).forEach(x=>{const tr=document.createElement('tr');[safeDate(x.date),Number(x.ndvi).toFixed(3),Number(x.ndmi).toFixed(3),x.valid_pixels??'غير متاح'].forEach(v=>{const td=document.createElement('td');td.style.cssText='border-top:1px solid #dce8df;padding:6px';td.textContent=String(v);tr.append(td)});tbody.append(tr)});table.append(tbody);historyList.append(table);
+ const tbody=document.createElement('tbody');past.slice(0,8).forEach(x=>{const tr=document.createElement('tr');[safeDate(x.date),formatSceneIndex(x,'NDVI'),formatSceneIndex(x,'NDMI'),x.valid_pixels??'غير متاح'].forEach(v=>{const td=document.createElement('td');td.style.cssText='border-top:1px solid #dce8df;padding:6px';td.textContent=String(v);tr.append(td)});tbody.append(tr)});table.append(tbody);historyList.append(table);
  const older=past.find(x=>x.date&&x.date!==record.date);if(older){const comparison=document.createElement('p');comparison.textContent='مقارنة مع '+safeDate(older.date)+': تغير NDVI '+(record.ndvi-older.ndvi>=0?'+':'')+(record.ndvi-older.ndvi).toFixed(3)+'، وتغير NDMI '+(record.ndmi-older.ndmi>=0?'+':'')+(record.ndmi-older.ndmi).toFixed(3)+'. قد تختلف النتائج بسبب الموسم أو الغيوم أو المعالجة.';historyList.prepend(comparison)}
  const names={NDVI:"الغطاء النباتي",NDMI:"رطوبة الغطاء النباتي",SAVI:"الغطاء مع تقليل أثر التربة",OSAVI:"الغطاء مع تصحيح التربة",MSAVI2:"الغطاء مع تقليل أثر التربة (MSAVI2)",EVI:"الغطاء النباتي المحسّن",GNDVI:"الغطاء باستخدام الأخضر",NDRE:"حافة الأحمر",MNDWI:"المياه السطحية",NBR:"الحرق/الاضطراب النباتي",MSI:"نسبة SWIR إلى NIR",CIgreen:"مؤشر الكلوروفيل الأخضر",NDRE2:"حافة أحمر بديلة (B8A/B06)",NDRE3:"حافة أحمر بديلة (B8A/B07)",CIrededge:"كلوروفيل حافة الأحمر",NIRv:"انعكاس NIR الموزون بـNDVI"};
- const vals=data.indices||{NDVI:data.ndvi,NDMI:data.ndmi};
+ const vals={...(data.indices||{}),NDVI:sceneIndex(data,'NDVI'),NDMI:sceneIndex(data,'NDMI')};
 
 
  const indexTitle=document.createElement("h4");indexTitle.textContent="🌿 المؤشرات الطيفية الـ16 المحسوبة تلقائيًا";
@@ -87,7 +89,8 @@ $('autoAnalyze').onclick=async()=>{
    if(Number(vals.NDVI)<0.2)addAdvice("NDVI منخفض نسبيًا لهذه العينة. افحص الكثافة النباتية والإنبات والأعشاب والآفات وتجانس الري ميدانيًا قبل نسبة السبب إلى الماء أو السماد.");
    else if(Number(vals.NDVI)<0.5)addAdvice("NDVI متوسط نسبيًا. قارن مناطق الحقل بصريًا، وسجّل مرحلة النمو ثم أعد الرصد في المشهد القادم للتحقق من الاتجاه.");
    else addAdvice("NDVI مرتفع نسبيًا في العينة. استمر بالمراقبة وقارن التوزيع داخل الحقل؛ القيمة المرتفعة لا تثبت وحدها كفاية الماء أو العناصر.");
-   if(Number(vals.NDMI)<0)addAdvice("NDMI سالب، وهو إشارة طيفية تستحق التحقق من رطوبة الغطاء النباتي. افحص رطوبة التربة عند عمق الجذور وانتظام وصول الماء قبل تغيير جدول الري.");
+   if(!Number.isFinite(vals.NDMI))addAdvice("قراءة NDMI غير متاحة؛ لم تُستبدل بصفر ولا يمكن استنتاج رطوبة الغطاء النباتي منها.");
+   else if(vals.NDMI<0)addAdvice("NDMI سالب، وهو إشارة طيفية تستحق التحقق من رطوبة الغطاء النباتي. افحص رطوبة التربة عند عمق الجذور وانتظام وصول الماء قبل تغيير جدول الري.");
    else addAdvice("NDMI غير سالب في متوسط العينة. استخدمه مع فحص التربة والطقس والمشاهدة الحقلية، ولا تعتبره قياسًا مباشرًا لماء التربة.");
    addAdvice("لا تغيّر جرعة التسميد أو الري اعتمادًا على المؤشرات وحدها؛ عند استمرار بقعة ضعيفة، افحص التربة/الماء أو النبات وخذ عينة من موضعها للمقارنة.");
  }
@@ -128,7 +131,7 @@ $('autoAnalyze').onclick=async()=>{
   const forecastRain=forecastComplete?sum("precipitation_sum",forecast):NaN;
   const relevant=irrigationLogs.filter(x=>Date.parse(x.irrigated_at)<ref+86400000&&Date.parse(x.irrigated_at)<=Date.now()).sort((a,b)=>Date.parse(b.irrigated_at)-Date.parse(a.irrigated_at));
   const lastIrr= relevant[0]||null,daysSince=lastIrr?Math.max(0,(ref-Date.parse(lastIrr.irrigated_at))/86400000):Infinity;
-  const val=numberOrNaN((scene.indices||{})["NDMI"]??scene.ndmi),ndvi=numberOrNaN((scene.indices||{})["NDVI"]??scene.ndvi),coverage=scene.coverage_percent==null?NaN:Number(scene.coverage_percent),sceneAge=Math.max(0,(Date.now()-ref)/86400000);
+  const val=sceneIndex(scene,'NDMI'),ndvi=sceneIndex(scene,'NDVI'),coverage=numberOrNaN(scene.coverage_percent),sceneAge=Math.max(0,(Date.now()-ref)/86400000);
   let score=40; if(Number.isFinite(coverage)){score+=coverage>=60?20:coverage>=25?10:-15} else score-=10;
   score+=weatherCount>=5?15:weatherCount>0?7:-15;score+=lastIrr?(daysSince<=7?10:3):-12;score+=sceneAge<=5?10:sceneAge<=12?5:-8;score=Math.max(20,Math.min(90,score));
   const reasons=[];
@@ -148,7 +151,7 @@ $('autoAnalyze').onclick=async()=>{
   else if(!Number.isFinite(coverage)||coverage<25||!Number.isFinite(numberOrNaN(scene.valid_pixels))||numberOrNaN(scene.valid_pixels)<3)advice="جودة العينة غير كافية أو غير مكتملة؛ تحقق ميدانيًا من حالة الجذور ولا تعمم المتوسط الفضائي على الحقل.";
   weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecastComplete?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: ";const weatherLink=document.createElement("a");weatherLink.href="https://open-meteo.com/";weatherLink.target="_blank";weatherLink.rel="noopener noreferrer";weatherLink.textContent="Open‑Meteo";weatherText.append(weatherLink," (تقديرات نموذجية).");
   recommendationText.textContent=advice;recommendationReason.replaceChildren();reasons.forEach(t=>{const li=document.createElement("li");li.textContent=t;recommendationReason.append(li)});
-  confidence.textContent="الثقة التشغيلية: "+score+"% — تقدير اكتمال وحداثة البيانات، وليست احتمالًا إحصائيًا لصحة التشخيص.";
+  confidence.textContent="مؤشر اكتمال وحداثة البيانات: "+score+"/100 — إرشادي، وليس تقديرًا لدقة التوصية أو صحة التشخيص.";
   const cropName=analyzedField.crop||"محصول غير محدد";currentRecommendation={crop:cropName,scene,advice,reasons,score,weather:{rain_mm_7d:weatherCount?rain:null,et0_mm_7d:weatherCount?eto:null,forecast_rain_mm_3d:forecastComplete?forecastRain:null},lastIrrigation:lastIrr};
  }
  async function loadWeather(){
@@ -159,7 +162,15 @@ $('autoAnalyze').onclick=async()=>{
   if(!rows.length)return;const {error}=await client.from("satellite_observations").upsert(rows,{onConflict:"field_id,acquisition_date"});if(error)throw error;
  }
  saveIrrigation.onclick=async()=>{saveIrrigation.disabled=true;try{const depth=waterDepth.value===""?null:Number(waterDepth.value),mins=duration.value===""?null:Number(duration.value);if(depth===null&&mins===null)throw Error("أدخل عمق الماء أو مدة الري على الأقل");const {error}=await client.from("field_irrigation_logs").insert({field_id:fieldId,owner_id:user.id,irrigated_at:new Date(irrigatedAt.value).toISOString(),water_depth_mm:depth,duration_minutes:mins,method:method.value,notes:notes.value||null});if(error)throw error;notes.value="";waterDepth.value="";duration.value="";await loadIrrigationLogs();renderWeatherAdvice();saveIrrigation.textContent="✓ تم تسجيل الرية";setTimeout(()=>saveIrrigation.textContent="＋ تسجيل رية",1800)}catch(e){irrigationList.textContent="تعذر حفظ سجل الري: "+e.message}finally{saveIrrigation.disabled=false}};
- saveRecommendation.onclick=async()=>{if(!currentRecommendation)return;saveRecommendation.disabled=true;try{const c=currentRecommendation;const fieldIdForSave=fieldId;const symptom="Sentinel‑2 "+String(c.scene.date).slice(0,10)+"; NDVI "+Number(c.scene.ndvi).toFixed(3)+"; NDMI "+Number(c.scene.ndmi).toFixed(3)+"; weather "+JSON.stringify(c.weather)+"; "+c.reasons.join(" ");const {error}=await client.from("field_recommendations").insert({owner_id:user.id,farm_id:option.dataset.farmId||null,field_id:fieldIdForSave,crop:c.crop,growth_stage:null,plant_symptoms:symptom,soil_moisture:Number.isFinite(Number(c.scene.ndmi))?"NDMI "+Number(c.scene.ndmi).toFixed(3):null,recommendation:c.advice,confidence:c.score+"% ثقة تشغيلية"});if(error)throw error;saveRecommendation.textContent="✓ حُفظت التوصية";setTimeout(()=>saveRecommendation.textContent="حفظ التوصية في سجل الحقل",2000)}catch(e){saveRecommendation.textContent="تعذر الحفظ: "+e.message}finally{saveRecommendation.disabled=false}};
+ saveRecommendation.onclick=async()=>{
+  if(!currentRecommendation)return;saveRecommendation.disabled=true;
+  try{
+   const c=currentRecommendation,ndmi=sceneIndex(c.scene,'NDMI');
+   const symptom="Sentinel‑2 "+String(c.scene.date).slice(0,10)+"; NDVI "+formatSceneIndex(c.scene,'NDVI')+"; NDMI "+formatSceneIndex(c.scene,'NDMI')+"; weather "+JSON.stringify(c.weather)+"; "+c.reasons.join(" ");
+   const {error}=await client.from("field_recommendations").insert({owner_id:user.id,farm_id:option.dataset.farmId||null,field_id:fieldId,crop:c.crop,growth_stage:null,plant_symptoms:symptom,soil_moisture:Number.isFinite(ndmi)?"NDMI "+ndmi.toFixed(3):null,recommendation:c.advice,confidence:c.score+"/100 اكتمال وحداثة البيانات؛ ليس تقديرًا لدقة التوصية"});
+   if(error)throw error;saveRecommendation.textContent="✓ حُفظت التوصية";setTimeout(()=>saveRecommendation.textContent="حفظ التوصية في سجل الحقل",2000);
+  }catch(e){saveRecommendation.textContent="تعذر الحفظ: "+e.message}finally{saveRecommendation.disabled=false}
+ };
  mapButton.onclick=async()=>{
   if(!mapArea.isConnected||mapButton.disabled)return;
   const selected=mapSelectors.map(x=>x.value),scene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||mapSeries[0];
@@ -222,12 +233,13 @@ $('autoAnalyze').onclick=async()=>{
   }catch(e){mapArea.textContent="تعذر تحميل مشهد القمر أو إنشاء الخريطة: "+e.message;mapButton.textContent="إعادة المحاولة"}
   finally{mapButton.disabled=false}
  };
- sceneSelect.onchange=()=>{renderWeatherAdvice();mapButton.click()};
+ sceneSelect.onchange=()=>{geminiAdvisor.invalidateContext();renderWeatherAdvice();mapButton.click()};
  const handoff=createAdvisorHandoff({getContext:()=>{
   const selectedScene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||data;
   return {fieldId,field:analyzedField,satellite:{...selectedScene,source:data.source,resolution_m:data.resolution_m,series:mapSeries},weather:weatherData?{...weatherData,source:'Open-Meteo',fetched_at:weatherFetchedAt}:null,irrigationLogs};
  }});
- handoff.append(createGeminiAdvisor({getContext:()=>handoff.getAdvisorContext(),getSession:async()=>{const {data,error}=await client.auth.getSession();if(error)throw error;return data.session;},endpoint:SATELLITE_API_URL}));
+ const geminiAdvisor=createGeminiAdvisor({getContext:()=>handoff.getAdvisorContext(),getSession:async()=>{const {data,error}=await client.auth.getSession();if(error)throw error;return data.session;},endpoint:SATELLITE_API_URL});
+ handoff.append(geminiAdvisor);
  const dashboard=document.createElement("section");dashboard.className="ag-dashboard";
  const dashHeading=document.createElement("div"),dashTitle=document.createElement("h3"),dashIntro=document.createElement("p");dashTitle.textContent="🛰️ لوحة تحليل الحقل";dashIntro.className="ag-dashboard-intro";dashIntro.textContent="طبقات المؤشرات مرسومة مكانيًا فوق مشهد Sentinel‑2 داخل حدود الحقل. اضغط على خريطة مصغرة لتكبيرها.";dashHeading.append(dashTitle,dashIntro);
  const mapLayout=document.createElement("div");mapLayout.className="ag-map-layout";
@@ -238,7 +250,7 @@ $('autoAnalyze').onclick=async()=>{
  mapLayout.append(mainMapCard,previewCard);
  const metricGrid=document.createElement("div");metricGrid.className="ag-metrics";
  const metricDefs=[["NDVI","الغطاء النباتي"],["NDMI","رطوبة الغطاء النباتي"],["NDRE","حافة الأحمر"],["MSI","مؤشر الإجهاد المائي الطيفي"],["CIgreen","كلوروفيل أخضر (مؤشر طيفي)"],["LST","حرارة سطح الأرض"]];
- metricDefs.forEach(([key,label])=>{const card=document.createElement("div");card.className="ag-metric";const name=document.createElement("small");name.textContent=key+" · "+label;const value=document.createElement("strong");const n=vals[key];if(key==="LST"){value.className="ag-unavailable";value.textContent="غير متاح";const note=document.createElement("em");note.textContent="Sentinel‑2 لا يقيس حرارة السطح";card.append(name,value,note)}else{value.textContent=Number.isFinite(Number(n))?Number(n).toFixed(3):"—";const note=document.createElement("em");note.textContent=key==="CIgreen"?"مؤشر بديل؛ ليس قراءة SPAD مخبرية":key==="MSI"?"نسبة طيفية؛ لا تعادل رطوبة التربة":"متوسط البكسلات الصالحة";card.append(name,value,note)}metricGrid.append(card)});
+ metricDefs.forEach(([key,label])=>{const card=document.createElement("div");card.className="ag-metric";const name=document.createElement("small");name.textContent=key+" · "+label;const value=document.createElement("strong");const n=numberOrNaN(vals[key]);if(key==="LST"){value.className="ag-unavailable";value.textContent="غير متاح";const note=document.createElement("em");note.textContent="Sentinel‑2 لا يقيس حرارة السطح";card.append(name,value,note)}else{value.textContent=Number.isFinite(n)?n.toFixed(3):"غير متاح";const note=document.createElement("em");note.textContent=key==="CIgreen"?"مؤشر بديل؛ ليس قراءة SPAD مخبرية":key==="MSI"?"نسبة طيفية؛ لا تعادل رطوبة التربة":"متوسط البكسلات الصالحة";card.append(name,value,note)}metricGrid.append(card)});
  const summary=document.createElement("section");summary.className="ag-summary";const summaryTitle=document.createElement("h4");summaryTitle.textContent="ملخص الحقل";const summaryDL=document.createElement("dl");const summaryItems=[["المساحة",(($("field").selectedOptions[0]?.dataset.areaDonum||"—")+" دونم")],["المحصول",$("field").selectedOptions[0]?.dataset.crop||"غير محدد"],["تاريخ التحليل",safeDate(data.date)],["المصدر",data.source||"Sentinel‑2 L2A"],["دقة الصورة",(data.resolution_m||20)+" متر"],["تغطية صالحة",Number.isFinite(coverage)?coverage.toFixed(1)+"%":"غير متاحة"]];summaryItems.forEach(([k,v])=>{const row=document.createElement("div"),dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=k;dd.textContent=v;row.append(dt,dd);summaryDL.append(row)});summary.append(summaryTitle,summaryDL);
  const caveat=document.createElement("p");caveat.className="notice";caveat.textContent="القيم متوسطات للبكسلات الصالحة. CIgreen مؤشر كلوروفيل طيفي وليس SPAD، وMSI ليس قياسًا مباشرًا لرطوبة التربة. لا تتوفر LST من Sentinel‑2.";
  const summaryWrap=document.createElement("div");summaryWrap.className="ag-summary-grid";summaryWrap.append(summary,weatherPanel);
@@ -256,7 +268,7 @@ setTimeout(()=>mapButton.click(),0);
 $('testConnection').onclick=async()=>{const box=$('connectionResult');box.textContent='جارٍ فحص الاتصال...';const results=[];const probe=async(label,opts)=>{try{const res=await fetch(SATELLITE_API_URL,{...opts,cache:'no-store'});let body='';try{body=await res.text()}catch(_){}results.push(label+': HTTP '+res.status+' — '+body.slice(0,160));return true}catch(e){results.push(label+': فشل اتصال المتصفح ('+e.message+')');return false}};const getOk=await probe('GET بدون بيانات',{method:'GET'});if(getOk){await probe('POST بدون مصادقة',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const {data:{session}}=await client.auth.getSession();if(session)await probe('POST مع تسجيل الدخول',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:$('field').value||'invalid'})});}box.textContent=results.join('\n');box.style.whiteSpace='pre-wrap';};
 let client,user=null;
 try{
- const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+ const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
  client=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
 }catch(e){$('status').textContent='تعذر تحميل الاتصال: '+e.message}
 async function refresh(){

@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parent.parent
 FIELD='11111111-1111-4111-8111-111111111111'
+FIELD_TWO='22222222-2222-4222-8222-222222222222'
 GEOMETRY={'type':'Polygon','coordinates':[[[44,33],[44.01,33],[44.01,33.01],[44,33.01],[44,33]]]}
 def chunk(tag,data): return struct.pack('!I',len(data))+tag+data+struct.pack('!I',zlib.crc32(tag+data)&0xffffffff)
 raw_rows=[b'\0'+b''.join(bytes([100,100,100,0 if row<2 and col<2 else 255]) for col in range(8)) for row in range(8)]
@@ -17,11 +18,13 @@ IMAGE='data:image/png;base64,'+base64.b64encode(png).decode()
 boundary={'geometry':GEOMETRY,'area_m2':10000,'perimeter_m':400,'updated_at':'2026-10-23T00:00:00Z'}
 field={'id':FIELD,'name':'حقل اختبار','crop':'حنطة','area_donum':4,'farm_id':'farm','farms':{'owner_id':'test-user'}}
 mock='''const field=FIELD,boundary=BOUNDARY;
-function createClient(){return {auth:{getUser:async()=>({data:{user:{id:'test-user'}}}),getSession:async()=>({data:{session:{access_token:'fixture-only',user:{id:'test-user'}}}})},from(table){const q={};for(const method of ['select','eq','order','limit','single','maybeSingle','upsert'])q[method]=()=>q;q.then=(ok,fail)=>Promise.resolve({data:table==='fields'?[field]:table==='farms'?[{id:'farm',name:'مزرعة اختبار'}]:table==='field_boundaries'?boundary:[],error:null}).then(ok,fail);return q;}};}
-'''.replace('FIELD',json.dumps(field)).replace('BOUNDARY',json.dumps(boundary))
+function createClient(){return {auth:{getUser:async()=>({data:{user:{id:'test-user'}}}),getSession:async()=>({data:{session:{access_token:'fixture-only',user:{id:'test-user'}}}})},from(table){const q={};for(const method of ['select','eq','order','limit','single','maybeSingle','upsert'])q[method]=()=>q;q.then=(ok,fail)=>Promise.resolve({data:table==='fields'?[field,{...field,id:FIELD_TWO,name:'حقل ثانٍ'}]:table==='farms'?[{id:'farm',name:'مزرعة اختبار'}]:table==='field_boundaries'?boundary:[],error:null}).then(ok,fail);return q;}};}
+'''.replace('FIELD_TWO',json.dumps(FIELD_TWO)).replace('FIELD',json.dumps(field)).replace('BOUNDARY',json.dumps(boundary))
 stats={'field_id':FIELD,'geometry':GEOMETRY,'ndvi':.5,'ndmi':.2,'date':'2026-10-23T00:00:00Z','valid_pixels':10,'geometry_pixels':10,'coverage_percent':100,'indices':{'NDVI':.5,'NDMI':.2,'NDRE':.3},'resolution_m':20,'series':[{'date':'2026-10-23T00:00:00Z','indices':{'NDVI':.5,'NDMI':.2,'NDRE':.3},'ndvi':.5,'ndmi':.2,'valid_pixels':10,'coverage_percent':100}]}
+stats['series'].append({**stats['series'][0],'date':'2026-10-22T00:00:00Z'})
 
 ADVICE_MODE={'value':'ready','requests':[]}
+DEFER_NEXT_IMAGE={'value':False,'pending':[]}
 RECOMMENDATION={'summary':'توصية اختبار <img src=x onerror=alert(1)>','evidence':['مؤشرات مؤرخة'],'missing_data':['تحليل التربة والماء'],'irrigation':['افحص رطوبة الجذور'],'fertilization':['راجع تحليل التربة'],'follow_up':['سجل الفحص'],'limitations':['إرشادي'] }
 def route_request(route):
     u=urlparse(route.request.url)
@@ -43,8 +46,11 @@ def route_request(route):
             route.fulfill(json={'provider':'Google Gemini','model':'gemini-3.5-flash-lite','generated_at':'2026-10-25T12:00:00Z','recommendation':RECOMMENDATION});return
         if payload.get('action')=='imagery':
             if payload.get('map_index')=='NDRE':route.fulfill(status=502,json={'error':'Fixture unavailable NDRE'});return
-            route.fulfill(json={'image':IMAGE,'bounds':[[33,44],[33.01,44.01]],'index':payload.get('map_index'),'date':payload.get('map_date'),'resolution_m':20});return
-        route.fulfill(json=stats);return
+            image_response={'image':IMAGE,'bounds':[[33,44],[33.01,44.01]],'index':payload.get('map_index'),'date':payload.get('map_date'),'resolution_m':20}
+            if DEFER_NEXT_IMAGE['value']:
+                DEFER_NEXT_IMAGE['value']=False;DEFER_NEXT_IMAGE['pending'].append((route,image_response));return
+            route.fulfill(json=image_response);return
+        route.fulfill(json={**stats,'field_id':payload.get('field_id',FIELD)});return
     if u.hostname=='api.open-meteo.com':
         route.fulfill(status=503,json={'error':'fixture weather unavailable'});return
     route.abort()
@@ -91,6 +97,33 @@ with sync_playwright() as p:
         page.wait_for_function("!document.querySelector('#loadIndicatorMap').disabled")
         assert page.locator('img.leaflet-image-layer').count()==1
         check_probe(page,'#map',mobile)
+        # Finish an older field's imagery after a newer field is already visible.
+        # The old response must never replace the new layer, its label or controls.
+        page.select_option('#mapIndicator','NDMI')
+        DEFER_NEXT_IMAGE['value']=True
+        page.click('#loadIndicatorMap')
+        page.wait_for_function("document.querySelector('#indicatorStatus').textContent.includes('جارٍ إنشاء طبقة NDMI')")
+        page.wait_for_timeout(50)
+        assert len(DEFER_NEXT_IMAGE['pending'])==1
+        page.select_option('#cloudField',FIELD_TWO)
+        assert page.locator('#loadIndicatorMap').is_enabled()
+        page.select_option('#mapIndicator','NDVI');page.click('#loadIndicatorMap')
+        page.wait_for_function("document.querySelector('#indicatorStatus').textContent.includes('✓ ظهرت طبقة NDVI')")
+        pending,image_response=DEFER_NEXT_IMAGE['pending'].pop()
+        pending.fulfill(json=image_response)
+        page.wait_for_timeout(100)
+        assert '✓ ظهرت طبقة NDVI' in page.locator('#indicatorStatus').inner_text()
+        assert page.locator('#cloudField').input_value()==FIELD_TWO
+        assert page.locator('img.leaflet-image-layer').count()==1
+        check_probe(page,'#map',mobile)
+        # Editing a boundary also clears its cached image: palette changes must
+        # not resurrect a raster clipped to the old geometry.
+        page.click('#draw')
+        page.locator('#map').click(position={'x':100,'y':180})
+        assert page.locator('img.leaflet-image-layer').count()==0
+        page.locator('#mapLowColor').evaluate("node=>{node.value='#222222';node.dispatchEvent(new Event('input',{bubbles:true}));}")
+        page.wait_for_timeout(50)
+        assert page.locator('img.leaflet-image-layer').count()==0
         assert not errors,errors
         page.goto('https://ur-smart.test/satellite-analysis.html')
         page.wait_for_function("document.querySelector('#field').options.length>1")
@@ -140,6 +173,13 @@ with sync_playwright() as p:
         assert gemini.locator('.gemini-result img').count()==0
         assert 'fixture-only' not in json.dumps(ADVICE_MODE['requests'][-1]['report'])
         assert FIELD==ADVICE_MODE['requests'][-1]['field_id']
+        page.locator('select[aria-label="اختيار تاريخ مشهد الأقمار الصناعية"]').select_option('2026-10-22T00:00:00Z')
+        assert gemini.locator('.gemini-result').inner_text()==''
+        assert gemini.locator('.gemini-preview').is_hidden()
+        assert not gemini.locator('input[type="checkbox"]').is_checked()
+        assert gemini.get_by_role('button',name='طلب توصية Gemini',include_hidden=True).is_disabled()
+        gemini.get_by_role('button',name='مراجعة البيانات قبل إرسالها إلى Gemini').click()
+        gemini.locator('input[type="checkbox"]').check()
         ADVICE_MODE['value']='quota'
         gemini.get_by_role('button',name='طلب توصية Gemini').click()
         page.wait_for_function("document.querySelector('.gemini-status').textContent.includes('حد الاستخدام المجاني')")
@@ -171,6 +211,23 @@ with sync_playwright() as p:
         assert report['observations']['soil_moisture']=='جافة'
         assert report['satellite'] is None
         assert report['observations']['notes']=='ملاحظة اختبار ميداني'
+        page.select_option('#plantSymptoms','اصفرار الأوراق')
+        handoff.locator('textarea[id$="-soilWaterLab"]').fill('تحليل مخبري للحقل الأول فقط')
+        handoff.locator('textarea[id$="-notes"]').fill('ملاحظة خاصة بالحقل الأول')
+        gemini=handoff.locator('.gemini-advisor')
+        gemini.get_by_role('button',name='مراجعة البيانات قبل إرسالها إلى Gemini').click()
+        gemini.locator('input[type="checkbox"]').check()
+        gemini.get_by_role('button',name='طلب توصية Gemini').click()
+        page.wait_for_function("document.querySelector('.gemini-result').textContent.includes('توصية اختبار')")
+        page.select_option('#savedField',FIELD_TWO)
+        for selector in ('#growthStage','#plantSymptoms','#soilMoisture','#notes'):
+            assert page.locator(selector).input_value()==''
+        for suffix in ('soilWaterLab','notes'):
+            assert handoff.locator('textarea[id$="-'+suffix+'"]').input_value()==''
+        assert handoff.locator('textarea[id^="ur-advisor-"][id$="-preview"]').input_value()==''
+        assert gemini.locator('.gemini-result').inner_text()==''
+        assert gemini.locator('.gemini-preview').is_hidden()
+        assert not gemini.locator('input[type="checkbox"]').is_checked()
         assert not errors,errors
         print(('Mobile' if mobile else 'Desktop')+': free ChatGPT report preview, missing-data preservation, private-ID exclusion, clipboard fallback and field-form defaults pass.')
         context.close()

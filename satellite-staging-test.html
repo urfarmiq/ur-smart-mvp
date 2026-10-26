@@ -50,7 +50,7 @@ function explain(error){const messages={
 };return messages[error]||'تعذر إكمال التحليل: '+String(error||'خطأ غير معروف');}
 async function load(){
 try{
-const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
 supabase=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
 const {data:{user:u},error:authError}=await supabase.auth.getUser();
 if(authError||!u){status.textContent='يرجى تسجيل الدخول من لوحة المزارع أولاً.';select.innerHTML='<option value="">يلزم تسجيل الدخول</option>';return;}

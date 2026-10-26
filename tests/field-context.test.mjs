@@ -46,3 +46,14 @@ test('late satellite result neither updates state nor upserts history after swit
  resolveFetch({ok:true,json:async()=>({field_id:'a',date:'2026-10-25',indices:{NDVI:.5}})});assert.equal(await first,null);
  assert.equal(context.snapshot().fieldId,'b');assert.equal(context.snapshot().satellite,null);assert.equal(upserts,0);
 });
+
+test('switching the field clears observations and hides previous reports and Gemini results',()=>{
+ const nodes=new Map();let handoffResets=0,geminiResets=0;
+ const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'previous-field-value',style:{},replaceChildren(){this.cleared=true;}});return nodes.get(id);};
+ const context=vm.createContext({$:node,handoff:{resetForField:()=>handoffResets++},geminiAdvisor:{invalidateContext:()=>geminiResets++}});
+ const start=html.indexOf('function resetFieldAdvice('),end=html.indexOf("$('savedField').addEventListener('change',resetFieldAdvice)",start);
+ vm.runInContext(html.slice(start,end),context);context.resetFieldAdvice();
+ for(const id of ['growthStage','plantSymptoms','soilMoisture','notes','irrigationDepth','irrigationDuration','irrigationNote'])assert.equal(node(id).value,'');
+ assert.equal(node('adviceResult').cleared,true);assert.equal(node('adviceResult').style.display,'none');assert.equal(node('report').style.display,'none');
+ assert.equal(handoffResets,1);assert.equal(geminiResets,1);
+});

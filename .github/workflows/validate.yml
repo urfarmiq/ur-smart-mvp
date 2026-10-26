@@ -1,0 +1,22 @@
+name: Validate UR Smart
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Check core functions and pages
+        run: |
+          node --test tests/*.test.mjs
+          python3 tests/check_pages.py
+          python3 -m py_compile tests/browser_satellite.py tests/browser_management.py

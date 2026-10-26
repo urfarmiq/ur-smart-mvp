@@ -26,6 +26,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Validate core functions and pages
+        run: |
+          node --test tests/*.test.mjs
+          python3 tests/check_pages.py
+          python3 -m py_compile tests/browser_satellite.py tests/browser_management.py
+
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4
         with:
