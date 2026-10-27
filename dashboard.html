@@ -36,6 +36,7 @@ a{color:#176b45}
 <p id="welcome">جارٍ التحقق من تسجيل الدخول...</p>
 <p id="fieldSummary" aria-live="polite"></p><div id="status" role="status">جارٍ الاتصال...</div>
 <button id="logout">تسجيل الخروج</button>
+<p><a id="adminLink" href="./admin.html" hidden>🔐 لوحة الإدارة وإشعارات التسجيل</a></p>
 </section>
 
 <section class="card"><h2>🌾 شنو تريد تسوي اليوم؟</h2><p class="hint">اضغط على الخدمة اللي تحتاجها:</p><div class="quick"><a href="./operations.html">📒 سجل العمليات والمستشعرات</a><a href="#fieldForm">➕ أضف حقل جديد</a><a href="./field-map.html">🗺️ حدد أرضك على الخريطة</a><a href="./satellite-analysis.html">🛰️ افحص حالة الزرع</a><a href="./field-analysis.html">📋 سوّي تقرير لحقلك</a></div></section><section class="card">
@@ -254,6 +255,9 @@ async function initialize(){
   return;
  }
  $('welcome').textContent='مرحبًا بك في منصة أور الزراعية.';
+ if(typeof supabase.rpc==='function'){
+  void supabase.rpc('admin_access').then(({data,error})=>{if(!error&&data===true)$('adminLink').hidden=false;}).catch(()=>{});
+ }
  status.textContent='تم تسجيل الدخول: '+(session.user.email||'المزارع');
  try{
   const farm=await ensureFarm();

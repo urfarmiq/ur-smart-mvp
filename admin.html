@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self'; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#174d36">
+<title>لوحة الإدارة الخاصة | أور الزراعية</title>
+<link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+<header><a class="brand" href="./index.html">🌱 أور الزراعية</a><nav aria-label="التنقل"><a href="./dashboard.html">لوحة المزارع</a><a href="./weather.html">الطقس</a><button id="logoutAdmin" type="button" hidden>تسجيل الخروج</button></nav></header>
+<main>
+<section class="intro"><p class="eyebrow">إدارة خاصة</p><h1>إشعارات الحسابات الجديدة</h1><p>تظهر بيانات الحساب الأساسية للمدير المصرّح له بعد التحقق الثنائي.</p></section>
+<p id="adminStatus" class="status" role="status" aria-live="polite">جارٍ التحقق من صلاحية الدخول…</p>
+<section class="panel" id="adminGate"><h2>الدخول إلى لوحة الإدارة</h2><p id="gateMessage">تُفحص صلاحية حسابك قبل تحميل أي إشعارات.</p><a class="button-link" id="adminSignIn" href="./auth.html">تسجيل الدخول</a></section>
+<section class="panel" id="mfaPanel" hidden aria-labelledby="mfaHeading">
+<p class="eyebrow">حماية حساب المدير</p><h2 id="mfaHeading">التحقق الثنائي</h2><p id="mfaDescription"></p>
+<p class="note">استخدم تطبيق مصادقة مثل Google Authenticator أو Microsoft Authenticator. لا تشارك رمز QR أو مفتاح الإعداد أو رموز التحقق مع أي شخص.</p>
+<button id="enrollMfa" type="button" hidden>إعداد تطبيق المصادقة</button>
+<div id="mfaSetup" class="setup" hidden>
+<h3>أضف الحساب إلى تطبيق المصادقة</h3><img id="mfaQr" alt="رمز إعداد تطبيق المصادقة لحسابك" width="220" height="220">
+<p>امسح الرمز من تطبيق المصادقة. إذا كنت تستخدم الهاتف نفسه، أضف حسابًا بمفتاح إعداد يدوي وانسخ المفتاح أدناه إلى التطبيق.</p>
+<label for="mfaSecret">مفتاح الإعداد الخاص بحسابك</label><input id="mfaSecret" readonly autocomplete="off" spellcheck="false" dir="ltr"><p class="muted">يظهر هنا مؤقتًا ويُخفى بعد التحقق. احتفظ بإمكانية الوصول إلى تطبيق المصادقة.</p>
+</div>
+<form id="verifyMfa" hidden>
+<div id="factorPicker" hidden><label for="mfaFactor">تطبيق المصادقة المسجّل</label><select id="mfaFactor"></select></div>
+<label for="mfaCode">الرمز المكوّن من 6 أرقام</label><input id="mfaCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required dir="ltr" placeholder="000000">
+<button id="verifyMfaButton" type="submit">التحقق وفتح الإشعارات</button>
+</form>
+<p id="mfaStatus" role="status" aria-live="polite"></p>
+</section>
+<section id="adminContent" hidden>
+<section class="panel heading-row"><div><p class="eyebrow">التسجيلات الجديدة</p><h2>غير المقروءة: <span id="unreadCount">—</span></h2><p class="muted">تظهر التسجيلات في دفعات من 50. استخدم «عرض تسجيلات أقدم» لمراجعة البقية، أو حدّث الإشعارات للعودة إلى أحدث التسجيلات.</p></div><div class="actions"><button id="refreshNotifications" type="button">تحديث الإشعارات</button><button id="markAllSeen" class="secondary" type="button" disabled>تعليم المعروضة كمقروءة</button></div></section>
+<p class="note">تبدأ الإشعارات من وقت تفعيل هذه الميزة؛ الحسابات القديمة لا تُنسخ تلقائيًا.</p>
+<div id="notificationList" class="notifications" aria-live="polite"></div>
+<p id="paginationStatus" class="muted" role="status"></p><button id="loadOlderNotifications" type="button" class="secondary" hidden>عرض تسجيلات أقدم</button>
+<p class="note">يعرض هذا القسم الاسم إن أُدخل، والبريد الإلكتروني، وتاريخ التسجيل، وحالة تأكيد البريد فقط. لا تُعرض كلمات المرور أو بصماتها أو رموز الجلسات أو بيانات الحقول.</p>
+</section>
+<footer>أور الزراعية — صلاحية المدير والتحقق الثنائي يُفرضان أيضًا على قراءة البيانات في قاعدة البيانات.</footer>
+</main>
+<script type="module" src="./admin.mjs"></script>
+</body></html>

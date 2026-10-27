@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
 <title>حساب المزارع | UR Smart</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body,button,input,select,textarea{font-family:"IBM Plex Sans Arabic",Inter,Tahoma,Arial,sans-serif}
@@ -23,75 +25,20 @@ button{background:#187044;color:white;border:0;cursor:pointer}
 <p>أنشئ حسابك أو سجّل الدخول إلى المنصة.</p>
 
 <form id="loginForm">
-<label>البريد الإلكتروني</label>
-<input id="email" type="email" required placeholder="البريد الإلكتروني">
-<label>كلمة المرور</label>
-<input id="password" type="password" minlength="6" required placeholder="6 أحرف على الأقل">
+<label for="email">البريد الإلكتروني</label>
+<input id="email" type="email" required maxlength="254" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="البريد الإلكتروني">
+<label for="password">كلمة المرور</label>
+<input id="password" type="password" required minlength="1" maxlength="256" autocomplete="current-password" aria-describedby="passwordHint" placeholder="كلمة المرور">
+<p id="passwordHint">لإنشاء حساب جديد، استخدم عبارة مرور من 12 حرفًا على الأقل. يمكنك تسجيل الدخول بكلمة مرور حسابك الحالي.</p>
 <button type="submit">تسجيل الدخول</button>
 </form>
 
 <button class="secondary" id="signup" type="button">إنشاء حساب جديد</button>
+<p style="font-size:13px;line-height:1.8">تتلقى إدارة المنصة إشعارًا ببريدك ووقت التسجيل وحالة تأكيد الحساب، والاسم إن كان متاحًا. لا يتضمن الإشعار كلمة المرور أو رموز الدخول.</p>
 <button class="secondary" id="logout" type="button">تسجيل الخروج</button>
-<p id="msg">جارٍ الاتصال...</p>
+<p id="msg" role="status" aria-live="polite">جارٍ الاتصال...</p>
 </main>
 
-<script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
-
-const supabase = createClient(
-'https://ynsmhtsktbubxfhsekjq.supabase.co',
-'sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc'
-);
-
-const email = document.getElementById('email');
-const password = document.getElementById('password');
-const msg = document.getElementById('msg');
-const say = text => msg.textContent = text;
-const openDashboard = () => {
- say('تم تسجيل الدخول. جارٍ فتح لوحة المزارع...');
- window.location.assign('./dashboard.html');
-};
-
-document.getElementById('loginForm').addEventListener('submit', async e => {
- e.preventDefault();
- say('جارٍ تسجيل الدخول...');
- const {data,error} = await supabase.auth.signInWithPassword({
-  email: email.value.trim(),
-  password: password.value
- });
- if (error) {
-  say('تعذر الدخول: ' + error.message);
-  return;
- }
- if (data.session) openDashboard();
- else say('تم التحقق من الحساب، لكن لم تُنشأ جلسة. حاول تسجيل الدخول مجددًا.');
-});
-
-document.getElementById('signup').addEventListener('click', async () => {
- if (!email.value.trim() || !password.value) {
-  say('أدخل البريد الإلكتروني وكلمة المرور أولاً.');
-  return;
- }
- say('جارٍ إنشاء الحساب...');
- const {data,error} = await supabase.auth.signUp({
-  email: email.value.trim(),
-  password: password.value
- });
- if (error) say('تعذر التسجيل: ' + error.message);
- else if (data.session) openDashboard();
- else say('تم إرسال طلب التسجيل. افحص بريدك الإلكتروني لتأكيد الحساب، ثم ارجع إلى هذه الصفحة وسجّل الدخول.');
-});
-
-document.getElementById('logout').addEventListener('click', async () => {
- const {error} = await supabase.auth.signOut();
- say(error ? error.message : 'تم تسجيل الخروج.');
-});
-
-supabase.auth.getSession().then(({data,error}) => {
- if (error) say('تعذر الاتصال: ' + error.message);
- else if (data.session) openDashboard();
- else say('أدخل بياناتك لتسجيل الدخول أو إنشاء حساب.');
-});
-</script>
+<script type="module" src="./auth.mjs"></script>
 </body>
 </html>

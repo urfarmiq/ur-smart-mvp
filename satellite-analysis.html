@@ -17,6 +17,7 @@ import {loadRasterImage,colorizeRaster,collectRasters} from './satellite-raster.
 import {attachPixelProbe} from './satellite-pixel-probe.mjs';
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
+import {readAccountCache,writeAccountCache} from './account-cache.mjs';
 const $=id=>document.getElementById(id);
 const numberOrNaN=value=>value===null||value===undefined||typeof value==='boolean'||typeof value==='string'&&!value.trim()?NaN:Number(value);
 function sceneIndex(scene,name){const value=scene?.indices?.[name];return numberOrNaN(value===undefined?scene?.[name.toLowerCase()]:value);}
@@ -35,10 +36,11 @@ $('autoAnalyze').onclick=async()=>{
  if(!client||!user){box.textContent='سجّل الدخول أولًا.';return}
  if(!SATELLITE_API_URL){box.textContent='التحليل التلقائي غير مفعّل بعد: يجب نشر خادم Sentinel-2 وربطه بالمنصة. لن نعرض قراءات وهمية.';return}
  const option=$('field').selectedOptions[0],analyzedField={name:option.textContent,crop:option.dataset.crop||null,area_donum:numberOrNaN(option.dataset.areaDonum),soil:option.dataset.soil||null,irrigation:option.dataset.irrigation||null};
- const analysisGeneration=++analysisRequestGeneration;
+ const analysisGeneration=++analysisRequestGeneration,analysisUserId=user.id;
+ const analysisIsCurrent=()=>analysisGeneration===analysisRequestGeneration&&user?.id===analysisUserId;
  const button=$('autoAnalyze');disposeIndicatorMaps();button.disabled=true;box.textContent='جارٍ طلب أحدث تحليل فضائي متاح...';
  try{
- const {data:{session}}=await client.auth.getSession();if(!session)throw Error('انتهت جلسة تسجيل الدخول');
+ const {data:{session}}=await client.auth.getSession();if(!analysisIsCurrent())return;if(!session||session.user?.id!==analysisUserId)throw Error('انتهت جلسة تسجيل الدخول');
  const res=await fetch(SATELLITE_API_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:fieldId})});
  const data=await res.json();if(analysisGeneration!==analysisRequestGeneration)return;if(!res.ok){const msg={'Insufficient satellite coverage for a reliable field average':'التغطية الفضائية الصالحة غير كافية لإعطاء نتيجة موثوقة. حاول لاحقًا أو تأكد من حدود الحقل.','No valid pixels found in the last 65 days':'لم تتوفر بكسلات صالحة خلال آخر 65 يومًا. يجري البحث في نافذة أوسع.', 'No valid cloud-free pixels found in the last 65 days':'لا توجد بكسلات خالية من الغيوم خلال 65 يومًا؛ جرّب التحقق من الحدود أو أعد المحاولة لاحقًا.', 'No valid cloud-free pixels found in the last 180 days':'لم نجد بكسلات صالحة خالية من الغيوم خلال 180 يومًا. تحقق من حدود الحقل أو أعد المحاولة بعد مرور مشهد أوضح.','Field boundary unavailable for this account':'ارسم حدود الحقل واحفظها أولًا.','Session expired':'انتهت جلسة الدخول. سجّل الدخول مرة ثانية.'};throw Error(msg[data.error]||(data.error?data.error+(data.details?' — '+data.details:''):'تعذر التحليل'))}
  if(!Number.isFinite(data.ndvi)||!Number.isFinite(data.ndmi))throw Error('النتيجة الفضائية غير صالحة');
@@ -57,7 +59,7 @@ $('autoAnalyze').onclick=async()=>{
  const copy=document.createElement('button');copy.className='secondary';copy.textContent='📋 نسخ نتيجة التحليل';copy.onclick=async()=>{const report=[title.textContent,'الحقل: '+analyzedField.name,numbers.textContent,meta.textContent,sampleNote,interpretation.textContent,advisorList.innerText,weatherPanel.innerText,warning.textContent].join('\n');try{await navigator.clipboard.writeText(report);copy.textContent='✓ تم نسخ التقرير'}catch(e){copy.textContent='تعذر النسخ، استخدم تحديد النص'}};
  const print=document.createElement('button');print.className='secondary';print.textContent='🖨️ طباعة / حفظ PDF';print.onclick=()=>window.print();actions.append(copy,print);
  const historyKey='ur-smart-satellite-history-v1';const record={field_id:fieldId,field_name:analyzedField.name,ndvi:data.ndvi,ndmi:data.ndmi,date:data.date||'',valid_pixels:Number.isFinite(pixels)?pixels:null,geometry_pixels:Number.isFinite(geometryPixels)?geometryPixels:null,coverage_percent:Number.isFinite(coverage)?coverage:null,source:data.source||'Sentinel-2',saved_at:new Date().toISOString()};
- let history=[];try{history=JSON.parse(localStorage.getItem(historyKey)||'[]');if(!Array.isArray(history))history=[];history=history.filter(x=>!(x.field_id===record.field_id&&x.date===record.date));history.unshift(record);localStorage.setItem(historyKey,JSON.stringify(history.slice(0,100)))}catch(e){history=[record]}
+ let history=[];try{history=readAccountCache(localStorage,historyKey,analysisUserId,[]);if(!Array.isArray(history))throw Error('سجل محلي غير صالح');history=history.filter(x=>x&&typeof x==='object'&&!(x.field_id===record.field_id&&x.date===record.date));history.unshift(record);writeAccountCache(localStorage,historyKey,analysisUserId,history.slice(0,100))}catch(e){history=[record]}
  const past=history.filter(x=>x.field_id===fieldId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  const historyTitle=document.createElement('h4');historyTitle.textContent='📈 سجل الرصد والمقارنة (محفوظ على هذا الجهاز)';
  const historyNote=document.createElement('p');historyNote.className='muted';historyNote.textContent='حُفظت قياسات هذه السلسلة والطقس المرتبط بها في سجل الحقل السحابي، بينما يحتفظ هذا الجهاز بملخص التحليلات الحديثة. المقارنة مؤشر متابعة وليست تشخيصًا مؤكدًا.';
@@ -172,6 +174,7 @@ $('autoAnalyze').onclick=async()=>{
   }catch(e){saveRecommendation.textContent="تعذر الحفظ: "+e.message}finally{saveRecommendation.disabled=false}
  };
  mapButton.onclick=async()=>{
+  if(!analysisIsCurrent())return;
   if(!mapArea.isConnected||mapButton.disabled)return;
   const selected=mapSelectors.map(x=>x.value),scene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||mapSeries[0];
   if(selected[0]===selected[1]){mapArea.textContent="اختر مؤشرين مختلفين لعرضهما كطبقتين على الخريطة.";return}
@@ -259,32 +262,53 @@ $('autoAnalyze').onclick=async()=>{
 setTimeout(()=>mapButton.click(),0);
  // Map images must not wait for weather, irrigation, or history storage.
  void (async()=>{
+  if(!analysisIsCurrent())return;
   await loadWeather();
+  if(!analysisIsCurrent())return;
   try{await loadIrrigationLogs()}catch(e){irrigationList.textContent="تعذر تحميل سجل الري: "+e.message;}
+  if(!analysisIsCurrent())return;
   try{await saveObservationHistory()}catch(e){weatherText.textContent+=" تعذر حفظ سلسلة المؤشرات السحابية: "+e.message;}
  })().catch(e=>{weatherText.textContent="تعذر تحديث البيانات المساندة: "+e.message;});
- }catch(e){const network=e instanceof TypeError||/Load failed|Failed to fetch|NetworkError/i.test(e.message);box.textContent=network?'تعذر الاتصال بخادم Cloudflare. افتح رابط فحص الخادم أدناه: إذا لم يفتح، المشكلة من الوصول إلى workers.dev أو إعدادات الشبكة؛ وإذا ظهر JSON، تحقق من إعدادات CORS وCloudflare.':'تعذر التحليل التلقائي: '+e.message; if(network){const link=document.createElement('a');link.href=SATELLITE_API_URL;link.target='_blank';link.rel='noopener noreferrer';link.textContent='فتح رابط الخادم لفحص الاتصال ↗';box.append(document.createElement('br'),link)}}finally{button.disabled=false}
+ }catch(e){if(!analysisIsCurrent())return;const network=e instanceof TypeError||/Load failed|Failed to fetch|NetworkError/i.test(e.message);box.textContent=network?'تعذر الاتصال بخادم Cloudflare. افتح رابط فحص الخادم أدناه: إذا لم يفتح، المشكلة من الوصول إلى workers.dev أو إعدادات الشبكة؛ وإذا ظهر JSON، تحقق من إعدادات CORS وCloudflare.':'تعذر التحليل التلقائي: '+e.message; if(network){const link=document.createElement('a');link.href=SATELLITE_API_URL;link.target='_blank';link.rel='noopener noreferrer';link.textContent='فتح رابط الخادم لفحص الاتصال ↗';box.append(document.createElement('br'),link)}}finally{if(analysisIsCurrent())button.disabled=!user}
 };
 $('testConnection').onclick=async()=>{const box=$('connectionResult');box.textContent='جارٍ فحص الاتصال...';const results=[];const probe=async(label,opts)=>{try{const res=await fetch(SATELLITE_API_URL,{...opts,cache:'no-store'});let body='';try{body=await res.text()}catch(_){}results.push(label+': HTTP '+res.status+' — '+body.slice(0,160));return true}catch(e){results.push(label+': فشل اتصال المتصفح ('+e.message+')');return false}};const getOk=await probe('GET بدون بيانات',{method:'GET'});if(getOk){await probe('POST بدون مصادقة',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const {data:{session}}=await client.auth.getSession();if(session)await probe('POST مع تسجيل الدخول',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({field_id:$('field').value||'invalid'})});}box.textContent=results.join('\n');box.style.whiteSpace='pre-wrap';};
-let client,user=null;
+let client,user=null,authRefreshGeneration=0,observedAuthUserId=null;
+function clearPrivateAnalysis(message){
+ authRefreshGeneration++;analysisRequestGeneration++;user=null;disposeIndicatorMaps();
+ $('field').replaceChildren(new Option('حمّل حقول حسابك بعد تسجيل الدخول',''));
+ $('autoResult').textContent=message;$('boundary').textContent='اختر حقلًا من حسابك لعرض حدوده.';$('connectionResult').textContent='';
+ $('autoAnalyze').disabled=true;$('status').textContent=message;
+}
 try{
  const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
  client=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
+ client.auth.onAuthStateChange?.((event,session)=>{
+  const nextId=session?.user?.id||null;
+  if(event==='SIGNED_OUT'||observedAuthUserId!==null&&nextId!==observedAuthUserId||user&&nextId!==user.id)clearPrivateAnalysis('انتهت الجلسة أو تغيّر الحساب. تم إخفاء التحليل السابق؛ حمّل حقول حسابك للمتابعة.');
+  observedAuthUserId=nextId;
+ });
 }catch(e){$('status').textContent='تعذر تحميل الاتصال: '+e.message}
 async function refresh(){
  if(!client)return;
+ let generation=++authRefreshGeneration;
+ analysisRequestGeneration++;disposeIndicatorMaps();$('autoResult').replaceChildren();$('boundary').textContent='اختر حقلًا لعرض حدوده.';$('autoAnalyze').disabled=true;
  const select=$('field');select.replaceChildren();select.add(new Option('اختر حقلًا',''));
  try{
- const {data:{user:u},error:authError}=await client.auth.getUser();if(authError||!u){$('status').textContent='سجّل الدخول من لوحة المزارع أولًا.';return}
+ const {data:{user:u},error:authError}=await client.auth.getUser();if(generation!==authRefreshGeneration)return;
+ if(authError||!u){clearPrivateAnalysis('سجّل الدخول من لوحة المزارع أولًا.');return}
+ if(observedAuthUserId&&observedAuthUserId!==u.id)return;
+ if(user&&user.id!==u.id){clearPrivateAnalysis('تغيّر الحساب. تم إخفاء تحليل الحساب السابق.');generation=authRefreshGeneration;}
  user=u;const {data,error}=await client.from('fields').select('id,name,crop,area_donum,farm_id,soil,irrigation,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');
+ if(generation!==authRefreshGeneration||user?.id!==u.id)return;
  if(error)throw error;
  (data||[]).forEach(f=>{const option=new Option(f.name,f.id);option.dataset.crop=f.crop||'';option.dataset.areaDonum=f.area_donum??'';option.dataset.farmId=f.farm_id||'';option.dataset.soil=f.soil||'';option.dataset.irrigation=f.irrigation||'';select.add(option)});
  $('status').textContent='متصل بحساب المزارع. اختر حقلًا للمتابعة.';
- }catch(e){$('status').textContent='تعذر تحميل الحقول: '+e.message}
+ $('autoAnalyze').disabled=false;
+ }catch(e){if(generation===authRefreshGeneration)$('status').textContent='تعذر تحميل الحقول: '+e.message}
 }
 $('refresh').onclick=refresh;
 $('field').onchange=async()=>{
- analysisRequestGeneration++;disposeIndicatorMaps();$('autoResult').replaceChildren();
+ analysisRequestGeneration++;disposeIndicatorMaps();$('autoResult').replaceChildren();$('autoAnalyze').disabled=!user;
  const id=$('field').value;const box=$('boundary');if(!id){box.textContent='اختر حقلًا أولًا.';return}
  box.textContent='جارٍ تحميل حدود الحقل...';
  const {data,error}=await client.from('field_boundaries').select('area_m2,perimeter_m,updated_at').eq('field_id',id).maybeSingle();

@@ -17,6 +17,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4"></script><script type="module">
 import {loadRasterImage,pickSceneDate} from './satellite-raster.mjs';
 import {attachPixelProbe} from './satellite-pixel-probe.mjs';
+import {readAccountCache,writeAccountCache} from './account-cache.mjs';
 (function(){
 const $=id=>document.getElementById(id), map=L.map('map',{tap:false}).setView([32.75,45.3],12);
 const cropOptions=["حنطة","قمح","شعير","ذرة","رز","بطاطا","بصل","باقلاء","برسيم","رمان","تين","عنب","زيتون","طماطم","نخيل","محصول آخر"];
@@ -51,15 +52,15 @@ $('locate').onclick=()=>{if(!navigator.geolocation){$('status').textContent='ا�
 function layer(which){map.removeLayer(streets);map.removeLayer(satellite);(which==='satellite'?satellite:streets).addTo(map);$('satellite').classList.toggle('active',which==='satellite');$('streets').classList.toggle('active',which==='streets')}
 $('satellite').onclick=()=>layer('satellite');$('streets').onclick=()=>layer('streets');
 function payload(){return {type:'Feature',properties:{name:$('fieldName').value,crop:$('crop').value,notes:$('notes').value,area_m2:Math.round(calcArea(points)),area_donum:calcArea(points)/2500,perimeter_m:calcPerimeter(points),measurement_method:'WGS84 local tangent plane approximate'},geometry:{type:'Polygon',coordinates:[[...points.map(p=>[p.lng,p.lat]),[points[0].lng,points[0].lat]]]}}}
-$('save').onclick=()=>{if([...$('cropOptions').querySelectorAll('.crop-choice:checked')].some(x=>x.value==='محصول آخر')&&!$('otherCropName').value.trim()){$('status').textContent='اكتب اسم المحصول الآخر قبل الحفظ.';return}if(points.length<3){$('status').textContent='يجب رسم ثلاث نقاط على الأقل قبل الحفظ.';return}try{localStorage.setItem('ur-smart-field-map-v1',JSON.stringify(payload()));$('status').textContent='✓ تم حفظ الحقل على هذا الجهاز فقط.'}catch(e){$('status').textContent='تعذر الحفظ المحلي: '+e.message}};
-$('load').onclick=()=>{try{const f=JSON.parse(localStorage.getItem('ur-smart-field-map-v1'));if(!f||f.geometry?.type!=='Polygon')throw Error('لا يوجد حقل محفوظ');points=f.geometry.coordinates[0].slice(0,-1).map(p=>L.latLng(p[1],p[0]));$('fieldName').value=f.properties?.name||'';setCropValue(f.properties?.crop||'');$('notes').value=f.properties?.notes||'';render();map.fitBounds(L.latLngBounds(points).pad(.2));$('status').textContent='✓ تمت استعادة الحقل المحفوظ.'}catch(e){$('status').textContent=e.message}};
+$('save').onclick=()=>{if(!cloudUser?.id){$('status').textContent='سجّل الدخول وحمّل حقول حسابك قبل الحفظ المحلي. يمكنك تصدير الرسم GeoJSON دون تسجيل الدخول.';return}if([...$('cropOptions').querySelectorAll('.crop-choice:checked')].some(x=>x.value==='محصول آخر')&&!$('otherCropName').value.trim()){$('status').textContent='اكتب اسم المحصول الآخر قبل الحفظ.';return}if(points.length<3){$('status').textContent='يجب رسم ثلاث نقاط على الأقل قبل الحفظ.';return}try{writeAccountCache(localStorage,'ur-smart-field-map-v1',cloudUser.id,payload());$('status').textContent='✓ تم حفظ الحقل محليًا على هذا الجهاز لحسابك فقط.'}catch(e){$('status').textContent='تعذر الحفظ المحلي: '+e.message}};
+$('load').onclick=()=>{if(!cloudUser?.id){$('status').textContent='سجّل الدخول وحمّل حقول حسابك قبل استعادة الحفظ المحلي.';return}try{const f=readAccountCache(localStorage,'ur-smart-field-map-v1',cloudUser.id);const ring=f?.geometry?.coordinates?.[0];if(f?.geometry?.type!=='Polygon'||!Array.isArray(ring)||ring.length<4)throw Error('لا توجد حدود محلية صالحة لهذا الحساب. النسخ القديمة غير المرتبطة بحساب لم تُحذف ولن تُعرض تلقائيًا.');if(!ring.every(p=>Array.isArray(p)&&p.length>=2&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=180&&Math.abs(p[1])<=90))throw Error('إحداثيات النسخة المحلية غير صالحة.');const restored=ring.slice(0,-1).map(p=>L.latLng(p[1],p[0]));points=restored;$('fieldName').value=typeof f.properties?.name==='string'?f.properties.name:'';setCropValue(typeof f.properties?.crop==='string'?f.properties.crop:'');$('notes').value=typeof f.properties?.notes==='string'?f.properties.notes:'';render();map.fitBounds(L.latLngBounds(points).pad(.2));$('status').textContent='✓ تمت استعادة الحقل المحلي لهذا الحساب.'}catch(e){$('status').textContent=e.message}};
 $('export').onclick=()=>{if(points.length<3){$('status').textContent='ارسم حدود الحقل أولًا.';return}const blob=new Blob([JSON.stringify(payload(),null,2)],{type:'application/geo+json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='ur-smart-field.geojson';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 
 // Cloud storage is opt-in and only available after applying the field_boundaries migration.
 const cloudClient=window.supabase?.createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
 const SATELLITE_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
 let indicatorGeometry=null,indicatorLayer=null,indicatorBoundary=null,indicatorStats=null,indicatorLegendControl=null,lastIndicatorImage=null,lastIndicatorIndex=null,indicatorRenderToken=0,indicatorRequestGeneration=0;
-let cloudUser=null,cloudFields=[];
+let cloudUser=null,cloudFields=[],cloudAuthGeneration=0,observedAuthUserId=null;
 attachPixelProbe({map,L,getLayers:()=>indicatorLayer?.pixelSample&&map.hasLayer(indicatorLayer)?[indicatorLayer.pixelSample]:[]});
 function invalidateIndicatorRequest(){indicatorRequestGeneration++;const button=$('loadIndicatorMap');if(button.disabled){button.disabled=false;button.textContent='🛰️ تحديث طبقة المؤشر على الخريطة'}}
 function clearIndicatorOverlay(preserveRequest=false){
@@ -69,7 +70,29 @@ function clearIndicatorOverlay(preserveRequest=false){
  if(indicatorLayer){map.removeLayer(indicatorLayer);indicatorLayer=null}if(indicatorBoundary){map.removeLayer(indicatorBoundary);indicatorBoundary=null}if(indicatorLegendControl){map.removeControl(indicatorLegendControl);indicatorLegendControl=null}$("indicatorLegend").hidden=true;
 }
 $("indicatorJump").onclick=()=>{$("indicatorPanel").scrollIntoView({behavior:"smooth",block:"center"});if(cloudUser&&$("cloudField").value)setTimeout(()=>$("loadIndicatorMap").click(),450);else indicatorError("اختر حقلًا محفوظًا من حسابك وسجّل الدخول، ثم اضغط تحديث طبقة المؤشر.")};
-async function refreshCloud(){const out=$('cloudStatus'),select=$('cloudField');clearIndicatorOverlay();select.replaceChildren();select.add(new Option('اختر حقلًا محفوظًا',''));if(!cloudClient){out.textContent='تعذر تحميل مكتبة الاتصال.';return}try{const {data:{user},error:authError}=await cloudClient.auth.getUser();if(authError||!user){cloudUser=null;out.textContent='سجّل الدخول أولًا من لوحة المزارع.';return}cloudUser=user;const {data,error}=await cloudClient.from('fields').select('id,name,farm_id,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');if(error)throw error;cloudFields=data||[];cloudFields.forEach(f=>select.add(new Option(f.name,f.id)));out.textContent=cloudFields.length?'اختر الحقل ثم احفظ حدوده أو افتحها.':'لا توجد حقول في حسابك. أضف حقلًا من لوحة المزارع.'}catch(e){out.textContent='تعذر تحميل الحقول: '+e.message}}
+function clearPrivateMap(message){
+ cloudAuthGeneration++;cloudUser=null;cloudFields=[];points=[];render();map.setView([32.75,45.3],12);
+ $('fieldName').value='';setCropValue('');$('notes').value='';
+ $('cloudField').replaceChildren(new Option('حمّل حقول حسابك بعد تسجيل الدخول',''));
+ $('mapSceneDate').replaceChildren(new Option('حمّل المشاهد أولًا',''));
+ $('cloudStatus').textContent=message;$('status').textContent=message;indicatorError(message);
+}
+async function refreshCloud(){
+ const out=$('cloudStatus'),select=$('cloudField');let generation=++cloudAuthGeneration;
+ clearIndicatorOverlay();select.replaceChildren(new Option('اختر حقلًا محفوظًا',''));
+ if(!cloudClient){out.textContent='تعذر تحميل مكتبة الاتصال.';return}
+ try{
+  const {data:{user},error:authError}=await cloudClient.auth.getUser();if(generation!==cloudAuthGeneration)return;
+  if(authError||!user){if(cloudUser||observedAuthUserId)clearPrivateMap('سجّل الدخول أولًا من لوحة المزارع.');else out.textContent='سجّل الدخول أولًا من لوحة المزارع.';return}
+  if(observedAuthUserId&&observedAuthUserId!==user.id)return;
+  if(cloudUser&&cloudUser.id!==user.id){clearPrivateMap('تغيّر الحساب. تم إخفاء رسم الحساب السابق.');generation=cloudAuthGeneration;}
+  cloudUser=user;
+  const {data,error}=await cloudClient.from('fields').select('id,name,farm_id,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');
+  if(generation!==cloudAuthGeneration||cloudUser?.id!==user.id)return;if(error)throw error;
+  cloudFields=data||[];cloudFields.forEach(f=>select.add(new Option(f.name,f.id)));
+  out.textContent=cloudFields.length?'اختر الحقل ثم احفظ حدوده أو افتحها.':'لا توجد حقول في حسابك. أضف حقلًا من لوحة المزارع.';
+ }catch(e){if(generation===cloudAuthGeneration)out.textContent='تعذر تحميل الحقول: '+e.message}
+}
 
 function indicatorError(message){const el=$('indicatorStatus');el.textContent=message;el.className='notice'}
 async function workerPost(payload){const {data:{session}}=await cloudClient.auth.getSession();if(!session)throw Error('سجّل الدخول من لوحة المزارع أولًا.');const r=await fetch(SATELLITE_API_URL,{method:'POST',signal:AbortSignal.timeout(90000),headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok){const map={'Invalid image date':'صيغة تاريخ المشهد غير صالحة. أعد تحميل المشاهد.','Image date is outside the analysis window':'المشهد أقدم من فترة التحليل المتاحة. أعد تحميل المشاهد.','No valid cloud-free pixels found in the last 65 days':'لم تتوفر بكسلات صالحة خلال آخر 65 يومًا.','Satellite image unavailable':'تعذر جلب صورة المؤشر من Copernicus الآن.'};throw Error((map[d.error]||d.error||'تعذر الاتصال بخدمة الأقمار الصناعية.')+(d.details?' ('+d.details+')':''))}return d}
@@ -140,6 +163,11 @@ $('refreshCloud').onclick=refreshCloud;
 $('saveCloud').onclick=async()=>{const out=$('cloudStatus'),fieldId=$('cloudField').value;if(!fieldId||!cloudUser){out.textContent='اختر حقلًا بعد تحميل حقول حسابك.';return}if(points.length<3){out.textContent='ارسم ثلاث نقاط على الأقل.';return}const a=calcArea(points);try{const record={field_id:fieldId,owner_id:cloudUser.id,geometry:payload().geometry,area_m2:a,perimeter_m:calcPerimeter(points),updated_at:new Date().toISOString()};const {error}=await cloudClient.from('field_boundaries').upsert(record,{onConflict:'field_id'});if(error)throw error;out.textContent='✓ تم حفظ الحدود في حسابك بنجاح.'}catch(e){out.textContent='تعذر الحفظ السحابي: '+e.message+' — تأكد من تفعيل جدول field_boundaries.'}};
 $('loadCloud').onclick=async()=>{const out=$('cloudStatus'),fieldId=$('cloudField').value;if(!fieldId||!cloudUser){out.textContent='اختر حقلًا من حسابك أولًا.';return}clearIndicatorOverlay();const requestGeneration=indicatorRequestGeneration,isCurrent=()=>requestGeneration===indicatorRequestGeneration&&$('cloudField').value===fieldId;try{const {data,error}=await cloudClient.from('field_boundaries').select('geometry').eq('field_id',fieldId).single();if(!isCurrent())return;if(error)throw error;const ring=data.geometry?.coordinates?.[0];if(!Array.isArray(ring)||ring.length<4)throw Error('حدود غير صالحة');const coords=ring.slice(0,-1);if(!coords.every(p=>Array.isArray(p)&&p.length>=2&&Number.isFinite(p[0])&&Number.isFinite(p[1])))throw Error('إحداثيات غير صالحة');points=coords.map(p=>L.latLng(p[1],p[0]));render();map.fitBounds(L.latLngBounds(points).pad(.2));out.textContent='✓ تم فتح الحدود المحفوظة.'}catch(e){if(isCurrent())out.textContent='تعذر فتح الحدود: '+e.message}};
 paintCropChooser();
+cloudClient?.auth.onAuthStateChange?.((event,session)=>{
+ const nextId=session?.user?.id||null;
+ if(event==='SIGNED_OUT'||observedAuthUserId!==null&&nextId!==observedAuthUserId||cloudUser&&nextId!==cloudUser.id)clearPrivateMap('انتهت الجلسة أو تغيّر الحساب. تم إخفاء بيانات الحساب السابق؛ حمّل حقول حسابك للمتابعة.');
+ observedAuthUserId=nextId;
+});
 refreshCloud();
 render();
 })();
