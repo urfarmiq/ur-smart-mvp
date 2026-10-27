@@ -25,6 +25,7 @@ a{color:#176b45}
 .actions .del{background:#fbe9e7;color:#a12a1a}
 #cancelEdit{background:#e8f3e9;color:#176b45;display:none}
 .quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick a{display:flex;align-items:center;justify-content:center;min-height:80px;text-align:center;padding:15px;border-radius:14px;background:#e8f3e9;border:1px solid #c9dfce;font-size:17px;font-weight:800;text-decoration:none;color:#14573a}.quick a:hover{background:#d5ebdb}.hint{font-size:14px;color:#58715e}.card{box-shadow:0 6px 25px #173d2610}@media(max-width:550px){.quick{grid-template-columns:1fr}.actions{flex-wrap:wrap}} .crop-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0}.crop-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #cddbd0;border-radius:10px;background:#fff;font-weight:600;cursor:pointer}.crop-chip input{width:auto;margin:0;accent-color:#147346}.crop-chip:has(input:checked){border-color:#168447;background:#eaf5ed}#otherCropWrap[hidden]{display:none}
+.weather-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}.weather-summary-grid[hidden]{display:none}.weather-summary-grid>div{padding:12px;background:#f1f7f2;border-radius:10px;overflow-wrap:anywhere}.weather-summary-grid span{display:block;font-size:13px;color:#58715e}.weather-summary-grid strong{display:block;font-size:19px}.actions a{display:flex;align-items:center;justify-content:center;padding:8px;margin-top:6px;background:#e4eff9;color:#1c527c;border-radius:8px;text-decoration:none;min-width:75px;font-size:14px}
 </style>
 </head>
 <body>
@@ -81,6 +82,7 @@ a{color:#176b45}
 
 <script type="module">
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
+import {createDashboardWeather} from './dashboard-weather.mjs';
 
 const supabase=createClient(
 'https://ynsmhtsktbubxfhsekjq.supabase.co',
@@ -107,6 +109,8 @@ let session=null;
 let farmId=null;
 let fields=[];
 let editingId=null;
+const weatherCard=createDashboardWeather({client:supabase});
+$('fieldForm').closest('section').before(weatherCard);
 
 function showError(prefix,error){
  status.textContent=prefix+(error?.message||'حدث خطأ غير معروف.');
@@ -191,6 +195,7 @@ async function loadCloudFields(){
   return;
  }
  fields=data||[];
+ weatherCard.setFields(fields);
  $('fieldSummary').textContent=`${fields.length} حقول — المساحة الإجمالية: ${fields.reduce((sum,f)=>sum+Number(f.area_donum||0),0).toLocaleString('ar-IQ')} دونم عراقي`;
  cloudFields.replaceChildren();
  if(!fields.length){
@@ -212,7 +217,8 @@ async function loadCloudFields(){
   const del=document.createElement('button');
   del.type='button';del.className='del';del.textContent='حذف';
   del.onclick=()=>deleteField(item);
-  actions.append(edit,del);
+  const weather=document.createElement('a');weather.textContent='🌦️ الطقس';weather.href='./weather.html?field='+encodeURIComponent(item.id);
+  actions.append(edit,del,weather);
   box.append(title,details,actions);
   cloudFields.appendChild(box);
  });

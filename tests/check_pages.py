@@ -15,3 +15,6 @@ for page in root.glob('*.html'):
             file.write(script);file.flush()
             subprocess.run(['node','--check',file.name],check=True,capture_output=True)
     print(f'{page.name}: local links, unique IDs, JavaScript syntax OK')
+for module in root.glob('*.mjs'):
+    subprocess.run(['node','--check',str(module)],check=True,capture_output=True)
+print('Local JavaScript modules: syntax OK')
