@@ -15,7 +15,7 @@ SECRET = 'JBSWY3DPEHPK3PXP'  # Public test vector, never a real account factor.
 
 MOCK = r"""
 const mode=FIXTURE_MODE,secret=FIXTURE_SECRET;
-window.__fixture={mode,calls:[],mfaCalls:[],signedIn:mode!=='anon',role:mode!=='anon'&&mode!=='ordinary',aal:mode==='admin'||mode==='pagination'?'aal2':'aal1',hasFactor:mode==='challenge',listeners:[],holdReads:false,pendingReads:[],failSelect:false,rows:[
+window.__fixture={mode,calls:[],mfaCalls:[],signedIn:mode!=='anon',role:mode!=='anon'&&mode!=='ordinary',aal:mode==='admin'||mode==='pagination'?'aal2':'aal1',hasFactor:mode==='challenge',listeners:[],holdReads:false,pendingReads:[],failSelect:false,holdVisits:false,pendingVisits:[],failVisits:false,malformedVisits:false,rows:[
  {id:'11111111-1111-4111-8111-111111111111',user_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',email:'farmer-one@example.test',display_name:'<img src=x onerror=window.__xss=true>',registered_at:'2026-10-27T09:00:00Z',email_confirmed_at:null,seen_at:null,password:'PASSWORD_MUST_NOT_APPEAR',encrypted_password:'HASH_MUST_NOT_APPEAR',access_token:'TOKEN_MUST_NOT_APPEAR'},
  {id:'22222222-2222-4222-8222-222222222222',user_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',email:'farmer-two@example.test',display_name:null,registered_at:'2026-10-27T08:00:00Z',email_confirmed_at:'2026-10-27T08:05:00Z',seen_at:null}
 ]};
@@ -34,7 +34,17 @@ function createClient(){const s=window.__fixture;return {
    async challengeAndVerify(input){s.mfaCalls.push({method:'verify',input});if(input.code!=='123456')return {data:null,error:{message:'sensitive provider error'}};s.aal='aal2';s.hasFactor=true;return {data:{access_token:'synthetic-promoted-session'},error:null};}
   }
  },
- async rpc(name){s.calls.push({rpc:name});return {data:s.role,error:null};},
+ async rpc(name){
+  s.calls.push({rpc:name});if(name==='admin_access')return {data:s.role,error:null};
+  if(name!=='admin_site_visits')throw Error('Unexpected RPC');
+  if(!s.signedIn||!s.role||s.aal!=='aal2')throw Error('Visit read attempted before private admin MFA');
+  if(s.failVisits)return {data:null,error:{message:'TOKEN_MUST_NOT_APPEAR'}};
+  const daily=Array.from({length:30},(_,i)=>({day:new Date(Date.UTC(2026,8,28+i)).toISOString().slice(0,10),views:i===29?12:1}));
+  const result={data:{started_at:'2026-09-01T07:00:00Z',today_views:12,week_views:18,month_views:41,total_views:50,daily,pages:[{page:'home',views:30},{page:'weather',views:20}]},error:null};
+  if(s.malformedVisits)result.data.pages.push({page:'<img src=x onerror=window.__visitXss=true>',views:0});
+  if(s.holdVisits)return new Promise(resolve=>s.pendingVisits.push(()=>resolve(result)));
+  return result;
+ },
  from(table){let action='select',payload=null,columns='',options={},filters=[],limit=50,start=0,orders=[];const q={};
   q.select=(value,opts={})=>{columns=value;options=opts;return q;};q.order=(key,opts)=>{orders.push([key,opts]);return q;};q.limit=value=>{limit=value;return q;};q.range=(from,to)=>{start=from;limit=to-from+1;return q;};
   q.eq=(key,value)=>{filters.push({op:'eq',key,value});return q;};q.is=(key,value)=>{filters.push({op:'is',key,value});return q;};q.in=(key,value)=>{filters.push({op:'in',key,value});return q;};
@@ -82,7 +92,9 @@ def wait_text(page, selector, value):
 
 def assert_no_notifications(page):
     assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='signup_notifications').length") == 0
+    assert page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='admin_site_visits').length") == 0
     assert page.locator('#adminContent').is_hidden()
+    assert page.locator('#visitsToday').inner_text() == '—'
     assert page.locator('#notificationList').inner_text() == ''
 
 
@@ -106,6 +118,17 @@ def assert_notifications(page):
     for call in page.evaluate("window.__fixture.calls.filter(call=>call.table==='signup_notifications')"):
         assert set(call['columns'].split(',')) <= allowed
         assert '*' not in call['columns']
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+
+
+def assert_visits(page):
+    page.wait_for_function("document.querySelector('#visitPages').children.length===2")
+    for selector, count in (('#visitsToday',12),('#visitsWeek',18),('#visitsMonth',41),('#visitsTotal',50)):
+        assert page.locator(selector).inner_text() == page.evaluate("value=>new Intl.NumberFormat('ar-IQ').format(value)", count)
+    assert 'الرئيسية' in page.locator('#visitPages').inner_text()
+    assert 'الطقس' in page.locator('#visitPages').inner_text()
+    assert page.locator('#visitDays tr').count() == 30
+    assert page.locator('#visitDetails').is_visible()
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
 
 
@@ -147,6 +170,7 @@ with sync_playwright() as playwright:
         page.fill('#mfaCode', '123456')
         page.click('#verifyMfaButton')
         assert_notifications(page)
+        assert_visits(page)
         assert page.locator('#mfaSecret').input_value() == ''
         assert page.locator('#mfaQr').get_attribute('src') is None
         assert page.locator('#mfaCode').input_value() == ''
@@ -172,12 +196,14 @@ with sync_playwright() as playwright:
         page.fill('#mfaCode', '123456')
         page.click('#verifyMfaButton')
         assert_notifications(page)
+        assert_visits(page)
         assert page.evaluate("window.__fixture.mfaCalls.filter(call=>call.method==='enroll').length") == 0
         assert page.evaluate("window.__fixture.mfaCalls.filter(call=>call.method==='verify').at(-1).input.factorId") == 'factor-existing'
 
         STATE['mode'] = 'admin'
         page.goto('https://ur-smart.test/admin.html')
         assert_notifications(page)
+        assert_visits(page)
         page.locator('#notificationList .notification').first.get_by_role('button', name='تعليم كمقروء', exact=True).click()
         page.wait_for_function("window.__fixture.rows[0].seen_at!==null&&document.querySelectorAll('#notificationList .notification.seen').length===1")
         page.click('#markAllSeen')
@@ -186,16 +212,38 @@ with sync_playwright() as playwright:
             assert set(call['payload']) == {'seen_at'}
         assert page.locator('#unreadCount').inner_text() == page.evaluate("new Intl.NumberFormat('ar-IQ').format(0)")
 
-        # A queued response must not restore account data after sign-out.
-        page.evaluate('window.__fixture.holdReads=true')
+        # Stats failure or malformed data must never become a misleading zero.
+        page.evaluate('window.__fixture.failVisits=true')
+        page.click('#refreshVisits')
+        wait_text(page, '#visitsStatus', 'تعذر تحميل')
+        assert page.locator('#visitsToday').inner_text() == '—'
+        assert page.locator('#visitDetails').is_hidden()
+        assert page.locator('#notificationList .notification').count() == 2
+        assert 'TOKEN_MUST_NOT_APPEAR' not in page.locator('#visitsStatus').inner_text()
+        page.evaluate('window.__fixture.failVisits=false;window.__fixture.malformedVisits=true')
+        page.click('#refreshVisits')
+        wait_text(page, '#visitsStatus', 'تعذر تحميل')
+        assert page.locator('#visitPages img').count() == 0
+        assert page.evaluate('window.__visitXss') is None
+        assert page.locator('#visitsToday').inner_text() == '—'
+        page.evaluate('window.__fixture.malformedVisits=false')
+        page.click('#refreshVisits')
+        assert_visits(page)
+
+        # Queued stats and notification responses must not restore data after sign-out.
+        page.evaluate('window.__fixture.holdReads=true;window.__fixture.holdVisits=true')
+        page.click('#refreshVisits')
+        page.wait_for_function('window.__fixture.pendingVisits.length===1')
         page.click('#refreshNotifications')
         page.wait_for_function('window.__fixture.pendingReads.length===1')
         page.click('#logoutAdmin')
         wait_text(page, '#adminStatus', 'تم تسجيل الخروج')
         assert page.locator('#adminContent').is_hidden()
         assert page.locator('#notificationList').inner_text() == ''
-        page.evaluate("async()=>{const pending=window.__fixture.pendingReads.splice(0);for(const resolve of pending)resolve();await new Promise(resolve=>setTimeout(resolve,0));}")
+        page.evaluate("async()=>{const pending=[...window.__fixture.pendingReads.splice(0),...window.__fixture.pendingVisits.splice(0)];for(const resolve of pending)resolve();await new Promise(resolve=>setTimeout(resolve,0));}")
         assert page.locator('#adminContent').is_hidden() and page.locator('#notificationList').inner_text() == ''
+        assert page.locator('#visitsToday').inner_text() == '—'
+        assert page.locator('#visitPages').inner_text() == ''
         assert_secret_not_persisted(page, logs)
 
         # Every stored registration remains reachable beyond the first batch.
@@ -211,8 +259,11 @@ with sync_playwright() as playwright:
         assert [query['range'] for query in queries] == [[0,49],[50,99]]
         assert all(query['orders'] == [['registered_at',{'ascending':False}],['id',{'ascending':False}]] for query in queries)
         before = len(queries)
+        assert_visits(page)
+        visits_before = page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='admin_site_visits').length")
         page.evaluate("async()=>{document.dispatchEvent(new Event('visibilitychange'));await new Promise(resolve=>setTimeout(resolve,0));}")
         assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='signup_notifications'&&call.action==='select'&&!call.options.head).length") == before
+        page.wait_for_function("before=>window.__fixture.calls.filter(call=>call.rpc==='admin_site_visits').length>before",arg=visits_before)
         old = page.locator('#notificationList .notification').filter(has_text='old-62@example.test')
         old.get_by_role('button', name='تعليم كمقروء', exact=True).click()
         page.wait_for_function("window.__fixture.rows.find(row=>row.email==='old-62@example.test').seen_at!==null&&[...document.querySelectorAll('#notificationList .notification.seen')].some(row=>row.textContent.includes('old-62@example.test'))")
@@ -221,6 +272,6 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.querySelectorAll('#notificationList .notification').length===50")
         assert page.locator('#loadOlderNotifications').is_visible()
         assert not errors, errors
-        print(('Mobile' if mobile else 'Desktop')+': strict CSP, anonymous/nonadmin denial, MFA enrollment/challenge gates, secret cleanup, safe signup fields, read markers, stale sign-out response, older-registration pagination and no secret storage pass using fixtures only.')
+        print(('Mobile' if mobile else 'Desktop')+': strict CSP, anonymous/nonadmin denial, MFA enrollment/challenge gates, secret cleanup, safe signup fields, read markers, stale sign-out responses, older-registration pagination, MFA-protected visit statistics with errors and stale-result cleanup, and no secret storage pass using fixtures only.')
         context.close()
     browser.close()

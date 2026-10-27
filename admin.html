@@ -13,7 +13,7 @@
 <body>
 <header><a class="brand" href="./index.html">🌱 أور الزراعية</a><nav aria-label="التنقل"><a href="./dashboard.html">لوحة المزارع</a><a href="./weather.html">الطقس</a><button id="logoutAdmin" type="button" hidden>تسجيل الخروج</button></nav></header>
 <main>
-<section class="intro"><p class="eyebrow">إدارة خاصة</p><h1>إشعارات الحسابات الجديدة</h1><p>تظهر بيانات الحساب الأساسية للمدير المصرّح له بعد التحقق الثنائي.</p></section>
+<section class="intro"><p class="eyebrow">إدارة خاصة</p><h1>لوحة الإدارة الخاصة</h1><p>إحصاءات الموقع وإشعارات الحسابات متاحة للمدير المصرّح له بعد التحقق الثنائي.</p></section>
 <p id="adminStatus" class="status" role="status" aria-live="polite">جارٍ التحقق من صلاحية الدخول…</p>
 <section class="panel" id="adminGate"><h2>الدخول إلى لوحة الإدارة</h2><p id="gateMessage">تُفحص صلاحية حسابك قبل تحميل أي إشعارات.</p><a class="button-link" id="adminSignIn" href="./auth.html">تسجيل الدخول</a></section>
 <section class="panel" id="mfaPanel" hidden aria-labelledby="mfaHeading">
@@ -33,6 +33,14 @@
 <p id="mfaStatus" role="status" aria-live="polite"></p>
 </section>
 <section id="adminContent" hidden>
+<section class="panel" aria-labelledby="visitsHeading">
+<div class="heading-row"><div><p class="eyebrow">حركة الموقع</p><h2 id="visitsHeading">مشاهدات صفحات المنصة</h2></div><button id="refreshVisits" type="button" class="secondary">تحديث الإحصاءات</button></div>
+<p id="visitsStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الإحصاءات بعد.</p>
+<div class="visit-metrics" aria-label="إجمالي مشاهدات الصفحات"><div><span>اليوم بتوقيت بغداد</span><strong id="visitsToday">—</strong></div><div><span>آخر 7 أيام</span><strong id="visitsWeek">—</strong></div><div><span>آخر 30 يومًا</span><strong id="visitsMonth">—</strong></div><div><span>منذ التفعيل</span><strong id="visitsTotal">—</strong></div></div>
+<p id="visitsSince" class="muted"></p>
+<div id="visitDetails" class="visit-details" hidden><section><h3>الصفحات الأكثر مشاهدة منذ التفعيل</h3><table class="visit-table"><thead><tr><th scope="col">الصفحة</th><th scope="col">المشاهدات</th></tr></thead><tbody id="visitPages"></tbody></table></section><details><summary>مشاهدات آخر 30 يومًا</summary><table class="visit-table"><thead><tr><th scope="col">اليوم بتوقيت بغداد</th><th scope="col">المشاهدات</th></tr></thead><tbody id="visitDays"></tbody></table></details></div>
+<p class="note">تبدأ الإحصاءات من التفعيل. الأرقام هي مشاهدات صفحات وتشمل إعادة التحميل؛ لا تمثل عدد أشخاص فريدين وقد تشمل زيارات آلية. لا تُسجّل صفحات الدخول والإدارة، ونحترم إعداد رفض التتبع. لا تحفظ هذه الإحصاءات عناوين IP أو هوية الزائر.</p>
+</section>
 <section class="panel heading-row"><div><p class="eyebrow">التسجيلات الجديدة</p><h2>غير المقروءة: <span id="unreadCount">—</span></h2><p class="muted">تظهر التسجيلات في دفعات من 50. استخدم «عرض تسجيلات أقدم» لمراجعة البقية، أو حدّث الإشعارات للعودة إلى أحدث التسجيلات.</p></div><div class="actions"><button id="refreshNotifications" type="button">تحديث الإشعارات</button><button id="markAllSeen" class="secondary" type="button" disabled>تعليم المعروضة كمقروءة</button></div></section>
 <p class="note">تبدأ الإشعارات من وقت تفعيل هذه الميزة؛ الحسابات القديمة لا تُنسخ تلقائيًا.</p>
 <div id="notificationList" class="notifications" aria-live="polite"></div>
