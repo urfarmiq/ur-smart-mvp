@@ -1,4 +1,5 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
+import { createClient } from './supabase-client.mjs';
+import { withDeadline } from './request-deadline.mjs';
 
 const supabase = createClient(
 'https://ynsmhtsktbubxfhsekjq.supabase.co',
@@ -57,7 +58,7 @@ document.getElementById('logout').addEventListener('click', async () => {
  finally{password.value='';setBusy(false);}
 });
 
-supabase.auth.getSession().then(({data,error}) => {
+withDeadline(supabase.auth.getSession()).then(({data,error}) => {
  if(busy)return;
  if (error) say('تعذر التحقق من جلسة الحساب. أعد المحاولة.');
  else if (data?.session) openDashboard();

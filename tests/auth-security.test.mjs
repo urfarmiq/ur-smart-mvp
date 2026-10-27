@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 
 const html=await readFile(new URL('../auth.html',import.meta.url),'utf8');
-assert.match(html,/<script type="module" src="\.\/auth\.mjs"><\/script>/);
+assert.match(html,/<script type="module" src="\.\/auth\.mjs\?v=20261027-local-sdk"><\/script>/);
 assert.match(html,/Content-Security-Policy/);
 assert.match(html,/script-src-attr 'none'/);
 const script=(await readFile(new URL('../auth.mjs',import.meta.url),'utf8')).replace(/^import[^\n]*\n/gm,'');
@@ -23,7 +23,7 @@ async function page(overrides={}){
   ...overrides,
  };
  const forbidden=()=>{throw Error('authentication must not write credentials to a custom store or log');};
- const context={createClient:()=>({auth}),document:{getElementById:id=>elements[id],querySelectorAll:()=>buttons},window:{location:{assign:path=>redirects.push(path)}},console:{log:forbidden,warn:forbidden,error:forbidden},localStorage:{setItem:forbidden},sessionStorage:{setItem:forbidden}};
+ const context={createClient:()=>({auth}),withDeadline:promise=>Promise.resolve(promise),document:{getElementById:id=>elements[id],querySelectorAll:()=>buttons},window:{location:{assign:path=>redirects.push(path)}},console:{log:forbidden,warn:forbidden,error:forbidden},localStorage:{setItem:forbidden},sessionStorage:{setItem:forbidden}};
  await vm.runInNewContext(script,context);
  return {elements,buttons,calls,redirects,submit:()=>elements.loginForm.listeners.submit({preventDefault(){}}),signup:()=>elements.signup.listeners.click(),logout:()=>elements.logout.listeners.click()};
 }

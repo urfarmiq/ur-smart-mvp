@@ -36,6 +36,7 @@ a{color:#176b45}
 <p id="welcome">جارٍ التحقق من تسجيل الدخول...</p>
 <p id="fieldSummary" aria-live="polite"></p><div id="status" role="status">جارٍ الاتصال...</div>
 <button id="logout">تسجيل الخروج</button>
+<div id="connectionRecovery" hidden><p>يمكنك إعادة المحاولة دون مسح بياناتك، أو فتح صفحة الحساب.</p><button id="retryConnection" type="button">إعادة المحاولة</button><a href="./auth.html">الانتقال إلى تسجيل الدخول</a></div>
 <p><a id="adminLink" href="./admin.html" hidden>🔐 لوحة الإدارة وإشعارات التسجيل</a></p>
 </section>
 
@@ -65,7 +66,7 @@ a{color:#176b45}
 </select>
 <label for="location">الموقع أو الإحداثيات</label>
 <input id="location" maxlength="180" placeholder="المحافظة أو إحداثيات الحقل">
-<button id="saveButton" type="submit">حفظ الحقل في السحابة</button>
+<button id="saveButton" type="submit" disabled>حفظ الحقل في السحابة</button>
 <button id="cancelEdit" type="button">إلغاء التعديل</button>
 </form>
 
@@ -81,9 +82,14 @@ a{color:#176b45}
 </section>
 </main>
 
+<script src="./dashboard-boot.js"></script>
 <script type="module">
-import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
+import {createClient} from './supabase-client.mjs';
 import {createDashboardWeather} from './dashboard-weather.mjs';
+import {withDeadline} from './request-deadline.mjs';
+
+if(window.urDashboardBoot.start()){
+try{
 
 const supabase=createClient(
 'https://ynsmhtsktbubxfhsekjq.supabase.co',
@@ -185,11 +191,15 @@ async function loadCloudFields(){
   return;
  }
  cloudFields.textContent='جارٍ تحميل الحقول...';
- const {data,error}=await supabase
+ let response;
+ try{response=await withDeadline(supabase
   .from('fields')
   .select('id,name,crop,area_donum,soil,irrigation,location,created_at')
   .eq('farm_id',farmId)
-  .order('created_at',{ascending:false});
+  .order('created_at',{ascending:false}));}
+ catch{window.urDashboardBoot.fail('تأخر تحميل الحقول. أعد المحاولة؛ بياناتك المحفوظة لم تتغير.');return false;}
+ if(!window.urDashboardBoot.isActive())return false;
+ const {data,error}=response;
  if(error){
   cloudFields.textContent='تعذر تحميل الحقول.';
   showError('خطأ في تحميل الحقول: ',error);
@@ -226,24 +236,27 @@ async function loadCloudFields(){
 }
 
 async function ensureFarm(){
- const {data:farms,error}=await supabase
-  .from('farms').select('id,name').eq('owner_id',session.user.id).limit(1);
+ const {data:farms,error}=await withDeadline(supabase
+  .from('farms').select('id,name').eq('owner_id',session.user.id).limit(1));
+ if(!window.urDashboardBoot.isActive())throw Error('توقفت محاولة الاتصال.');
  if(error) throw error;
  if(farms&&farms.length) return farms[0];
- const {data:created,error:createError}=await supabase
+ const {data:created,error:createError}=await withDeadline(supabase
   .from('farms')
   .insert({name:'مزرعتي',owner_id:session.user.id})
-  .select('id,name').single();
+  .select('id,name').single());
+ if(!window.urDashboardBoot.isActive())throw Error('توقفت محاولة الاتصال.');
  if(createError) throw createError;
  return created;
 }
 
 async function initialize(){
  saveButton.disabled=true;
- const {data,error}=await supabase.auth.getSession();
+ const {data,error}=await withDeadline(supabase.auth.getSession());
+ if(!window.urDashboardBoot.isActive())return;
  if(error){
   showError('خطأ في التحقق من تسجيل الدخول: ',error);
-  $('welcome').textContent='تعذر التحقق من الحساب.';
+  window.urDashboardBoot.fail('تعذر التحقق من الحساب. أعد المحاولة دون إنشاء حساب جديد.');
   return;
  }
  session=data.session;
@@ -252,22 +265,24 @@ async function initialize(){
   $('welcome').textContent='لم يتم تسجيل الدخول.';
   $('logout').textContent='الذهاب إلى تسجيل الدخول';
   cloudFields.textContent='سجّل الدخول لعرض حقولك.';
+  window.urDashboardBoot.finish();
   return;
  }
  $('welcome').textContent='مرحبًا بك في منصة أور الزراعية.';
  if(typeof supabase.rpc==='function'){
-  void supabase.rpc('admin_access').then(({data,error})=>{if(!error&&data===true)$('adminLink').hidden=false;}).catch(()=>{});
+  void supabase.rpc('admin_access').then(({data,error})=>{if(window.urDashboardBoot.isActive()&&!error&&data===true)$('adminLink').hidden=false;}).catch(()=>{});
  }
  status.textContent='تم تسجيل الدخول: '+(session.user.email||'المزارع');
  try{
   const farm=await ensureFarm();
+  if(!window.urDashboardBoot.isActive())return;
   farmId=farm.id;
   status.textContent='تم الاتصال بنجاح. المزرعة: '+farm.name;
   saveButton.disabled=false;
   await loadCloudFields();
+  window.urDashboardBoot.finish();
  }catch(err){
-  showError('تعذر تحميل أو إنشاء المزرعة: ',err);
-  cloudFields.textContent='تعذر تحديد مزرعتك. تأكد من تشغيل أوامر SQL الخاصة بالصلاحيات.';
+  window.urDashboardBoot.fail('تعذر تحميل المزرعة الآن. أعد المحاولة؛ لا تحتاج إلى إنشاء حساب جديد.');
  }
 }
 
@@ -327,7 +342,9 @@ $('logout').addEventListener('click',async()=>{
 });
 
 renderLocalFields();
-try{await initialize();}catch(error){showError('تعذر تشغيل اللوحة: ',error);}
+await initialize();
+}catch{window.urDashboardBoot.fail('تعذر استكمال الاتصال بالحساب. تحقق من الإنترنت ثم أعد المحاولة دون مسح بياناتك.');}
+}
 </script>
 <nav style="max-width:700px;margin:0 auto 24px;padding:16px;background:#e8f3e9;border-radius:12px"><a href="./field-map.html" style="font-weight:bold">🗺️ فتح خريطة الحقول ورسم الحدود وحساب المساحة بالدونم العراقي ←</a><p><a href="./satellite-analysis.html" style="font-weight:bold">🛰️ مركز التحليل الفضائي وحساب NDVI وNDMI من بيانات طيفية ←</a></p></nav>
 <footer aria-label="خصوصية الإحصاءات" style="max-width:1100px;margin:20px auto;padding:0 16px;text-align:center;color:#61766a"><small>نحصي مشاهدات الصفحات إجمالياً دون حفظ بيانات تعريف الزائر. هذه المشاهدات ليست عدد الأشخاص.</small></footer>

@@ -36,10 +36,13 @@ export {createClient};
 
 def route_request(route):
     url = urlparse(route.request.url)
+    if url.path.endswith('/supabase-client.mjs'):
+        route.fulfill(body=MOCK, content_type='text/javascript')
+        return
     if url.hostname == 'ur-smart.test':
         path = ROOT / url.path.lstrip('/')
         if path.is_file():
-            content_type = {'.mjs':'text/javascript', '.css':'text/css'}.get(path.suffix, 'text/html')
+            content_type = {'.mjs':'text/javascript', '.js':'text/javascript', '.css':'text/css'}.get(path.suffix, 'text/html')
             route.fulfill(body=path.read_bytes(), content_type=content_type)
             return
     if '@supabase/supabase-js' in url.path:

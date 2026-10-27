@@ -11,10 +11,12 @@ signUp:async()=>{window.fixtureCalls.push('signup');return {data:{session:null},
 signOut:async()=>({error:null})}};}"""
 def route_request(route):
     url=urlparse(route.request.url)
+    if url.path.endswith('/supabase-client.mjs'):
+        route.fulfill(body=SDK,content_type='text/javascript');return
     if url.hostname=='auth.test':
         path=ROOT/url.path.lstrip('/')
         if path.is_file():
-            route.fulfill(body=path.read_bytes(),content_type='text/javascript' if path.suffix=='.mjs' else 'text/html');return
+            route.fulfill(body=path.read_bytes(),content_type='text/javascript' if path.suffix in ('.mjs','.js') else 'text/html');return
     if '@supabase/supabase-js' in url.path:
         route.fulfill(body=SDK,content_type='text/javascript');return
     route.abort()
