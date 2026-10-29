@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#176b45">
+  <meta name="referrer" content="no-referrer">
+  <title>نقل السجلات المحلية | أور الزراعية</title>
+  <link rel="stylesheet" href="./local-data.css">
+</head>
+<body>
+  <header>
+    <a class="brand" href="./index.html">🌱 UR Smart <span>أور الزراعية</span></a>
+    <nav aria-label="التنقل"><a href="./dashboard.html">لوحة المزارع</a><a href="./auth.html">تسجيل الدخول</a></nav>
+  </header>
+  <main>
+    <p class="eyebrow">بياناتك عند الانتقال إلى العنوان الجديد</p>
+    <h1>انقل سجلات هذا المتصفح</h1>
+    <p class="intro">حقولك المحفوظة في السحابة مرتبطة بحسابك وتبقى موجودة. سجّل الدخول في الموقع الجديد باستخدام <strong>حسابك الحالي نفسه</strong>؛ لا تحتاج إلى إنشاء حساب آخر.</p>
+    <p class="notice">العمليات الزراعية المحفوظة محليًا، ومسودة حدود الحقل، وسجل تحليل الأقمار المحلي لا تنتقل تلقائيًا بين عنوانَي الموقع. صدّرها من الموقع القديم، ثم اختر ملف النسخة هنا لاستعادتها على الموقع الجديد.</p>
+    <ol class="steps">
+      <li>افتح الموقع القديم من المتصفح والجهاز اللذين استخدمتهما سابقًا ونزّل النسخة المحلية.</li>
+      <li>افتح <a href="https://ur-smart-urfarmiq.pages.dev/local-data.html">صفحة الاستعادة في الموقع الجديد</a>، ثم اختر الملف وراجع عدد السجلات.</li>
+      <li>استعد السجلات غير الموجودة، ثم <a href="./auth.html">سجّل الدخول بحسابك الحالي</a> لعرض بيانات حسابك.</li>
+    </ol>
+    <p class="privacy">يُعالج الملف داخل متصفحك فقط. لا تُنقل كلمات المرور أو جلسة الدخول، ولا يُرفع الملف إلى خدمة خارجية. احتفظ بالنسخة في مكان خاص لأنها قد تحتوي أسماء الحقول وملاحظاتك.</p>
+    <div class="grid">
+      <section class="card" aria-labelledby="export-heading">
+        <span class="step-label">١ · من المتصفح القديم</span>
+        <h2 id="export-heading">تنزيل نسخة محلية</h2>
+        <p>يضم الملف سجلات التطبيق المحلية الموجودة على عنوان هذه الصفحة فقط. تبقى البيانات القديمة كما هي بعد التنزيل.</p>
+        <button id="export" type="button">تنزيل النسخة المحلية JSON</button>
+        <p class="hint">إذا لم تجد سجلات هنا، افتح الموقع القديم من الجهاز والمتصفح الأصليين. لا تُضمَّن بيانات الحساب السحابية في هذا الملف.</p>
+      </section>
+      <section class="card" aria-labelledby="import-heading">
+        <span class="step-label">٢ · في الموقع الجديد</span>
+        <h2 id="import-heading">مراجعة نسخة واستعادتها</h2>
+        <label for="backup-file">اختر ملف النسخة المحلية JSON</label>
+        <input id="backup-file" type="file" accept=".json,application/json" aria-describedby="file-help">
+        <p id="file-help" class="hint">الحد الأقصى 4 ميبيبايت و500 سجل. اختيار الملف للمراجعة لا يحفظ شيئًا.</p>
+        <div id="review" class="review" hidden>
+          <p id="review-summary"></p>
+          <div id="legacy-notice" class="legacy" hidden>
+            <p>تحتوي النسخة حقولًا قديمة غير مرتبطة بحساب. قد تظهر هذه الحقول في قسم الحقول القديمة كما كانت تظهر في الموقع القديم، بما فيها حقول أي شخص استخدم المتصفح نفسه.</p>
+            <label class="consent"><input id="legacy-consent" type="checkbox"><span>أوافق على استعادة الحقول القديمة غير المرتبطة بحساب من هذا الملف.</span></label>
+          </div>
+          <p class="hint">لن تُستبدل السجلات الموجودة هنا. تبقى سجلات الحسابات المحلية مرتبطة بأصحابها، وتُعرض وفق فحص الحساب الحالي في التطبيق.</p>
+          <button id="restore" type="button" disabled>استعادة السجلات غير الموجودة</button>
+        </div>
+      </section>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">اختر تنزيل نسخة أو ملفًا للمراجعة. لن يتغير التخزين حتى تضغط زر الاستعادة.</p>
+    <a class="continue" href="./dashboard.html">متابعة إلى لوحة المزارع ←</a>
+    <noscript><p class="notice">فعّل JavaScript محليًا لتنزيل النسخة أو مراجعتها. لم تتغير أي بيانات.</p></noscript>
+  </main>
+  <footer>أور الزراعية · نقل السجلات المحلية بين عنوانَي الموقع</footer>
+  <script type="module" src="./local-data-ui.mjs"></script>
+</body>
+</html>

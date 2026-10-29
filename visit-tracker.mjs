@@ -1,6 +1,5 @@
 // Aggregate page views only. Never attach account, URL query, or visitor identifiers.
-const ORIGIN='https://urfarmiq.github.io';
-const BASE='/ur-smart-mvp/';
+const HOSTS=new Map([['https://urfarmiq.github.io','/ur-smart-mvp/'],['https://ur-smart-urfarmiq.pages.dev','/']]);
 const ENDPOINT='https://ynsmhtsktbubxfhsekjq.supabase.co/rest/v1/rpc/record_site_visit';
 const PUBLIC_KEY='sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc';
 const PAGES=new Map([
@@ -14,8 +13,9 @@ export function pageForVisit(address,privacy={}){
  if(String(privacy.doNotTrack)==='1'||privacy.globalPrivacyControl===true)return null;
  try{
   const url=new URL(address);
-  if(url.origin!==ORIGIN||!url.pathname.startsWith(BASE)||url.username||url.password)return null;
-  return PAGES.get(url.pathname.slice(BASE.length))||null;
+  const base=HOSTS.get(url.origin);
+  if(!base||!url.pathname.startsWith(base)||url.username||url.password)return null;
+  return PAGES.get(url.pathname.slice(base.length))||null;
  }catch{return null;}
 }
 

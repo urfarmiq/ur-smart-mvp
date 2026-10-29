@@ -51,11 +51,12 @@ def fixture_forecast(latitude):
     days = [(local.date() + timedelta(days=i)).isoformat() for i in range(7)]
     temp = 32 if latitude > 33.5 else 28
     return {
+        'source': {'name':'MET Norway','url':'https://www.met.no/','license':'CC BY 4.0','license_url':'https://creativecommons.org/licenses/by/4.0/'},
         'timezone': 'Asia/Baghdad', 'utc_offset_seconds': 10800,
         'current_units': {'temperature_2m':'°C','relative_humidity_2m':'%','precipitation':'mm','wind_speed_10m':'km/h'},
-        'current': {'time':local.isoformat(timespec='minutes'),'interval':900,'temperature_2m':temp,'apparent_temperature':temp+1,'relative_humidity_2m':None,'precipitation':0,'weather_code':2,'wind_speed_10m':12,'wind_gusts_10m':18,'wind_direction_10m':270,'is_day':1},
-        'hourly': {'time':times,'temperature_2m':[temp+i/10 for i in range(24)],'relative_humidity_2m':[50]*24,'precipitation':[None]+[0]*23,'precipitation_probability':[None]+[15]*23,'wind_speed_10m':[12]*24,'wind_gusts_10m':[18]*24,'weather_code':[2]*24},
-        'daily': {'time':days,'weather_code':[2]*7,'temperature_2m_max':[35]*7,'temperature_2m_min':[19]*7,'precipitation_sum':[0,2,3,0,0,1,0],'precipitation_probability_max':[10,30,40,0,0,20,0],'wind_speed_10m_max':[18]*7,'wind_gusts_10m_max':[25]*7,'et0_fao_evapotranspiration':[None]+[4.2]*6,'sunrise':[day+'T06:00' for day in days],'sunset':[day+'T17:30' for day in days]}
+        'current': {'time':local.isoformat(timespec='minutes'),'interval':3600,'temperature_2m':temp,'apparent_temperature':None,'relative_humidity_2m':None,'precipitation':0,'weather_code':2,'wind_speed_10m':12,'wind_gusts_10m':18,'wind_direction_10m':270,'is_day':1},
+        'hourly': {'time':times,'temperature_2m':[temp+i/10 for i in range(24)],'relative_humidity_2m':[50]*24,'precipitation':[None]+[0]*23,'precipitation_probability':[None]*24,'wind_speed_10m':[12]*24,'wind_gusts_10m':[18]*24,'weather_code':[2]*24},
+        'daily': {'time':days,'weather_code':[2]*7,'temperature_2m_max':[35]*7,'temperature_2m_min':[19]*7,'precipitation_sum':[0,2,3,0,0,1,0],'precipitation_probability_max':[None]*7,'wind_speed_10m_max':[18]*7,'wind_gusts_10m_max':[25]*7,'et0_fao_evapotranspiration':[None]*7,'sunrise':[None]*7,'sunset':[None]*7}
     }
 
 
@@ -72,13 +73,13 @@ def route_request(route):
     if '@supabase/supabase-js' in url.path:
         route.fulfill(body=MOCK, content_type='text/javascript')
         return
-    if url.hostname == 'api.open-meteo.com':
+    if url.hostname == 'ur-smart-satellite.alialbatekh111.workers.dev' and url.path == '/weather':
         query = parse_qs(url.query)
         STATE['requests'].append({'query':query,'headers':route.request.headers})
         if STATE['mode'] == 'quota':
             route.fulfill(status=429, json={'error':True,'reason':'fixture quota'})
         else:
-            route.fulfill(json=fixture_forecast(float(query['latitude'][0])))
+            route.fulfill(json=fixture_forecast(float(query['lat'][0])))
         return
     route.abort()
 
@@ -103,15 +104,16 @@ with sync_playwright() as p:
         assert page.locator('#weatherHourly .hour-card').count() == 24
         assert page.locator('#weatherDaily .day-card').count() == 7
         assert page.locator('#weatherCurrent .metric').filter(has_text='الرطوبة النسبية').locator('strong').inner_text() == '—'
-        assert page.locator('#weatherDaily .day-card').first.locator('dl > div').filter(has_text='التبخر المرجعي').locator('dd').inner_text() == '—'
+        assert page.locator('#weatherDaily .day-card').first.locator('dl > div').filter(has_text='التبخر المرجعي').locator('dd').inner_text() == 'غير متاح'
         assert 'فترة' in page.locator('#weatherCurrent').inner_text()
         assert 'هطول اليوم المتوقع' in page.locator('#weatherCurrent').inner_text()
         assert 'تقديرات نماذج الطقس' in page.locator('#weatherResult').inner_text()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
         request = STATE['requests'][-1]
-        assert request['query']['timezone'] == ['Asia/Baghdad']
-        assert request['query']['forecast_hours'] == ['24'] and request['query']['forecast_days'] == ['7']
-        assert 'authorization' not in request['headers'] and 'apikey' not in request['headers']
+        assert set(request['query']) == {'lat', 'lon'}
+        assert 'MET Norway' in page.locator('footer.source').inner_text()
+        assert 'CC BY 4.0' in page.locator('footer.source').inner_text()
+        assert 'authorization' not in request['headers'] and 'apikey' not in request['headers'] and 'cookie' not in request['headers']
         assert not any('key' in key.lower() for key in request['query'])
         assert page.evaluate("window.__fixture.calls.every(call=>call.action==='select')")
         page.screenshot(path='/tmp/ur-weather-'+('mobile' if mobile else 'desktop')+'.png', full_page=True)
@@ -154,7 +156,7 @@ with sync_playwright() as p:
         wait_text(page, '#weatherStatus', 'طقس المدينة المرجعية')
         assert page.locator('#weatherLocation').inner_text() == 'البصرة'
         assert 'مدينة مرجعية' in page.locator('#weatherLocationKind').inner_text()
-        assert STATE['requests'][-1]['query']['latitude'] == ['30.5085']
+        assert STATE['requests'][-1]['query']['lat'] == ['30.5085']
 
         page.goto('https://ur-smart.test/dashboard.html')
         page.wait_for_function("document.querySelector('#dashboardWeatherField').options.length===3")

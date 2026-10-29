@@ -177,6 +177,7 @@ body{background:white}main{width:100%;margin:0}
 <script type="module">
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
+import {buildWeatherUrl,WEATHER_SOURCE,WEATHER_SOURCE_URL,WEATHER_SOURCE_LICENSE,WEATHER_SOURCE_LICENSE_URL,WEATHER_TIMEZONE} from './weather-core.mjs';
 (async()=>{
 try{
 const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
@@ -422,23 +423,23 @@ async function loadFieldWeather(fieldId,token=contextLoadToken){
  const [lon,lat]=await getFieldCenter(fieldId);
  if(!contextIsCurrent(fieldId,token))return null;
  if(!Number.isFinite(lon)||!Number.isFinite(lat)||Math.abs(lat)>90||Math.abs(lon)>180)throw Error('إحداثيات حدود الحقل غير صالحة للطقس.');
- const url=new URL('https://api.open-meteo.com/v1/forecast');
- url.search=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max',past_days:'7',forecast_days:'7',timezone:'auto'}).toString();
- const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
+ const url=buildWeatherUrl({latitude:lat,longitude:lon});
+ const response=await fetch(url,{method:'GET',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(20000)});
  const data=await response.json().catch(()=>({}));
  if(!contextIsCurrent(fieldId,token))return null;
  if(!response.ok||data.error)throw Error(data.reason||'تعذر جلب توقعات الطقس ('+response.status+').');
  if(!data.daily?.time?.length)throw Error('وصل رد الطقس دون توقعات يومية.');
- const timezone=data.timezone||'Asia/Baghdad';
+ const timezone=data.timezone||WEATHER_TIMEZONE;
+ if(timezone!==WEATHER_TIMEZONE||data.utc_offset_seconds!==10800)throw Error('منطقة استجابة الطقس لا تطابق توقيت بغداد.');
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- const weather={...summarizeWeather(data,today),fieldId,updatedAt:new Date().toISOString(),source:'Open-Meteo',timezone};
+ const weather={...summarizeWeather(data,today),fieldId,updatedAt:new Date().toISOString(),source:WEATHER_SOURCE,source_url:WEATHER_SOURCE_URL,source_license:WEATHER_SOURCE_LICENSE,source_license_url:WEATHER_SOURCE_LICENSE_URL,modeled:true,timezone};
  fieldContext.weather=weather;fieldContext.updatedAt=weather.updatedAt;
  const box=$('weatherContext');box.replaceChildren();
  const p=document.createElement('p');p.textContent='مطر آخر 7 أيام: '+mmText(weather.pastRain)+' ملم — ET₀ المرجعي: '+mmText(weather.pastEt0)+' ملم.';
  const q=document.createElement('p');q.textContent='توقع 3 أيام (من اليوم): مطر '+mmText(weather.forecastRain)+' ملم — ET₀ مرجعي '+mmText(weather.forecastEt0)+' ملم'+(weather.maxForecastTemp===null?'':(' — أعلى حرارة متاحة '+weather.maxForecastTemp.toFixed(1)+'°م'))+'. لا تُجمع فترة ناقصة على أنها مكتملة.';
  const list=document.createElement('ul');list.className='weather-days';
  weather.daily.forEach(row=>{if(row.date<today)return;const li=document.createElement('li'),dateLabel=new Intl.DateTimeFormat('ar-IQ',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'}).format(new Date(row.date+'T12:00:00Z'));li.textContent=dateLabel+': مطر '+mmText(row.precipitation_mm)+' ملم، ET₀ '+mmText(row.et0_mm)+' ملم'+(row.tmax_c===null?'':'، عظمى '+row.tmax_c.toFixed(1)+'°م');list.append(li)});
- const n=document.createElement('p');n.className='muted';n.textContent='المصدر Open‑Meteo؛ توقع نموذجي قرب مركز الحقل ('+timezone+'). تُعرض الأيام السبعة منفصلة، لكن حساب التوصية يستخدم الأيام الثلاثة الأولى فقط.';
+ const n=document.createElement('p');n.className='muted';const sourceLink=document.createElement('a'),licenseLink=document.createElement('a');sourceLink.href=WEATHER_SOURCE_URL;sourceLink.textContent=WEATHER_SOURCE;licenseLink.href=WEATHER_SOURCE_LICENSE_URL;licenseLink.textContent=WEATHER_SOURCE_LICENSE;for(const link of [sourceLink,licenseLink]){link.target='_blank';link.rel='noopener noreferrer';}n.append('المصدر: ',sourceLink,' — ',licenseLink,'؛ عُدّلت البيانات للعرض والتجميع بتوقيت بغداد. توقع نموذجي قرب مركز الحقل ('+timezone+'). العظمى من عينات التوقع المتاحة وليست أقصى حرارة مقاسة. لا يوفّر هذا المصدر طقس الأيام الماضية أو ET₀؛ تبقى القيم غير المتاحة فارغة ولا يُحسب منها الطلب التبخري. تُعرض الأيام السبعة منفصلة، لكن حساب التوصية يستخدم الأيام الثلاثة الأولى فقط.');
  box.append(p,q,list,n);return weather;
 }
 async function loadIrrigationLogs(fieldId,token=contextLoadToken){
@@ -535,7 +536,7 @@ $('getAdviceButton').addEventListener('click',async()=>{
   reasons.push('لم يُستخدم معامل Kc ثابت لهذا المحصول: احتياجه يتغير كثيرًا حسب عدد الحشات/عمر الأشجار والغطاء الأرضي وطريقة الإدارة؛ لذلك لا نحسب ETc رقميًا كي لا نعرض تقديرًا مضللًا.');
  }
  if(weather){
-  reasons.push('طقس قرب مركز الحقل (Open‑Meteo): ET₀ مرجعي آخر 7 أيام '+mmText(weather.pastEt0)+' ملم، ومطر '+mmText(weather.pastRain)+' ملم؛ المتوقع للأيام الثلاثة القادمة ET₀ '+mmText(weather.forecastEt0)+' ملم ومطر '+mmText(weather.forecastRain)+' ملم.');
+  reasons.push('توقع نموذجي قرب مركز الحقل (MET Norway، CC BY 4.0): ET₀ مرجعي آخر 7 أيام '+mmText(weather.pastEt0)+' ملم، ومطر '+mmText(weather.pastRain)+' ملم؛ المتوقع للأيام الثلاثة القادمة ET₀ '+mmText(weather.forecastEt0)+' ملم ومطر '+mmText(weather.forecastRain)+' ملم. لا يوفر المصدر الحالي بيانات تاريخية أو ET₀.');
   if(Number.isFinite(weather.forecastEt0)&&crops.length>1&&selectedProfiles.length){for(const item of selectedProfiles){const etc=item.profile.kc[stageIndex]*weather.forecastEt0;reasons.push('لـ'+item.profile.name+': ETc إرشادي خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (Kc × ET₀)، ولا يُجمع بين المحاصيل دون معرفة مساحة كل محصول.')}}
   else if(kc!==null&&Number.isFinite(weather.forecastEt0)){const etc=kc*weather.forecastEt0;reasons.push('الطلب التبخري المرجعي المتوقع للمحصول خلال 3 أيام ≈ '+etc.toFixed(1)+' ملم (ETc = Kc × ET₀). هذا تقدير استهلاك جوي وليس جرعة ري صافية أو كمية تضخ للمزرعة.')}
   if(Number.isFinite(weather.forecastRain)&&weather.forecastRain>=5)advice.push('هناك مطر متوقع بنحو '+mmText(weather.forecastRain)+' ملم خلال 3 أيام؛ أعد فحص التربة بعد المطر قبل تحديد موعد الري، لأن التوقع لا يضمن المطر الفعلي ولا يحدد المطر الفعال.');

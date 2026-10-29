@@ -18,6 +18,7 @@ import {attachPixelProbe} from './satellite-pixel-probe.mjs';
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
 import {readAccountCache,writeAccountCache} from './account-cache.mjs';
+import {buildWeatherUrl,WEATHER_SOURCE,WEATHER_SOURCE_URL,WEATHER_SOURCE_LICENSE,WEATHER_SOURCE_LICENSE_URL,WEATHER_TIMEZONE} from './weather-core.mjs';
 const $=id=>document.getElementById(id);
 const numberOrNaN=value=>value===null||value===undefined||typeof value==='boolean'||typeof value==='string'&&!value.trim()?NaN:Number(value);
 function sceneIndex(scene,name){const value=scene?.indices?.[name];return numberOrNaN(value===undefined?scene?.[name.toLowerCase()]:value);}
@@ -128,7 +129,7 @@ $('autoAnalyze').onclick=async()=>{
   const completePrior=prior.filter(x=>[weatherData.daily.precipitation_sum?.[x.i],weatherData.daily.et0_fao_evapotranspiration?.[x.i]].every(v=>Number.isFinite(numberOrNaN(v))&&numberOrNaN(v)>=0));
   const sum=(key,rows)=>rows.length?rows.map(x=>numberOrNaN(weatherData.daily[key]?.[x.i])).filter(Number.isFinite).reduce((a,b)=>a+b,0):NaN;
   const rain=sum("precipitation_sum",completePrior),eto=sum("et0_fao_evapotranspiration",completePrior),weatherCount=completePrior.length;
-  const currentDay=new Date().toISOString().slice(0,10),forecast=String(scene.date).slice(0,10)>=currentDay?weatherRows.map((day,i)=>({day,i})).filter(x=>x.day>=currentDay).slice(0,3):[];
+  const currentDay=new Date(Date.now()+3*3600000).toISOString().slice(0,10),forecast=String(scene.date).slice(0,10)>=currentDay?weatherRows.map((day,i)=>({day,i})).filter(x=>x.day>=currentDay).slice(0,3):[];
   const forecastComplete=forecast.length===3&&forecast.every(x=>Number.isFinite(numberOrNaN(weatherData.daily.precipitation_sum?.[x.i])));
   const forecastRain=forecastComplete?sum("precipitation_sum",forecast):NaN;
   const relevant=irrigationLogs.filter(x=>Date.parse(x.irrigated_at)<ref+86400000&&Date.parse(x.irrigated_at)<=Date.now()).sort((a,b)=>Date.parse(b.irrigated_at)-Date.parse(a.irrigated_at));
@@ -151,13 +152,13 @@ $('autoAnalyze').onclick=async()=>{
   }
   if(sceneAge>7)advice="هذا مشهد تاريخي أقدم من 7 أيام؛ لا يُصدر منه قرار ري لليوم. أعد قياس رطوبة الجذور وحدّث المشهد والطقس، ثم ناقش التقرير مع المساعد.";
   else if(!Number.isFinite(coverage)||coverage<25||!Number.isFinite(numberOrNaN(scene.valid_pixels))||numberOrNaN(scene.valid_pixels)<3)advice="جودة العينة غير كافية أو غير مكتملة؛ تحقق ميدانيًا من حالة الجذور ولا تعمم المتوسط الفضائي على الحقل.";
-  weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecastComplete?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: ";const weatherLink=document.createElement("a");weatherLink.href="https://open-meteo.com/";weatherLink.target="_blank";weatherLink.rel="noopener noreferrer";weatherLink.textContent="Open‑Meteo";weatherText.append(weatherLink," (تقديرات نموذجية).");
+  weatherText.textContent="طقس الأيام السبعة السابقة للمشهد: مطر "+(weatherCount?rain.toFixed(1)+" ملم":"غير متاح")+"؛ ET₀ "+(weatherCount?eto.toFixed(1)+" ملم":"غير متاح")+"؛ المتوقع خلال 3 أيام: "+(forecastComplete?forecastRain.toFixed(1)+" ملم":"غير متاح")+" — المصدر: ";const weatherLink=document.createElement("a"),licenseLink=document.createElement("a");weatherLink.href=WEATHER_SOURCE_URL;weatherLink.textContent=WEATHER_SOURCE;licenseLink.href=WEATHER_SOURCE_LICENSE_URL;licenseLink.textContent=WEATHER_SOURCE_LICENSE;for(const link of [weatherLink,licenseLink]){link.target="_blank";link.rel="noopener noreferrer";}weatherText.append(weatherLink," — ",licenseLink,"؛ عُدّلت البيانات للعرض والتجميع بتوقيت بغداد. توقعات نموذجية؛ العظمى والصغرى من عينات التوقع المتاحة. لا يوفّر المصدر طقس الأيام الماضية أو ET₀، ولا يُعرض مجموع مطر لفترة ناقصة.");
   recommendationText.textContent=advice;recommendationReason.replaceChildren();reasons.forEach(t=>{const li=document.createElement("li");li.textContent=t;recommendationReason.append(li)});
   confidence.textContent="مؤشر اكتمال وحداثة البيانات: "+score+"/100 — إرشادي، وليس تقديرًا لدقة التوصية أو صحة التشخيص.";
   const cropName=analyzedField.crop||"محصول غير محدد";currentRecommendation={crop:cropName,scene,advice,reasons,score,weather:{rain_mm_7d:weatherCount?rain:null,et0_mm_7d:weatherCount?eto:null,forecast_rain_mm_3d:forecastComplete?forecastRain:null},lastIrrigation:lastIrr};
  }
  async function loadWeather(){
-  try{const [lon,lat]=fieldCenter(data.geometry);const q=new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:"precipitation_sum,et0_fao_evapotranspiration,temperature_2m_mean,temperature_2m_max",timezone:"auto",past_days:"65",forecast_days:"3"});const r=await fetch("https://api.open-meteo.com/v1/forecast?"+q.toString(),{signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error("HTTP "+r.status);weatherData=await r.json();weatherFetchedAt=new Date().toISOString();(weatherData.daily?.time||[]).forEach((day,i)=>weatherByDate.set(day,{date:day,precipitation_mm:weatherData.daily.precipitation_sum?.[i]??null,et0_mm:weatherData.daily.et0_fao_evapotranspiration?.[i]??null,tmax_c:weatherData.daily.temperature_2m_max?.[i]??null,tmean_c:weatherData.daily.temperature_2m_mean?.[i]??null}));renderWeatherAdvice()}catch(e){weatherText.textContent="تعذر جلب الطقس المرتبط بموقع الحقل: "+e.message;weatherData=null;renderWeatherAdvice()}
+  try{const [lon,lat]=fieldCenter(data.geometry);const r=await fetch(buildWeatherUrl({latitude:lat,longitude:lon}),{method:'GET',cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(20000)});if(!analysisIsCurrent())return;if(!r.ok)throw Error("HTTP "+r.status);const payload=await r.json();if(!analysisIsCurrent())return;if(payload.error||payload.timezone!==WEATHER_TIMEZONE||payload.utc_offset_seconds!==10800||!payload.daily?.time?.length)throw Error('استجابة الطقس غير صالحة أو لا تطابق توقيت بغداد.');weatherData=payload;weatherFetchedAt=new Date().toISOString();weatherByDate.clear();(weatherData.daily?.time||[]).forEach((day,i)=>weatherByDate.set(day,{date:day,precipitation_mm:weatherData.daily.precipitation_sum?.[i]??null,et0_mm:weatherData.daily.et0_fao_evapotranspiration?.[i]??null,tmax_c:weatherData.daily.temperature_2m_max?.[i]??null,tmean_c:weatherData.daily.temperature_2m_mean?.[i]??null,source:WEATHER_SOURCE,source_license:WEATHER_SOURCE_LICENSE,modeled:true}));renderWeatherAdvice()}catch(e){if(!analysisIsCurrent())return;weatherText.textContent="تعذر جلب الطقس المرتبط بموقع الحقل: "+e.message;weatherData=null;weatherByDate.clear();renderWeatherAdvice()}
  }
  async function saveObservationHistory(){
   const rows=mapSeries.map(s=>({field_id:fieldId,owner_id:user.id,acquisition_date:String(s.date).slice(0,10),indices:s.indices||{NDVI:s.ndvi,NDMI:s.ndmi},valid_pixels:s.valid_pixels??null,geometry_pixels:s.geometry_pixels??null,coverage_percent:s.coverage_percent??null,source:data.source||"Sentinel-2 L2A",weather_context:weatherForDate(s.date)}));
@@ -239,7 +240,7 @@ $('autoAnalyze').onclick=async()=>{
  sceneSelect.onchange=()=>{geminiAdvisor.invalidateContext();renderWeatherAdvice();mapButton.click()};
  const handoff=createAdvisorHandoff({getContext:()=>{
   const selectedScene=mapSeries.find(x=>String(x.date)===String(sceneSelect.value))||data;
-  return {fieldId,field:analyzedField,satellite:{...selectedScene,source:data.source,resolution_m:data.resolution_m,series:mapSeries},weather:weatherData?{...weatherData,source:'Open-Meteo',fetched_at:weatherFetchedAt}:null,irrigationLogs};
+  return {fieldId,field:analyzedField,satellite:{...selectedScene,source:data.source,resolution_m:data.resolution_m,series:mapSeries},weather:weatherData?{...weatherData,source:WEATHER_SOURCE,source_url:WEATHER_SOURCE_URL,source_license:WEATHER_SOURCE_LICENSE,source_license_url:WEATHER_SOURCE_LICENSE_URL,modeled:true,fetched_at:weatherFetchedAt}:null,irrigationLogs};
  }});
  const geminiAdvisor=createGeminiAdvisor({getContext:()=>handoff.getAdvisorContext(),getSession:async()=>{const {data,error}=await client.auth.getSession();if(error)throw error;return data.session;},endpoint:SATELLITE_API_URL});
  handoff.append(geminiAdvisor);

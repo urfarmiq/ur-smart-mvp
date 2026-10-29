@@ -7,6 +7,7 @@ const root='https://urfarmiq.github.io/ur-smart-mvp/';
 test('only the seven production pages contribute aggregate page views',()=>{
  const pages={'':'home','index.html':'home','dashboard.html':'dashboard','field-map.html':'field-map','field-analysis.html':'field-analysis','satellite-analysis.html':'satellite-analysis','operations.html':'operations','weather.html':'weather'};
  for(const [file,page] of Object.entries(pages))assert.equal(pageForVisit(root+file),page);
+ for(const [file,page] of Object.entries(pages))assert.equal(pageForVisit('https://ur-smart-urfarmiq.pages.dev/'+file),page);
  for(const value of [
   root+'admin.html',root+'auth.html',root+'satellite-staging-test.html',root+'unknown.html',
   root+'weather.html/extra','http://urfarmiq.github.io/ur-smart-mvp/',

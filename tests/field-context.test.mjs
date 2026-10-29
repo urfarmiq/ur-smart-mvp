@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {buildWeatherUrl} from '../weather-core.mjs';
 const html=await readFile(new URL('../field-analysis.html',import.meta.url),'utf8');
 const functions=html.slice(html.indexOf('function finiteNumber('),html.indexOf('function setLocalDateTime('));
 const guard=html.slice(html.indexOf('function contextIsCurrent('),html.indexOf('function finiteNumber('));
@@ -22,11 +23,26 @@ test('incomplete weather retains null and counts valid observations; genuine zer
  data.daily.precipitation_sum.fill(0);data.daily.et0_fao_evapotranspiration.fill(0);summary=context.summarizeWeather(data,'2026-10-25');assert.equal(summary.forecastRain,0);assert.equal(summary.forecastEt0,0);
  assert.equal(context.finiteNumber(null),null);assert.equal(context.finiteNumber(false),null);assert.equal(context.finiteNumber('  '),null);assert.equal(context.finiteNumber('0'),0);
 });
+test('forecast-only MET Norway data cannot create past rainfall or unavailable ET0 totals',()=>{
+ const context=vm.createContext({});vm.runInContext(functions,context);
+ const data={daily:{time:['2026-10-25','2026-10-26','2026-10-27'],precipitation_sum:[null,0,2],et0_fao_evapotranspiration:[null,null,null],temperature_2m_max:[31,32,33]}};
+ const summary=context.summarizeWeather(data,'2026-10-25');
+ assert.equal(summary.pastRain,null);assert.equal(summary.pastEt0,null);assert.equal(summary.forecastRain,null);assert.equal(summary.forecastEt0,null);assert.equal(summary.completeness.forecastRainDays,2);assert.equal(summary.maxForecastTemp,33);
+});
 function contextHarness(extra={}){
  const context=vm.createContext({...extra});
  vm.runInContext("let selectedField='a',contextLoadToken=1,fieldContext={fieldId:'a',requestToken:1,logs:[],satellite:null};const $=()=>({value:selectedField});"+guard+"globalThis.switchField=(id)=>{selectedField=id;contextLoadToken++;fieldContext={fieldId:id,requestToken:contextLoadToken,logs:[],satellite:null};};globalThis.snapshot=()=>fieldContext;",context);
  return context;
 }
+test('field weather is anonymous and a late reply cannot update the newly selected field',async()=>{
+ let resolveFetch,request;const started=new Promise(resolve=>request=resolve);let issued;
+ const context=contextHarness({buildWeatherUrl,AbortSignal,getFieldCenter:async()=>[44,33],fetch:(url,options)=>{issued={url,options};request();return new Promise(resolve=>resolveFetch=resolve);}});
+ const loader=html.slice(html.indexOf('async function loadFieldWeather('),html.indexOf('async function loadIrrigationLogs('));vm.runInContext(loader,context);
+ const first=context.loadFieldWeather('a');await started;context.switchField('b');
+ resolveFetch({ok:true,json:async()=>({timezone:'Asia/Baghdad',utc_offset_seconds:10800,daily:{time:['2026-10-25']}})});
+ assert.equal(await first,null);assert.equal(context.snapshot().fieldId,'b');assert.equal(context.snapshot().weather,undefined);
+ assert.equal(issued.url,'https://ur-smart-satellite.alialbatekh111.workers.dev/weather?lat=33&lon=44');assert.equal(issued.options.credentials,'omit');assert.equal(issued.options.headers,undefined);assert.equal(issued.options.cache,'no-store');
+});
 test('out-of-order irrigation results cannot change another selected field',async()=>{
  const waiting=[];let renders=0;
  const supabase={from(){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>new Promise(resolve=>waiting.push(resolve))};return q;}};

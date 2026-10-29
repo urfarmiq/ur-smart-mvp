@@ -4,6 +4,7 @@ import {validateCoordinates,fieldWeatherLocation,buildWeatherUrl,weatherCode,nor
 
 const NOW='2026-10-27T05:25:00Z'; // 08:25 Baghdad, independent of machine timezone.
 function fixture(){return {
+ source:{name:'MET Norway',url:'https://www.met.no/',license:'CC BY 4.0',license_url:'https://creativecommons.org/licenses/by/4.0/'},
  timezone:'Asia/Baghdad',utc_offset_seconds:10800,
  current:{time:'2026-10-27T08:15',interval:900,temperature_2m:0,apparent_temperature:null,relative_humidity_2m:80,precipitation:0,weather_code:0,wind_speed_10m:0,wind_direction_10m:0,wind_gusts_10m:5,is_day:1},
  current_units:{temperature_2m:'°C',relative_humidity_2m:'%',precipitation:'mm',wind_speed_10m:'km/h'},
@@ -20,13 +21,11 @@ test('weather locations require finite real coordinates and a closed polygon, wi
  for(const bad of [null,{},'{invalid',{type:'Point',coordinates:[44,33]},{type:'Polygon',coordinates:[[[44,33],[null,33],[44,34],[44,33]]]},{type:'Polygon',coordinates:[[[44,33],[44,33],[44,33],[44,33]]]},{type:'Polygon',coordinates:[[[44,33],[45,33],[45,34],[44,34]]]}])assert.throws(()=>fieldWeatherLocation(bad));
 });
 
-test('forecast request uses the free fixed endpoint, explicit units, timezone and requested horizons',()=>{
+test('forecast request uses the anonymous fixed MET Norway adapter with coordinates only',()=>{
  const url=new URL(buildWeatherUrl({latitude:33.3,longitude:44.4}));
- assert.equal(url.origin,'https://api.open-meteo.com');assert.equal(url.pathname,'/v1/forecast');
- assert.equal(url.searchParams.get('timezone'),'Asia/Baghdad');assert.equal(url.searchParams.get('forecast_hours'),'24');assert.equal(url.searchParams.get('forecast_days'),'7');
- assert.equal(url.searchParams.get('temperature_unit'),'celsius');assert.equal(url.searchParams.get('wind_speed_unit'),'kmh');assert.equal(url.searchParams.get('precipitation_unit'),'mm');
- assert.match(url.searchParams.get('current'),/wind_gusts_10m/);assert.match(url.searchParams.get('daily'),/et0_fao_evapotranspiration/);
- assert.equal(url.searchParams.has('apikey'),false);assert.throws(()=>buildWeatherUrl({latitude:null,longitude:44}));
+ assert.equal(url.origin,'https://ur-smart-satellite.alialbatekh111.workers.dev');assert.equal(url.pathname,'/weather');
+ assert.deepEqual([...url.searchParams.entries()],[['lat','33.3'],['lon','44.4']]);
+ assert.throws(()=>buildWeatherUrl({latitude:null,longitude:44}));
 });
 
 test('Arabic WMO descriptions preserve valid clear code zero and unknown missing codes',()=>{
@@ -43,8 +42,20 @@ test('normalization keeps zero, missing arrays, invalid probabilities and timest
  assert.equal(result.hourly[1].temperature_c,null);assert.equal(result.hourly[1].humidity_percent,null);assert.equal(result.hourly[1].rain_probability_percent,null);
  assert.deepEqual(result.daily.map(x=>x.date),['2026-10-27','2026-10-28']);
  assert.equal(result.daily[0].et0_mm,0);assert.equal(result.daily[1].et0_mm,null);assert.equal(result.daily[0].sunrise,'2026-10-27T06:10');assert.equal(result.daily[1].sunrise,null);
- assert.equal(result.source,'Open-Meteo');assert.equal(result.timezone,'Asia/Baghdad');assert.equal(result.fetched_at,new Date(NOW).toISOString());assert.equal(result.modeled,true);
+ assert.equal(result.source,'MET Norway');assert.equal(result.source_url,'https://www.met.no/');assert.equal(result.source_license,'CC BY 4.0');assert.equal(result.source_license_url,'https://creativecommons.org/licenses/by/4.0/');assert.equal(result.timezone,'Asia/Baghdad');assert.equal(result.fetched_at,new Date(NOW).toISOString());assert.equal(result.modeled,true);
  assert.match(result.note,/ليست قياس محطة/);
+});
+
+test('MET Norway missing measurements stay null and coarse model intervals remain usable',()=>{
+ const data=fixture();
+ data.current.interval=21600;data.current.time='2026-10-27T03:00';data.current.precipitation=null;
+ data.hourly.precipitation_probability.fill(null);
+ for(const key of ['et0_fao_evapotranspiration','precipitation_probability_max','sunrise','sunset'])data.daily[key]=data.daily.time.map(()=>null);
+ const result=normalizeWeather(data,{now:NOW});
+ assert.equal(result.current.interval_minutes,360);assert.equal(result.current.stale,false);assert.equal(result.current.precipitation_mm,null);
+ assert.ok(result.hourly.every(row=>row.rain_probability_percent===null));
+ assert.ok(result.daily.every(row=>row.et0_mm===null&&row.rain_probability_percent===null&&row.sunrise===null&&row.sunset===null));
+ data.current.time='2026-10-26T23:00';assert.equal(normalizeWeather(data,{now:NOW}).current.stale,true);
 });
 
 test('Baghdad day and observation age use response offset across UTC midnight, not host timezone',()=>{
@@ -79,7 +90,7 @@ test('wrong units, service errors and unusable timestamps are rejected instead o
 test('fetch makes one anonymous no-store request and timestamps only a successful fresh result',async()=>{
  const calls=[];
  const weather=await fetchWeather({latitude:33,longitude:44,now:NOW,fetchImpl:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>fixture()};}});
- assert.equal(calls.length,1);assert.equal(calls[0].options.cache,'no-store');assert.equal(calls[0].options.method,'GET');assert.equal(calls[0].options.headers,undefined);assert.equal(weather.fetched_at,new Date(NOW).toISOString());
+ assert.equal(calls.length,1);assert.equal(calls[0].options.cache,'no-store');assert.equal(calls[0].options.method,'GET');assert.equal(calls[0].options.headers,undefined);assert.equal(calls[0].options.credentials,'omit');assert.equal(new URL(calls[0].url).hostname,'ur-smart-satellite.alialbatekh111.workers.dev');assert.equal(weather.fetched_at,new Date(NOW).toISOString());
  await assert.rejects(fetchWeather({latitude:33,longitude:44,fetchImpl:async()=>({ok:false,status:429})}),/حد الطلبات/);
  await assert.rejects(fetchWeather({latitude:33,longitude:44,fetchImpl:async()=>({ok:false,status:503})}),/HTTP 503/);
  await assert.rejects(fetchWeather({latitude:33,longitude:44,fetchImpl:async()=>({ok:true,json:async()=>{throw new SyntaxError('external response')}})}),/استجابة/);

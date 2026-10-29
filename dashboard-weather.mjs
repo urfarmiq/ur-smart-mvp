@@ -13,7 +13,8 @@ export function createDashboardWeather({client}){
  const status=node('p','سجّل الدخول واختر حقلًا لعرض طقسه.');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const output=node('div');output.className='weather-summary-grid';output.hidden=true;output.dataset.weatherSummary='';
  const link=node('a','عرض التوقعات بالساعات ولسبعة أيام ←');link.href='./weather.html';
- section.append(heading,hint,label,select,refresh,status,output,link);
+ const source=node('p','المصدر: '),sourceLink=node('a','MET Norway'),licenseLink=node('a','CC BY 4.0');source.className='hint';sourceLink.href='https://www.met.no/';licenseLink.href='https://creativecommons.org/licenses/by/4.0/';for(const a of [sourceLink,licenseLink]){a.target='_blank';a.rel='noopener noreferrer';}source.append(sourceLink,' — ',licenseLink,'؛ عُدّلت للعرض بتوقيت بغداد.');
+ section.append(heading,hint,label,select,refresh,status,output,link,source);
  let fields=[],generation=0,controller=null;
  function clear(){generation++;controller?.abort();controller=null;output.replaceChildren();output.hidden=true;refresh.disabled=!select.value;}
  function setFields(rows){
@@ -37,10 +38,10 @@ export function createDashboardWeather({client}){
    const location=fieldWeatherLocation(data.geometry),weather=await fetchWeather({...location,signal:activeController.signal});
    if(!isCurrent())return;
    const today=new Date(Date.now()+3*3600000).toISOString().slice(0,10),current=weather.current,day=weather.daily.find(row=>row.date===today);
-   const cards=[['الحرارة الآن',metric(current?.temperature_c,'°م')],['حالة الجو',weatherCode(current?.weather_code).label],['الرطوبة النسبية',metric(current?.humidity_percent,'%')],['الرياح',metric(current?.wind_kmh,'كم/س')],['مطر اليوم المتوقع',metric(day?.precipitation_mm,'ملم')],['احتمال المطر اليوم',metric(day?.rain_probability_percent,'%')]];
+   const cards=[['الحرارة المتوقعة الآن',metric(current?.temperature_c,'°م')],['حالة الجو المتوقعة',weatherCode(current?.weather_code).label],['الرطوبة النسبية',metric(current?.humidity_percent,'%')],['الرياح',metric(current?.wind_kmh,'كم/س')],['مطر اليوم المتوقع',metric(day?.precipitation_mm,'ملم')],['احتمال المطر اليوم',metric(day?.rain_probability_percent,'%')]];
    for(const [title,value] of cards){const card=node('div'),small=node('span',title),strong=node('strong',value);card.append(small,strong);output.append(card);}
    output.hidden=false;
-   status.textContent='قرب مركز حدود '+(field.name||'الحقل')+' — تحديث '+clock(weather.fetched_at)+' بتوقيت بغداد. المصدر: Open‑Meteo.'+(current?.stale?' بيانات الحالة الحالية قديمة؛ راجع وقتها في صفحة الطقس.':'');
+   status.textContent='قرب مركز حدود '+(field.name||'الحقل')+' — تحديث '+clock(weather.fetched_at)+' بتوقيت بغداد. المصدر: MET Norway؛ توقع نموذجي.'+(current?.stale?' بيانات التوقع الحالي قديمة؛ راجع وقتها في صفحة الطقس.':'');
    link.href='./weather.html?field='+encodeURIComponent(field.id);
   }catch(error){if(!isCurrent())return;status.textContent=error?.message||'تعذر تحميل الطقس الآن. أعد المحاولة.';}
   finally{if(isCurrent())refresh.disabled=false;}

@@ -1,6 +1,8 @@
-// Open-Meteo model forecasts. No API key, paid fallback or automatic database writes.
-export const WEATHER_SOURCE='Open-Meteo';
-export const WEATHER_SOURCE_URL='https://open-meteo.com/';
+// MET Norway model forecasts through the public weather adapter. No account credentials.
+export const WEATHER_SOURCE='MET Norway';
+export const WEATHER_SOURCE_URL='https://www.met.no/';
+export const WEATHER_SOURCE_LICENSE='CC BY 4.0';
+export const WEATHER_SOURCE_LICENSE_URL='https://creativecommons.org/licenses/by/4.0/';
 export const WEATHER_TIMEZONE='Asia/Baghdad';
 const HOUR=3600000,DAY=24*HOUR;
 const finite=value=>typeof value==='number'&&Number.isFinite(value)?value:typeof value==='string'&&value.trim()&&Number.isFinite(Number(value))?Number(value):null;
@@ -32,12 +34,9 @@ export function fieldWeatherLocation(value){
 }
 
 export function buildWeatherUrl({latitude,longitude}){
- const coordinates=validateCoordinates(latitude,longitude),url=new URL('https://api.open-meteo.com/v1/forecast');
- url.search=new URLSearchParams({latitude:String(coordinates.latitude),longitude:String(coordinates.longitude),
-  current:'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
-  hourly:'temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m',
-  daily:'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,et0_fao_evapotranspiration,sunrise,sunset',
-  timezone:WEATHER_TIMEZONE,temperature_unit:'celsius',wind_speed_unit:'kmh',precipitation_unit:'mm',timeformat:'iso8601',forecast_hours:'24',forecast_days:'7'}).toString();
+ const coordinates=validateCoordinates(latitude,longitude),url=new URL('https://ur-smart-satellite.alialbatekh111.workers.dev/weather');
+ // The adapter fixes the units, Baghdad timezone and 24-hour / seven-day horizons.
+ url.search=new URLSearchParams({lat:String(coordinates.latitude),lon:String(coordinates.longitude)}).toString();
  return url.toString();
 }
 
@@ -94,7 +93,7 @@ export function normalizeWeather(data,{fetchedAt,now=new Date()}={}){
  const raw=data.current,instant=timeInstant(raw?.time,offset);
  if(instant!==null){
   const age=(nowMs-instant)/60000,interval=bounded(raw.interval,1,86400);
-  current={time:raw.time,temperature_c:bounded(raw.temperature_2m,-100,70),feels_like_c:bounded(raw.apparent_temperature,-150,100),humidity_percent:bounded(raw.relative_humidity_2m,0,100),precipitation_mm:bounded(raw.precipitation,0),wind_kmh:bounded(raw.wind_speed_10m,0),wind_gusts_kmh:bounded(raw.wind_gusts_10m,0),wind_direction_deg:bounded(raw.wind_direction_10m,0,360),weather_code:integer(raw.weather_code),is_day:[0,1].includes(integer(raw.is_day))?integer(raw.is_day):null,interval_seconds:interval,interval_minutes:interval===null?null:interval/60,age_minutes:Math.max(0,Math.round(age)),stale:age>90||age< -15};
+  current={time:raw.time,temperature_c:bounded(raw.temperature_2m,-100,70),feels_like_c:bounded(raw.apparent_temperature,-150,100),humidity_percent:bounded(raw.relative_humidity_2m,0,100),precipitation_mm:bounded(raw.precipitation,0),wind_kmh:bounded(raw.wind_speed_10m,0),wind_gusts_kmh:bounded(raw.wind_gusts_10m,0),wind_direction_deg:bounded(raw.wind_direction_10m,0,360),weather_code:integer(raw.weather_code),is_day:[0,1].includes(integer(raw.is_day))?integer(raw.is_day):null,interval_seconds:interval,interval_minutes:interval===null?null:interval/60,age_minutes:Math.max(0,Math.round(age)),stale:age>(interval===null?90:interval/60+90)||age< -15};
   if(['temperature_c','humidity_percent','precipitation_mm','wind_kmh','weather_code'].every(key=>current[key]===null))current=null;
  }
  const arrayValue=(group,key,i)=>Array.isArray(group?.[key])?group[key][i]:undefined;
@@ -117,7 +116,7 @@ export function normalizeWeather(data,{fetchedAt,now=new Date()}={}){
  const usableHourly=hourly.some(row=>hasValues(row,['temperature_c','humidity_percent','precipitation_mm','rain_probability_percent','wind_kmh','wind_gusts_kmh']));
  const usableDaily=daily.some(row=>hasValues(row,['tmax_c','tmin_c','precipitation_mm','rain_probability_percent','wind_max_kmh','wind_gusts_max_kmh','et0_mm']));
  if(!usableCurrent&&!usableHourly&&!usableDaily)throw Error('لم تتوفر بيانات طقس مؤرخة لهذا الموقع الآن.');
- return {source:WEATHER_SOURCE,source_url:WEATHER_SOURCE_URL,timezone,utc_offset_seconds:offset,fetched_at:fetched.toISOString(),modeled:true,note:'تقديرات نموذجية قرب الموقع من Open-Meteo، وليست قياس محطة داخل الحقل. قد تتغير التوقعات؛ راجع القياسات والنشرة الرسمية قبل القرار.',current,hourly,daily,alerts:alertsFor(current,daily)};
+ return {source:WEATHER_SOURCE,source_url:WEATHER_SOURCE_URL,source_license:WEATHER_SOURCE_LICENSE,source_license_url:WEATHER_SOURCE_LICENSE_URL,timezone,utc_offset_seconds:offset,fetched_at:fetched.toISOString(),modeled:true,note:'تقديرات نموذجية قرب الموقع من MET Norway بترخيص CC BY 4.0، وليست قياس محطة داخل الحقل. العظمى والصغرى من عينات التوقع المتاحة؛ تبقى فترات المطر غير المكتملة والبيانات غير المتاحة فارغة. راجع القياسات والنشرة الرسمية قبل القرار.',current,hourly,daily,alerts:alertsFor(current,daily)};
 }
 
 export async function fetchWeather({latitude,longitude,signal,fetchImpl=globalThis.fetch,timeoutMs=15000,now}={}){
@@ -129,7 +128,7 @@ export async function fetchWeather({latitude,longitude,signal,fetchImpl=globalTh
  signal?.addEventListener('abort',cancel,{once:true});
  const timer=setTimeout(()=>{timedOut=true;controller.abort()},Math.max(1,Math.min(60000,Number(timeoutMs)||15000)));
  try{
-  const response=await fetchImpl(url,{method:'GET',cache:'no-store',signal:controller.signal});
+  const response=await fetchImpl(url,{method:'GET',cache:'no-store',credentials:'omit',signal:controller.signal});
   if(!response.ok)throw Error(response.status===429?'بلغت خدمة الطقس حد الطلبات. أعد المحاولة لاحقًا.':'تعذر جلب الطقس الآن (HTTP '+response.status+').');
   const payload=await response.json();if(controller.signal.aborted){const error=Error();error.name='AbortError';throw error;}
   const stamp=now??new Date();return normalizeWeather(payload,{now:stamp,fetchedAt:stamp});

@@ -37,6 +37,8 @@ def route_request(route):
     if '@supabase/supabase-js' in u.path:
         route.fulfill(body=mock+('export {createClient};' if u.path.endswith('/+esm') else 'window.supabase={createClient};'),content_type='text/javascript');return
     if u.hostname and u.hostname.endswith('workers.dev'):
+        if u.path=='/weather':
+            route.fulfill(status=503,json={'error':'fixture weather unavailable'});return
         if u.path=='/advice/status':
             route.fulfill(json={'available':ADVICE_MODE['value']!='setup','model':'gemini-3.5-flash-lite'});return
         payload=route.request.post_data_json or {}
@@ -51,8 +53,6 @@ def route_request(route):
                 DEFER_NEXT_IMAGE['value']=False;DEFER_NEXT_IMAGE['pending'].append((route,image_response));return
             route.fulfill(json=image_response);return
         route.fulfill(json={**stats,'field_id':payload.get('field_id',FIELD)});return
-    if u.hostname=='api.open-meteo.com':
-        route.fulfill(status=503,json={'error':'fixture weather unavailable'});return
     route.abort()
 
 def probe_point(page,map_selector,mobile,fx=.5,fy=.5,outside=False):

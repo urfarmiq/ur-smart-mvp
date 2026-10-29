@@ -1,4 +1,4 @@
-name: Deploy UR Smart Satellite Worker
+name: Deploy UR Smart Platform
 
 on:
   workflow_dispatch:
@@ -8,20 +8,29 @@ on:
     paths:
       - "satellite-backend/**"
       - "advisor-handoff.mjs"
+      - "*.html"
+      - "*.css"
+      - "*.mjs"
+      - "*.js"
+      - "vendor/**"
+      - "scripts/**"
       - ".github/workflows/deploy-satellite-worker.yml"
 
 permissions:
   contents: read
+  actions: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: deploy-satellite-worker
+  group: deploy-ur-smart-platform
   cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Deploy production Worker
+    name: Deploy backend and commercial-capable free static hosting
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -46,4 +55,49 @@ jobs:
           workingDirectory: satellite-backend
           wranglerVersion: "4"
           command: deploy worker.js --name ur-smart-satellite --compatibility-date 2026-10-22 --keep-vars
+
+      - name: Ensure the free static Pages project
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ensure-pages-project.mjs
+
+      - name: Build public static files only
+        run: node scripts/build-public-site.mjs
+
+      - name: Deploy static frontend to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: dist-pages
+          wranglerVersion: "4"
+          command: pages deploy . --project-name ur-smart-urfarmiq --branch main
+
+      - name: Verify the new hostname and backend origin
+        run: node scripts/verify-platform.mjs
+
+  redirect:
+    name: Keep the old GitHub link as a redirect
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Wait for the legacy branch deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/wait-legacy-pages.mjs
+      - name: Build redirect-only site
+        run: node scripts/build-pages-redirect.mjs
+      - name: Upload redirect artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-redirect
+      - name: Publish the redirect
+        id: deployment
+        uses: actions/deploy-pages@v4
 
