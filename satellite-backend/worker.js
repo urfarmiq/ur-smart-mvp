@@ -106,13 +106,16 @@ function evaluatePixel(s){
  return [Math.round(tone(s.B04)),Math.round(tone(s.B03)),Math.round(tone(s.B02)),255];
 }`;
    }
-   const body={input:{bounds:{geometry,properties:{crs:"http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
+   const body={input:{bounds:{geometry,properties:{crs:"http://www.opengis.net/def/crs/OGC/1.3/CRS84"}},data:[{type:"sentinel-2-l2a",dataFilter:{timeRange:{from,to},mosaickingOrder:"leastCC",maxCloudCoverage:100},processing:{upsampling:"NEAREST",downsampling:"NEAREST"}}]},output:{width,height,responses:[{identifier:"default",format:{type:"image/png"}}]},evalscript:script};
    const imageRes=await satelliteFetch(SH+"/process/v1",{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)},60000);
    if(!imageRes.ok)return reply({error:mapIndex?"Indicator raster unavailable":"Satellite image unavailable"},502,allowed);
    const bytes=new Uint8Array(await imageRes.arrayBuffer());let binary="";
    for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
    const mapBounds=[[bounds.minLat,bounds.minLon],[bounds.maxLat,bounds.maxLon]];
-   return reply({field_id,date:mapDate,index:mapIndex||null,image:"data:image/png;base64,"+btoa(binary),bounds:mapBounds,resolution_m:resolution,source:mapIndex?"Sentinel-2 L2A per-pixel "+mapIndex+" raster via Copernicus Data Space":"Sentinel-2 L2A true color via Copernicus Data Space"},200,allowed);
+   // The PNG is north-up in CRS84; approximate cell sizes follow its geographic
+   // axes, not the rotated UTM polygon used to choose the bounded request grid.
+   const metresPerDegree=6371008.8*Math.PI/180,geographicWidth=(bounds.maxLon-bounds.minLon)*metresPerDegree*Math.cos((bounds.minLat+bounds.maxLat)/2*Math.PI/180),geographicHeight=(bounds.maxLat-bounds.minLat)*metresPerDegree;
+   return reply({field_id,date:mapDate,index:mapIndex||null,image:"data:image/png;base64,"+btoa(binary),bounds:mapBounds,width,height,resolution_m:resolution,native_resolution_m:resolution,resolution_x_m:Math.round(geographicWidth/width*100)/100,resolution_y_m:Math.round(geographicHeight/height*100)/100,pixel_size_is_approximate:true,display_range:mapIndex?indexRanges[mapIndex]:null,encoding:mapIndex?'uint8-grayscale-clamped':'rgb',resampling:'NEAREST',source:mapIndex?"Sentinel-2 L2A per-pixel "+mapIndex+" raster via Copernicus Data Space":"Sentinel-2 L2A true color via Copernicus Data Space"},200,allowed);
  }
  const ring=geometry.coordinates[0];const center=ring.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,ring.length-1));const zone=Math.floor((center[0]+180)/6)+1;const epsg=(center[1]<0?32700:32600)+zone;const projected={type:'Polygon',coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,zone)))};const indexNames=["NDVI","NDMI","SAVI","OSAVI","MSAVI2","EVI","GNDVI","NDRE","MNDWI","NBR","MSI","CIgreen","NDRE2","NDRE3","CIrededge","NIRv"];
  const parseItems=result=>(result.data||[]).map(x=>{const bands=x.outputs?.indices?.bands||{};const indices=Object.fromEntries(indexNames.map((n,i)=>[n,bands["B"+i]?.stats?.mean]));const n=bands.B0?.stats;return {date:x.interval?.from,indices,ndvi:indices.NDVI,ndmi:indices.NDMI,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));

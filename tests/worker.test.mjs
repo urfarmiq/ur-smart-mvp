@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {deflateSync} from 'node:zlib';
 const source=await readFile(new URL('../satellite-backend/worker.js',import.meta.url),'utf8');
 const worker=(await import('../satellite-backend/worker.js')).default;
 test('worker rejects unauthorized origin and missing configuration',async()=>{
@@ -172,4 +173,35 @@ test('research internal map routing rejects another owner boundary without satel
   assert.ok(!calls.some(call=>call.url.includes('/openid-connect/token')||call.url.endsWith('/statistics/v1')));
   const finished=JSON.parse(calls.find(call=>call.url.endsWith('/rpc/finish_research_order')).options.body);assert.equal(finished.p_status,'needs_review');assert.equal(finished.p_result.maps,null);
  },{foreignBoundary:true});
+});
+
+// A real RGBA PNG with the requested dimensions keeps the upstream fixture
+// consistent with the grid metadata, including for thin fields capped at1024px.
+function imageryPng(width,height){
+ const crc=data=>{let value=0xffffffff;for(const byte of data){value^=byte;for(let bit=0;bit<8;bit++)value=(value>>>1)^((value&1)?0xedb88320:0);}return (value^0xffffffff)>>>0;};
+ const chunk=(name,data)=>{const type=Buffer.from(name),length=Buffer.alloc(4),checksum=Buffer.alloc(4);length.writeUInt32BE(data.length);checksum.writeUInt32BE(crc(Buffer.concat([type,data])));return Buffer.concat([length,type,data,checksum]);};
+ const header=Buffer.alloc(13);header.writeUInt32BE(width,0);header.writeUInt32BE(height,4);header[8]=8;header[9]=6;
+ const rows=Buffer.alloc(height*(width*4+1));for(let y=0;y<height;y++)for(let x=0;x<width;x++){const offset=y*(width*4+1)+1+x*4;rows[offset]=rows[offset+1]=rows[offset+2]=153;rows[offset+3]=255;}
+ return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(rows)),chunk('IEND',Buffer.alloc(0))]);
+}
+
+test('imagery preserves native bounded grids and reports actual display encoding and coarser capped sampling',async()=>{
+ const longField={type:'Polygon',coordinates:[[[44,33],[44.5,33],[44.5,33.0002],[44,33.0002],[44,33]]]};
+ for(const [geometry,coarse] of [[validGeometry,false],[longField,true]]){
+  let process;
+  const {response}=await fixture({field_id:validId,action:'imagery',map_date:new Date().toISOString().slice(0,10),map_index:'NDVI'},{geometry,upstream:async(url,options)=>{
+   if(!url.endsWith('/process/v1'))return null;process=JSON.parse(options.body);return new Response(imageryPng(process.output.width,process.output.height),{headers:{'content-type':'image/png'}});
+  }});
+  assert.equal(response.status,200);const result=await response.json();
+  assert.equal(result.width,process.output.width);assert.equal(result.height,process.output.height);
+  assert.ok(result.width>0&&result.width<=1024&&result.height>0&&result.height<=1024);
+  assert.equal(result.native_resolution_m,10);assert.deepEqual(result.display_range,[-.2,.8]);assert.equal(result.encoding,'uint8-grayscale-clamped');assert.equal(result.resampling,'NEAREST');assert.equal(result.pixel_size_is_approximate,true);
+  assert.deepEqual(process.input.data[0].processing,{upsampling:'NEAREST',downsampling:'NEAREST'});
+  const png=Buffer.from(result.image.split(',')[1],'base64');assert.equal(png.readUInt32BE(16),result.width);assert.equal(png.readUInt32BE(20),result.height);
+  assert.ok(result.resolution_x_m>0&&result.resolution_y_m>0);
+  if(coarse){assert.equal(result.width,1024);assert.ok(result.resolution_x_m>40);}else{assert.ok(result.width<20&&result.height<20);assert.ok(result.resolution_x_m<=10.5);}
+  const context=vm.createContext({});vm.runInContext(process.evalscript,context);
+  assert.deepEqual(Array.from(context.evaluatePixel({B08:.7,B04:.3,dataMask:1,SCL:4})),[153,153,153,255]);
+  assert.deepEqual(Array.from(context.evaluatePixel({B08:.7,B04:.3,dataMask:1,SCL:9})),[0,0,0,0]);
+ }
 });

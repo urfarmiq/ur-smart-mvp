@@ -1,8 +1,10 @@
 import {createClient} from './supabase-client.mjs';
 import {withDeadline} from './request-deadline.mjs';
 import {parseResearchCsv,analyzeResearchData} from './research-statistics.mjs';
+import {createResearchImageViewer} from './research-image-viewer.mjs';
 
 const $=id=>document.getElementById(id);
+const imageViewer=createResearchImageViewer($('mapFigure'));
 const node=(tag,text,className)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(className)e.className=className;return e;};
 const API='https://ur-smart-satellite.alialbatekh111.workers.dev';
 const ORDER_FIELDS='id,owner_id,topic,task_type,fee_iqd,status,payment_reference,admin_note,approved_at,created_at,updated_at,attempt_count,started_at,result,result_status';
@@ -32,7 +34,7 @@ function sync(){
  $('fetchMapImage').disabled=loadingImage||!imageContext||!ownerId;
  $('downloadCsv').disabled=!report?.analysis&&!report?.maps; $('downloadJson').disabled=!report;
 }
-function clearReport(){report=null;reportOrderId=null;chartSvg=null;imageData=null;imageContext=null;$('reportContent').replaceChildren();$('reportPanel').hidden=true;$('mapImagePanel').hidden=true;$('mapFigure').hidden=true;$('mapImage').removeAttribute('src');$('mapCaption').textContent='';$('mapImageNote').textContent='';$('mapImageStatus').textContent='';$('downloadChart').hidden=true;$('downloadImage').hidden=true;}
+function clearReport(){imageViewer.clear();report=null;reportOrderId=null;chartSvg=null;imageData=null;imageContext=null;$('reportContent').replaceChildren();$('reportPanel').hidden=true;$('mapImagePanel').hidden=true;$('mapFigure').hidden=true;$('mapImage').removeAttribute('src');$('mapCaption').textContent='';$('mapImageNote').textContent='';$('mapImageStatus').textContent='';$('downloadChart').hidden=true;$('downloadImage').hidden=true;}
 function clearCsv(){fileVersion++;csvText='';parsedCsv=null;readingFile=false;$('csvFile').value='';for(const id of ['valueColumn','groupColumn','predictorColumn'])$(id).replaceChildren(new Option('اختر ملفاً أولاً',''));$('fileStatus').textContent='لم يُحدد ملف.';$('localPreview').replaceChildren();$('localPreview').hidden=true;}
 function resetPrivate(message){
  generation++;for(const c of controllers)c.abort();controllers.clear();ownerId=null;orders=[];selectedId=null;creating=false;loadingOrders=false;loadingFields=false;running=false;checking=false;loadingImage=false;clearCsv();clearReport();
@@ -125,7 +127,19 @@ function createChart(stats,localData=null){
  if(stats.method==='regression'||!bars.length)return null;bars=bars.slice(0,30);const low=Math.min(0,...bars.map(b=>b.value)),high=Math.max(0,...bars.map(b=>b.value)),span=high-low||1,sy=v=>280-(v-low)/span*235,zero=sy(0),step=610/bars.length;svg.append(svgNode('path',{d:'M65 35V285H680',class:'axis'}),svgNode('line',{x1:65,y1:zero,x2:680,y2:zero,class:'axis'}));bars.forEach((b,i)=>{const x=65+i*step+step*.15,y=sy(b.value);const rect=svgNode('rect',{x,y:Math.min(y,zero),width:step*.7,height:Math.max(1,Math.abs(zero-y)),class:'bar'});rect.append(svgNode('title',{},b.name+': '+b.value));svg.append(rect,svgNode('text',{x:x+step*.35,y:Math.max(20,y-8),'text-anchor':'middle'},number(b.value)),svgNode('text',{x:x+step*.35,y:315,'text-anchor':'middle'},b.name.slice(0,18)));});return svg;
 }
 function boundarySvg(geometry){if(geometry?.type!=='Polygon'||!Array.isArray(geometry.coordinates))return null;const rings=geometry.coordinates.filter(r=>Array.isArray(r)&&r.length>=4&&r.every(p=>Array.isArray(p)&&p.length>=2&&p.slice(0,2).every(Number.isFinite)));if(!rings.length)return null;const pts=rings.flat(),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),spanX=maxX-minX||1,spanY=maxY-minY||1,scale=Math.min(360/spanX,240/spanY);const path=rings.map(r=>r.map((p,i)=>(i?'L':'M')+(30+(p[0]-minX)*scale).toFixed(2)+' '+(270-(p[1]-minY)*scale).toFixed(2)).join(' ')+'Z').join(' '),svg=svgNode('svg',{viewBox:'0 0 420 300',class:'boundary',role:'img','aria-label':'حدود حقل الدراسة المحفوظة'});svg.append(svgNode('title',{},'حدود الحقل المحفوظة'),svgNode('path',{d:path}));return svg;}
-async function fetchMapImage(){if(!imageContext||loadingImage||!ownerId)return;const token=generation,context={...imageContext};loadingImage=true;sync();$('mapImageStatus').textContent='جارٍ جلب الصورة الفعلية للمشهد…';try{const session=await sessionFor(token);if(!session)return;const data=await api('',{body:{action:'imagery',field_id:context.fieldId,map_date:context.date,map_index:'NDVI'},accessToken:session.access_token,timeout:100000,token});if(token!==generation||reportOrderId!==context.orderId||!data)return;if(typeof data.image!=='string'||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(data.image)||data.image.length>12*1024*1024)throw Error('لم تصل صورة PNG صالحة.');imageData=data.image;$('mapImage').src=imageData;$('mapCaption').textContent=(data.source||'Sentinel-2 L2A')+' · '+context.date+' · '+(data.resolution_m?number(data.resolution_m)+' متر':'الدقة غير متاحة');$('mapFigure').hidden=false;$('downloadImage').hidden=false;$('mapImageStatus').textContent='الصورة مبنية على بكسلات المشهد الفعلية؛ قد تظهر مساحات شفافة عند غياب قياسات صالحة.';}catch(e){if(token===generation)$('mapImageStatus').textContent='تعذر تحميل الصورة: '+(e.message||'أعد المحاولة.');}finally{if(token===generation){loadingImage=false;sync();}}}
+async function fetchMapImage(){
+ if(!imageContext||loadingImage||!ownerId)return;const token=generation,context={...imageContext};loadingImage=true;imageData=null;imageViewer.clear();$('downloadImage').hidden=true;sync();$('mapImageStatus').textContent='جارٍ جلب الصورة الفعلية وتجهيز عرضها…';
+ const isCurrent=()=>token===generation&&reportOrderId===context.orderId&&ownerId;
+ try{
+  const session=await sessionFor(token);if(!session)return;
+  const data=await api('',{body:{action:'imagery',field_id:context.fieldId,map_date:context.date,map_index:'NDVI'},accessToken:session.access_token,timeout:100000,token});
+  if(!isCurrent()||!data)return;
+  if(data.field_id!==context.fieldId||String(data.date||'').slice(0,10)!==context.date||data.index!=='NDVI')throw Error('بيانات صورة المؤشر لا تطابق الحقل والمشهد المطلوبين.');
+  if(typeof data.image!=='string'||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(data.image)||data.image.length>12*1024*1024)throw Error('لم تصل صورة PNG صالحة.');
+  const displayed=await imageViewer.show(data,{isCurrent});if(!isCurrent()||!displayed)return;imageData=displayed;$('downloadImage').hidden=false;$('mapImageStatus').textContent='جاهزة: ألوان NDVI محسوبة من بكسلات المشهد الفعلية. استخدم العرض الأكبر والتكبير، أو المس نقطة لقراءة قيمتها التقريبية.';
+ }catch(e){if(isCurrent()){$('mapImageStatus').textContent='تعذر تحميل الصورة: '+(e.message||'أعد المحاولة.');imageData=null;imageViewer.clear();$('downloadImage').hidden=true;}}
+ finally{if(token===generation){loadingImage=false;sync();}}
+}
 function download(blob,name){const url=URL.createObjectURL(blob),a=node('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function safeCell(value){const raw=value===null||value===undefined?'':typeof value==='number'&&Number.isFinite(value)?String(value):String(value);const safe=typeof value==='string'&&/^[\s\uFEFF]*[=+\-@]/u.test(raw)?"'"+raw:raw;return '"'+safe.replaceAll('"','""')+'"';}
 function flatten(value,path='',rows=[]){if(value===null||typeof value!=='object'){rows.push([path,value]);return rows;}if(Array.isArray(value)){value.forEach((v,i)=>flatten(v,path+'['+i+']',rows));return rows;}for(const [key,v] of Object.entries(value))if(key!=='geometry')flatten(v,path?path+'.'+key:key,rows);return rows;}

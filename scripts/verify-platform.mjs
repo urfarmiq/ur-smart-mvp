@@ -9,7 +9,7 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
   await wait(4000);
  }
  if(!published)throw Error('The new Pages hostname has not served the expected deployment. The GitHub redirect must stay unpublished.');
- for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs']){
+ for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs']){
   const response=await fetchImpl(origin+'/'+file,{signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error('A required public page is unavailable: '+file);
  }

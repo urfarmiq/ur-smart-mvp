@@ -23,7 +23,7 @@ function createClient(){return {
  from(table){let columns='',filters=[];const q={};q.select=value=>{columns=value;return q;};q.eq=(key,value)=>{filters.push([key,value]);return q;};q.order=q.limit=()=>q;q.then=(ok,fail)=>Promise.resolve().then(()=>{s.calls.push({table,columns,filters});if(!s.signedIn)throw Error('Read before account auth');if(table==='research_orders')return {data:s.orders.map(row=>({...row})),error:null};if(table==='fields')return {data:[{id:field,name:'حقل الباحث',farms:{owner_id:s.owner}},{id:'foreign-field',name:'FOREIGN_PRIVATE_FIELD',farms:{owner_id:'foreign'}}],error:null};throw Error('Unexpected table');}).then(ok,fail);return q;}
 };}
 const originalFetch=window.fetch.bind(window);
-window.fetch=async(resource,options={})=>{const url=new URL(typeof resource==='string'?resource:resource.url);if(url.hostname!=='ur-smart-satellite.alialbatekh111.workers.dev')return originalFetch(resource,options);const body=options.body?JSON.parse(options.body):null;s.calls.push({api:url.pathname,body,headers:options.headers});if(url.pathname==='/research/status')return new Response(JSON.stringify({available:true,free_tier_confirmed:true}),{status:200});if(url.pathname==='/research'){if(options.headers.Authorization!=='Bearer synthetic-private-token')throw Error('Missing authenticated request');const row=s.orders.find(row=>row.id===body.order_id);if(!row||!row.approved_at||row.status!=='approved')return new Response(JSON.stringify({message:'Payment not approved'}),{status:403});if(!body.consent)throw Error('Missing consent');if(s.holdExecution)await new Promise(resolve=>s.releaseExecution=resolve);row.status='completed';row.result=s.report;row.attempt_count++;return new Response(JSON.stringify({order_id:row.id,status:'completed',result:s.report}),{status:200});}if(url.pathname==='/'){if(body.action!=='imagery'||body.field_id!==field||body.map_date!=='2026-10-20'||body.map_index!=='NDVI')throw Error('Wrong imagery request');return new Response(JSON.stringify({image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZQmcAAAAASUVORK5CYII=',source:'Sentinel-2 L2A',resolution_m:10}),{status:200});}throw Error('Unexpected API route');};
+window.fetch=async(resource,options={})=>{const url=new URL(typeof resource==='string'?resource:resource.url);if(url.hostname!=='ur-smart-satellite.alialbatekh111.workers.dev')return originalFetch(resource,options);const body=options.body?JSON.parse(options.body):null;s.calls.push({api:url.pathname,body,headers:options.headers});if(url.pathname==='/research/status')return new Response(JSON.stringify({available:true,free_tier_confirmed:true}),{status:200});if(url.pathname==='/research'){if(options.headers.Authorization!=='Bearer synthetic-private-token')throw Error('Missing authenticated request');const row=s.orders.find(row=>row.id===body.order_id);if(!row||!row.approved_at||row.status!=='approved')return new Response(JSON.stringify({message:'Payment not approved'}),{status:403});if(!body.consent)throw Error('Missing consent');if(s.holdExecution)await new Promise(resolve=>s.releaseExecution=resolve);row.status='completed';row.result=s.report;row.attempt_count++;return new Response(JSON.stringify({order_id:row.id,status:'completed',result:s.report}),{status:200});}if(url.pathname==='/'){if(body.action!=='imagery'||body.field_id!==field||body.map_date!=='2026-10-20'||body.map_index!=='NDVI')throw Error('Wrong imagery request');return new Response(JSON.stringify({image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAYCAYAAACbU/80AAAAf0lEQVR4nO3WQQqAMAwEwP4pr80H843opSBWbZdEsqCHvXaHQps0EWlIVHUaM1sOVM4C8EleAXjPAsD3g3vCAD8HBEwhUHkAcIuAyoOASwRUngAYEHSAx/IkgP+AbMDwO37uBlIB5c+QAlD+FVMMI4pxTLGQ0KxkR0D5UpoK2ADYLpS0+L8fNAAAAABJRU5ErkJggg==',source:'Sentinel-2 L2A',resolution_m:10,field_id:field,index:'NDVI',date:'2026-10-20',width:32,height:24}),{status:200});}throw Error('Unexpected API route');};
 export {createClient};
 '''
 
@@ -66,97 +66,102 @@ def prepare(page):
     page.locator('#researchConsent').check()
 
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
-    STATE['mode'] = 'anon'
-    context = browser.new_context()
-    context.route('**/*', route_request)
-    page = context.new_page()
-    page.goto('https://ur-smart.test/research-lab.html')
-    wait_text(page, '#accountStatus', 'سجّل الدخول')
-    assert page.locator('#labContent').is_hidden()
-    assert page.evaluate('window.__fixture.calls.length') == 0
-    context.close()
-
-    for mobile in (False, True):
-        STATE['mode'] = 'ready'
-        context = browser.new_context(viewport={'width':390 if mobile else 1280,'height':844 if mobile else 900}, is_mobile=mobile, has_touch=mobile, accept_downloads=True)
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(executable_path='/usr/bin/chromium', headless=True, args=['--no-sandbox'])
+        STATE['mode'] = 'anon'
+        context = browser.new_context()
         context.route('**/*', route_request)
         page = context.new_page()
-        page.set_default_timeout(10000)
-        errors=[]
-        page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto('https://ur-smart.test/research-lab.html')
-        page.wait_for_selector('#labContent:not([hidden])')
-        page.wait_for_function("document.querySelectorAll('#ordersList article').length===1")
-        assert 'FOREIGN_PRIVATE_ORDER' not in page.locator('body').inner_text()
-        assert 'FOREIGN_PRIVATE_FIELD' not in page.locator('#researchField').inner_text()
-        for call in page.evaluate("window.__fixture.calls.filter(row=>row.table==='research_orders')"):
-            assert ['owner_id',OWNER] in call['filters']
-            assert 'run_token' not in call['columns'] and 'approved_by' not in call['columns']
-        field_call=page.evaluate("window.__fixture.calls.find(row=>row.table==='fields')")
-        assert ['farms.owner_id',OWNER] in field_call['filters']
-        select_order(page)
-        assert page.locator('#runResearch').is_disabled()
-        assert 'بانتظار تأكيد الدفع' in page.locator('#approvalNotice').inner_text()
-        assert page.evaluate("window.__fixture.calls.filter(row=>row.api==='/research').length") == 0
-        page.locator('#topic').fill('دراسة اختبار إنشاء طلب بحث جديد')
-        page.locator('#taskType').select_option('data')
-        page.locator('#paymentReference').fill('FIXTURE-25000')
-        page.locator('#createOrder').click()
-        wait_text(page, '#createStatus', 'أُنشئ الطلب')
-        assert page.locator('#runResearch').is_disabled()
-        request=page.evaluate("window.__fixture.calls.find(row=>row.rpc==='create_research_order').input")
-        assert request == {'p_topic':'دراسة اختبار إنشاء طلب بحث جديد','p_task_type':'data','p_payment_reference':'FIXTURE-25000'}
-        prepare(page)
-        page.locator('#previewData').click()
-        page.wait_for_selector('#localPreview:not([hidden]) svg')
-        assert 'إجمالي الصفوف' in page.locator('#localPreview').inner_text()
-        assert page.evaluate("window.__fixture.calls.filter(row=>row.api==='/research').length") == 0
-        # A previously selected hidden group column must not affect regression.
-        page.locator('#method').select_option('regression')
-        page.locator('#predictorColumn').select_option('x')
-        page.locator('#previewData').click()
-        assert page.locator('#localPreview svg circle').count() == 4
-        page.locator('#method').select_option('oneway')
-        page.locator('#previewData').click()
-        page.locator('#runResearch').click()
-        wait_text(page, '#runStatus', 'انتهى التنفيذ')
-        page.wait_for_selector('#reportPanel:not([hidden])')
-        assert page.locator('#reportContent img').count() == 0 and page.evaluate('window.__xss') is None
-        assert '<img src=x' in page.locator('#reportContent').inner_text()
-        assert page.locator('#reportContent a').count() == 1
-        assert page.locator('#reportContent a').get_attribute('href') == 'https://doi.org/10.1234/test.2026'
-        assert page.locator('#runResearch').is_disabled()
-        request=page.evaluate("window.__fixture.calls.find(row=>row.api==='/research')")
-        assert request['body']['csv'].startswith('treatment,yield,x')
-        assert request['body']['consent'] is True and request['body']['field_id'] == FIELD
-        assert request['body']['order_id'] == ORDER and request['body']['group_column'] == 'treatment'
-        assert 'fee_iqd' not in request['body'] and 'approved_at' not in request['body']
-        assert request['headers']['Authorization'] == 'Bearer synthetic-private-token'
-        assert page.locator('#reportContent svg.chart').count() == 1
-        with page.expect_download() as download_info:
-            page.locator('#downloadCsv').click()
-        csv=Path(download_info.value.path()).read_text(encoding='utf-8-sig')
-        assert '"\'=1+1"' in csv
-        with page.expect_download() as download_info:
-            page.locator('#downloadChart').click()
-        svg=Path(download_info.value.path()).read_text()
-        assert '<svg' in svg and '=1+1' in svg
-        page.locator('#fetchMapImage').click()
-        page.wait_for_selector('#mapFigure:not([hidden])')
-        assert page.locator('#mapImage').get_attribute('src').startswith('data:image/png;base64,')
-        image_request=page.evaluate("window.__fixture.calls.find(row=>row.api==='/')")
-        assert image_request['body'] == {'action':'imagery','field_id':FIELD,'map_date':'2026-10-20','map_index':'NDVI'}
-        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
-        # Session changes clear reports, raw files and all private form state.
-        page.evaluate("window.__fixture.owner='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';for(const cb of window.__fixture.listeners)cb('SIGNED_IN',{user:{id:window.__fixture.owner}})")
-        assert page.locator('#labContent').is_hidden() and page.locator('#reportPanel').is_hidden()
-        assert page.locator('#csvFile').input_value() == '' and page.locator('#localPreview').inner_text() == ''
-        assert page.locator('#reportContent').inner_text() == '' and page.locator('#mapImage').get_attribute('src') is None
-        assert page.locator('#bibliographyQuery').input_value() == '' and not page.locator('#researchConsent').is_checked()
-        assert page.evaluate('localStorage.length===0&&sessionStorage.length===0')
-        assert not errors, errors
+        wait_text(page, '#accountStatus', 'سجّل الدخول')
+        assert page.locator('#labContent').is_hidden()
+        assert page.evaluate('window.__fixture.calls.length') == 0
         context.close()
-    browser.close()
-print('Research lab: anonymous gate, fixed-price order, payment gate, CSV preview/ANOVA/regression, safe report/DOI/CSV/SVG, actual imagery, account cleanup and mobile layout passed.')
+
+        for mobile in (False, True):
+            STATE['mode'] = 'ready'
+            context = browser.new_context(viewport={'width':390 if mobile else 1280,'height':844 if mobile else 900}, is_mobile=mobile, has_touch=mobile, accept_downloads=True)
+            context.route('**/*', route_request)
+            page = context.new_page()
+            page.set_default_timeout(10000)
+            errors=[]
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto('https://ur-smart.test/research-lab.html')
+            page.wait_for_selector('#labContent:not([hidden])')
+            page.wait_for_function("document.querySelectorAll('#ordersList article').length===1")
+            assert 'FOREIGN_PRIVATE_ORDER' not in page.locator('body').inner_text()
+            assert 'FOREIGN_PRIVATE_FIELD' not in page.locator('#researchField').inner_text()
+            for call in page.evaluate("window.__fixture.calls.filter(row=>row.table==='research_orders')"):
+                assert ['owner_id',OWNER] in call['filters']
+                assert 'run_token' not in call['columns'] and 'approved_by' not in call['columns']
+            field_call=page.evaluate("window.__fixture.calls.find(row=>row.table==='fields')")
+            assert ['farms.owner_id',OWNER] in field_call['filters']
+            select_order(page)
+            assert page.locator('#runResearch').is_disabled()
+            assert 'بانتظار تأكيد الدفع' in page.locator('#approvalNotice').inner_text()
+            assert page.evaluate("window.__fixture.calls.filter(row=>row.api==='/research').length") == 0
+            page.locator('#topic').fill('دراسة اختبار إنشاء طلب بحث جديد')
+            page.locator('#taskType').select_option('data')
+            page.locator('#paymentReference').fill('FIXTURE-25000')
+            page.locator('#createOrder').click()
+            wait_text(page, '#createStatus', 'أُنشئ الطلب')
+            assert page.locator('#runResearch').is_disabled()
+            request=page.evaluate("window.__fixture.calls.find(row=>row.rpc==='create_research_order').input")
+            assert request == {'p_topic':'دراسة اختبار إنشاء طلب بحث جديد','p_task_type':'data','p_payment_reference':'FIXTURE-25000'}
+            prepare(page)
+            page.locator('#previewData').click()
+            page.wait_for_selector('#localPreview:not([hidden]) svg')
+            assert 'إجمالي الصفوف' in page.locator('#localPreview').inner_text()
+            assert page.evaluate("window.__fixture.calls.filter(row=>row.api==='/research').length") == 0
+            # A previously selected hidden group column must not affect regression.
+            page.locator('#method').select_option('regression')
+            page.locator('#predictorColumn').select_option('x')
+            page.locator('#previewData').click()
+            assert page.locator('#localPreview svg circle').count() == 4
+            page.locator('#method').select_option('oneway')
+            page.locator('#previewData').click()
+            page.locator('#runResearch').click()
+            wait_text(page, '#runStatus', 'انتهى التنفيذ')
+            page.wait_for_selector('#reportPanel:not([hidden])')
+            assert page.locator('#reportContent img').count() == 0 and page.evaluate('window.__xss') is None
+            assert '<img src=x' in page.locator('#reportContent').inner_text()
+            assert page.locator('#reportContent a').count() == 1
+            assert page.locator('#reportContent a').get_attribute('href') == 'https://doi.org/10.1234/test.2026'
+            assert page.locator('#runResearch').is_disabled()
+            request=page.evaluate("window.__fixture.calls.find(row=>row.api==='/research')")
+            assert request['body']['csv'].startswith('treatment,yield,x')
+            assert request['body']['consent'] is True and request['body']['field_id'] == FIELD
+            assert request['body']['order_id'] == ORDER and request['body']['group_column'] == 'treatment'
+            assert 'fee_iqd' not in request['body'] and 'approved_at' not in request['body']
+            assert request['headers']['Authorization'] == 'Bearer synthetic-private-token'
+            assert page.locator('#reportContent svg.chart').count() == 1
+            with page.expect_download() as download_info:
+                page.locator('#downloadCsv').click()
+            csv=Path(download_info.value.path()).read_text(encoding='utf-8-sig')
+            assert '"\'=1+1"' in csv
+            with page.expect_download() as download_info:
+                page.locator('#downloadChart').click()
+            svg=Path(download_info.value.path()).read_text()
+            assert '<svg' in svg and '=1+1' in svg
+            page.locator('#fetchMapImage').click()
+            page.wait_for_selector('#mapFigure:not([hidden])')
+            assert page.locator('#mapImage').get_attribute('src').startswith('data:image/png;base64,')
+            image_request=page.evaluate("window.__fixture.calls.find(row=>row.api==='/')")
+            assert image_request['body'] == {'action':'imagery','field_id':FIELD,'map_date':'2026-10-20','map_index':'NDVI'}
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+            # Session changes clear reports, raw files and all private form state.
+            page.evaluate("window.__fixture.owner='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';for(const cb of window.__fixture.listeners)cb('SIGNED_IN',{user:{id:window.__fixture.owner}})")
+            assert page.locator('#labContent').is_hidden() and page.locator('#reportPanel').is_hidden()
+            assert page.locator('#csvFile').input_value() == '' and page.locator('#localPreview').inner_text() == ''
+            assert page.locator('#reportContent').inner_text() == '' and page.locator('#mapImage').get_attribute('src') is None
+            assert page.locator('#bibliographyQuery').input_value() == '' and not page.locator('#researchConsent').is_checked()
+            assert page.evaluate('localStorage.length===0&&sessionStorage.length===0')
+            assert not errors, errors
+            context.close()
+        browser.close()
+    print('Research lab: anonymous gate, fixed-price order, payment gate, CSV preview/ANOVA/regression, safe report/DOI/CSV/SVG, actual imagery, account cleanup and mobile layout passed.')
+
+
+if __name__ == "__main__":
+    main()
