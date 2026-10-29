@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co https://ur-smart-satellite.alialbatekh111.workers.dev; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+  <meta name="theme-color" content="#123d2d">
+  <meta name="description" content="مختبر أور للبحث الزراعي: تحليل بيانات CSV وخرائط الحقول المحفوظة، بعد تأكيد الدفع يدوياً من الإدارة.">
+  <title>مختبر البحث الزراعي | أور الزراعية</title>
+  <link rel="stylesheet" href="./research-lab.css">
+  <script type="module" src="./research-lab.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">انتقل إلى المحتوى</a>
+  <header><div class="wrap header-inner">
+    <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true">🌱</span><span>أور الزراعية<small lang="en" dir="ltr">UR SMART AGRICULTURE</small></span></a>
+    <nav aria-label="التنقل الرئيسي"><a href="./dashboard.html">لوحة المزارع</a><a href="./research.html">الدعم البحثي</a><a href="./auth.html" id="loginLink">دخول / تسجيل</a><button type="button" id="signOut" class="text-button" hidden>تسجيل الخروج</button></nav>
+  </div></header>
+  <main id="main">
+    <section class="hero"><div class="wrap hero-inner"><div><p class="eyebrow">مختبر البحث الزراعي</p><h1>من بياناتك إلى<br><span>نتائج قابلة للمراجعة</span></h1><p>إحصاء محسوب من ملفك، وقراءة فضائية لحدود حقلك المحفوظة، مع مسودة تفسير ومراجع بحثية.</p></div><aside class="price-card"><span>سعر الطلب الواحد</span><strong>٢٥٬٠٠٠ <small>دينار عراقي</small></strong><p>يشمل خيار البيانات والخرائط معاً. تبدأ المعالجة بعد تأكيد الإدارة للدفع يدوياً.</p></aside></div></section>
+    <div class="wrap workspace">
+      <ol class="steps" aria-label="خطوات الخدمة"><li><strong>١. أنشئ الطلب</strong><span>حدد الموضوع ونوع العمل</span></li><li><strong>٢. أكّد الدفع مع الإدارة</strong><span>تراجع الإدارة الدفع وتوافق يدوياً</span></li><li><strong>٣. نفّذ وراجع</strong><span>ارفع CSV واختر الحقل بعد الموافقة</span></li></ol>
+      <section class="panel account-panel" aria-labelledby="accountTitle"><div><h2 id="accountTitle">حساب الباحث</h2><p id="accountStatus" role="status">جارٍ التحقق من جلسة الدخول…</p></div><button id="retryAccount" type="button" class="button secondary">إعادة التحقق</button></section>
+      <noscript><p class="notice error">يحتاج المختبر إلى JavaScript. فعّله ثم أعد تحميل الصفحة.</p></noscript>
+      <div id="labContent" hidden>
+        <div class="main-grid">
+          <section class="panel" aria-labelledby="newOrderTitle">
+            <p class="kicker">الخطوة الأولى</p><h2 id="newOrderTitle">طلب بحث جديد</h2>
+            <form id="orderForm" autocomplete="off"><fieldset id="orderFields">
+              <label for="topic">موضوع البحث وما تريد تحليله</label><textarea id="topic" maxlength="2000" minlength="10" rows="4" required placeholder="مثال: مقارنة إنتاجية ثلاثة أصناف قمح، وقراءة الغطاء النباتي لحقل التجربة"></textarea>
+              <label for="taskType">نوع العمل</label><select id="taskType"><option value="combined">تحليل بيانات + خرائط</option><option value="data">تحليل بيانات CSV</option><option value="maps">تحليل وخرائط حقل</option><option value="study">مسودة منهجية ومراجع</option></select>
+              <label for="paymentReference">مرجع الدفع <span class="muted">(اختياري)</span></label><input id="paymentReference" maxlength="120" placeholder="رقم العملية أو الوصف المتفق عليه مع الإدارة">
+              <p class="hint">إضافة مرجع لا تؤكد الدفع. تراجع الإدارة العملية بنفسها قبل السماح بالتنفيذ.</p>
+              <button class="button primary" id="createOrder" type="submit">إنشاء الطلب · ٢٥٬٠٠٠ د.ع</button>
+            </fieldset></form>
+            <p id="createStatus" class="status" role="status" hidden></p>
+            <div class="payment-help"><strong>تنسيق الدفع</strong><p>تواصل مع حساب أور الرسمي، واذكر رقم طلبك. لا توجد عملية تحصيل إلكترونية هنا.</p><a href="https://www.instagram.com/ur.farm.iq/" target="_blank" rel="noopener noreferrer">فتح حساب أور على إنستغرام ↗</a></div>
+          </section>
+          <section class="panel orders-panel" aria-labelledby="ordersTitle"><div class="section-top"><div><p class="kicker">حسابك فقط</p><h2 id="ordersTitle">طلباتي</h2></div><button id="refreshOrders" type="button" class="button secondary">تحديث</button></div><p class="hint">تتحدث القائمة كل ٣٠ ثانية أثناء ظهور الصفحة. اختر طلباً لعرض نتيجته أو تجهيز تنفيذه.</p><p id="ordersStatus" role="status"></p><div id="ordersList" class="orders-list"></div></section>
+        </div>
+        <section class="panel execution-panel" id="executionPanel" hidden aria-labelledby="executionTitle"><div class="section-top"><div><p class="kicker">تجهيز التنفيذ</p><h2 id="executionTitle">الطلب المحدد</h2></div><span class="badge" id="selectedStatus"></span></div><p id="selectedTopic" class="selected-topic"></p><p id="selectedDetails" class="hint"></p><p id="approvalNotice" class="notice"></p>
+          <form id="executeForm" autocomplete="off"><fieldset id="executeFields">
+            <div id="dataControls"><h3>١. ملف البيانات</h3><label for="csvFile">ملف CSV فقط</label><input id="csvFile" type="file" accept=".csv,text/csv"><p class="hint">من Excel اختر «حفظ باسم CSV UTF-8». الحد: ٥١٢ كيلوبايت، ٥٠٠٠ صف، ٥٠ عموداً. يبقى الملف في ذاكرة هذه الصفحة حتى تضغط التنفيذ؛ لا يُرفع عند اختياره.</p><p id="fileStatus" role="status">لم يُحدد ملف.</p>
+              <div class="form-grid"><div><label for="method">الطريقة الإحصائية</label><select id="method"><option value="descriptive">إحصاء وصفي</option><option value="oneway">ANOVA أحادي الاتجاه لمجموعات مستقلة</option><option value="regression">انحدار خطي بسيط</option></select></div><div><label for="valueColumn">عمود القياس الرقمي</label><select id="valueColumn" disabled><option value="">اختر ملفاً أولاً</option></select></div><div id="groupControl" hidden><label for="groupColumn">عمود المجموعة المستقلة</label><select id="groupColumn" disabled></select></div><div id="predictorControl" hidden><label for="predictorColumn">المتغير المستقل الرقمي (X)</label><select id="predictorColumn" disabled></select></div></div>
+              <p id="methodNote" class="hint">القيم المفقودة لا تُعامل كأصفار. يعاد حساب الإحصاء على الخادم عند التنفيذ.</p><button type="button" id="previewData" class="button secondary" disabled>معاينة الإحصاء محلياً</button><div id="localPreview" class="local-preview" hidden></div>
+            </div>
+            <div id="mapControls"><h3>٢. حقل الدراسة</h3><label for="researchField">حقل محفوظ في حسابك</label><div class="field-row"><select id="researchField" disabled><option value="">جارٍ تحميل الحقول…</option></select><button type="button" class="button secondary" id="refreshFields">تحديث الحقول</button></div><p id="fieldsStatus" class="hint" role="status">يُستخدم حد الحقل المحفوظ، وتتوفر النتائج حسب المشاهد الفضائية الصالحة.</p><a class="inline-link" href="./field-map.html">إضافة حقل وحدوده</a></div>
+            <label for="bibliographyQuery">عبارة البحث عن المراجع <span class="muted">(اختيارية، حتى ٢٥٠ حرفاً)</span></label><input id="bibliographyQuery" maxlength="250" placeholder="مثال: wheat yield irrigation NDVI">
+            <label class="consent" for="researchConsent"><input type="checkbox" id="researchConsent" required><span>أوافق على إرسال ملخص التحليل وطلب البحث إلى Gemini، وكلمات البحث إلى CrossRef. الملف الكامل لا يرسل إلى Google ولا يحفظ سحابياً؛ يرسل مؤقتاً إلى خادم أور لحساب الإحصاء، وتُحفظ النتائج المجمعة فقط.</span></label>
+            <p class="hint">استخدم بيانات مسموحًا لك بمشاركتها؛ لا ترفع معلومات شخصية أو سرية. <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer">شروط Gemini</a>.</p>
+            <p class="notice">أبقِ هذه الصفحة مفتوحة أثناء التنفيذ. قد يستغرق الطلب عدة دقائق؛ لا تقدم هذه الصفحة تنفيذاً مستمراً في الخلفية.</p>
+            <div class="action-row"><button type="submit" id="runResearch" class="button primary" disabled>تنفيذ الطلب الموافق عليه</button><button type="button" id="checkService" class="button secondary">فحص جاهزية الخدمة</button></div>
+          </fieldset></form><p id="serviceStatus" class="hint" role="status"></p><p id="runStatus" class="status" role="status" hidden></p>
+        </section>
+        <section id="reportPanel" class="panel report-panel" hidden aria-labelledby="reportTitle"><div class="section-top"><div><p class="kicker">نتيجة قابلة للمراجعة</p><h2 id="reportTitle">تقرير الطلب</h2></div><span id="reportState" class="badge"></span></div><p class="notice">التفسير مسودة مساعدة للباحث؛ راجع الافتراضات والمراجع والنتائج قبل استخدامها أكاديمياً.</p><div id="reportContent"></div><div id="mapImagePanel" hidden><h3>صورة المؤشر الفعلية</h3><p id="mapImageNote" class="hint"></p><button type="button" id="fetchMapImage" class="button secondary">تحميل صورة NDVI الفعلية</button><p id="mapImageStatus" role="status"></p><figure id="mapFigure" hidden><img id="mapImage" alt="صورة NDVI الفعلية ضمن نطاق حقل الدراسة"><figcaption id="mapCaption"></figcaption></figure></div><div class="report-actions"><button type="button" id="downloadJson" class="button secondary">تنزيل JSON</button><button type="button" id="downloadCsv" class="button secondary">تنزيل جداول CSV</button><button type="button" id="downloadChart" class="button secondary" hidden>تنزيل الرسم SVG</button><button type="button" id="downloadImage" class="button secondary" hidden>تنزيل الصورة PNG</button><button type="button" id="printReport" class="button primary">طباعة / حفظ PDF</button></div></section>
+      </div>
+    </div>
+  </main>
+  <footer><div class="wrap"><strong>أور الزراعية الذكية</strong><p>بيانات محسوبة، مصادر معلومة، وقرار بحثي تراجعه أنت.</p></div></footer>
+</body>
+</html>

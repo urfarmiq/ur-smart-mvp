@@ -6,6 +6,7 @@ import path from 'node:path';
 import {ensurePagesProject} from '../scripts/ensure-pages-project.mjs';
 import {buildPublicSite} from '../scripts/build-public-site.mjs';
 import {getRedirectUrl,buildPagesRedirect} from '../scripts/build-pages-redirect.mjs';
+import {verifyPlatform} from '../scripts/verify-platform.mjs';
 
 const env={CLOUDFLARE_API_TOKEN:'synthetic-secret-never-logged',CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32)};
 const project={name:'ur-smart-urfarmiq',production_branch:'main',subdomain:'ur-smart-urfarmiq.pages.dev'};
@@ -50,4 +51,18 @@ test('old links preserve app routes and existing callbacks on the fixed new host
  for(const pathname of ['//evil.example/','/ur-smart-mvp//evil.example/','/ur-smart-mvp/%2F%2Fevil.example'])assert.equal(new URL(getRedirectUrl({pathname,search:'?redirect=https://evil.example',hash:'#existing-callback'})).origin,'https://ur-smart-urfarmiq.pages.dev');
  const temp=await mkdtemp(path.join(os.tmpdir(),'ur-redirect-'));
  try{await buildPagesRedirect({outDir:temp});const html=await readFile(path.join(temp,'index.html'),'utf8');assert.match(html,/downloadBackup/);assert.match(html,/migrationNotice/);assert.doesNotMatch(html,/supabase-js|signOut\(/);}finally{await rm(temp,{recursive:true,force:true});}
+});
+
+test('release verification requires the new researcher files and actual payment-gated backend',async()=>{
+ const origin='https://ur-smart-urfarmiq.pages.dev',release='c'.repeat(40),calls=[];
+ const fetchImpl=async url=>{calls.push(String(url));if(String(url).endsWith('/release.txt'))return new Response(release);if(String(url).includes('workers.dev'))return new Response(JSON.stringify({fee_iqd:25000,manual_admin_approval_required:true}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});return new Response('fixture');};
+ assert.equal((await verifyPlatform({release,fetchImpl,wait:async()=>{}})).research,true);
+ assert.ok(calls.some(url=>url.endsWith('/research-lab.html')));assert.ok(calls.some(url=>url.endsWith('/research/status')));
+ for(const bad of ['missing_page','wrong_gate']){
+  await assert.rejects(verifyPlatform({release,wait:async()=>{},fetchImpl:async(url,options)=>{
+   if(bad==='missing_page'&&String(url).endsWith('/research-lab.html'))return new Response('',{status:404});
+   if(bad==='wrong_gate'&&String(url).endsWith('/research/status'))return new Response(JSON.stringify({fee_iqd:1,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
+   return fetchImpl(url,options);
+  }}),/required public page|payment gate/);
+ }
 });

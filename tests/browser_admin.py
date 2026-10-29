@@ -19,7 +19,13 @@ window.__fixture={mode,calls:[],mfaCalls:[],signedIn:mode!=='anon',role:mode!=='
  {id:'11111111-1111-4111-8111-111111111111',user_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',email:'farmer-one@example.test',display_name:'<img src=x onerror=window.__xss=true>',registered_at:'2026-10-27T09:00:00Z',email_confirmed_at:null,seen_at:null,password:'PASSWORD_MUST_NOT_APPEAR',encrypted_password:'HASH_MUST_NOT_APPEAR',access_token:'TOKEN_MUST_NOT_APPEAR'},
  {id:'22222222-2222-4222-8222-222222222222',user_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',email:'farmer-two@example.test',display_name:null,registered_at:'2026-10-27T08:00:00Z',email_confirmed_at:'2026-10-27T08:05:00Z',seen_at:null}
 ]};
+Object.assign(window.__fixture,{holdOrderReads:false,pendingOrderReads:[],holdReview:false,pendingReviews:[],failReview:false,failOrderRead:false,researchRows:[
+ {id:'33333333-3333-4333-8333-333333333333',owner_id:'fixture-admin',topic:'<img src=x onerror=window.__researchXss=true> دراسة محصول القمح',task_type:'combined',fee_iqd:25000,status:'waiting_payment',payment_reference:'TRANSFER-QA-25000',admin_note:null,approved_at:null,created_at:'2026-10-29T09:00:00Z',updated_at:'2026-10-29T09:00:00Z',attempt_count:0,started_at:null,result_status:null,result:{private:'RAW_CSV_MUST_NOT_APPEAR'}},
+ {id:'44444444-4444-4444-8444-444444444444',owner_id:'fixture-researcher',topic:'تحليل التربة',task_type:'data',fee_iqd:25000,status:'waiting_payment',payment_reference:null,admin_note:null,approved_at:null,created_at:'2026-10-29T08:00:00Z',updated_at:'2026-10-29T08:00:00Z',attempt_count:0,started_at:null,result_status:null},
+ {id:'55555555-5555-4555-8555-555555555555',owner_id:'fixture-researcher',topic:'طلب سابق معتمد',task_type:'study',fee_iqd:25000,status:'approved',payment_reference:'PREVIOUS',admin_note:'تمت مراجعة الدفع',approved_at:'2026-10-29T07:30:00Z',created_at:'2026-10-29T07:00:00Z',updated_at:'2026-10-29T07:30:00Z',attempt_count:0,started_at:null,result_status:null}
+]});
 if(mode==='pagination')for(let i=0;i<63;i++)window.__fixture.rows.push({id:String(i+3).padStart(8,'0')+'-0000-4000-8000-000000000000',user_id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',email:'old-'+i+'@example.test',display_name:'تسجيل قديم '+i,registered_at:new Date(Date.parse('2026-10-27T07:59:00Z')-i*60000).toISOString(),email_confirmed_at:null,seen_at:null});
+if(mode==='pagination')for(let i=0;i<63;i++)window.__fixture.researchRows.push({...window.__fixture.researchRows[1],id:String(i+10).padStart(8,'0')+'-1000-4000-8000-000000000000',topic:'طلب بحث قديم '+i,created_at:new Date(Date.parse('2026-10-29T06:59:00Z')-i*60000).toISOString()});
 const user=()=>({id:'fixture-admin',email:'admin@example.test',user_metadata:{role:'admin',is_admin:true}});
 function createClient(){const s=window.__fixture;return {
  auth:{
@@ -34,8 +40,19 @@ function createClient(){const s=window.__fixture;return {
    async challengeAndVerify(input){s.mfaCalls.push({method:'verify',input});if(input.code!=='123456')return {data:null,error:{message:'sensitive provider error'}};s.aal='aal2';s.hasFactor=true;return {data:{access_token:'synthetic-promoted-session'},error:null};}
   }
  },
- async rpc(name){
-  s.calls.push({rpc:name});if(name==='admin_access')return {data:s.role,error:null};
+ async rpc(name,input){
+  s.calls.push({rpc:name,...(input?{input}: {})});if(name==='admin_access')return {data:s.role,error:null};
+  if(name==='review_research_order'){
+   if(!s.signedIn||!s.role||s.aal!=='aal2')throw Error('Review attempted before private admin MFA');
+   if(s.failReview)return {data:null,error:{message:'PAYMENT_PROVIDER_SECRET_MUST_NOT_APPEAR'}};
+   if(!input||Object.keys(input).sort().join(',')!=='p_decision,p_note,p_order_id'||!['approve','reject'].includes(input.p_decision)||input.p_note!==null&&(typeof input.p_note!=='string'||input.p_note.length>1000))throw Error('Unexpected review input');
+   const row=s.researchRows.find(row=>row.id===input.p_order_id);
+   if(!row||row.status!=='waiting_payment')return {data:null,error:{message:'Already reviewed'}};
+   row.status=input.p_decision==='approve'?'approved':'rejected';row.fee_iqd=25000;row.admin_note=input.p_note;row.approved_at=input.p_decision==='approve'?'2026-10-29T10:00:00Z':null;
+   const result={data:{id:row.id,status:row.status,fee_iqd:25000},error:null};
+   if(s.holdReview)return new Promise(resolve=>s.pendingReviews.push(()=>resolve(result)));
+   return result;
+  }
   if(name!=='admin_site_visits')throw Error('Unexpected RPC');
   if(!s.signedIn||!s.role||s.aal!=='aal2')throw Error('Visit read attempted before private admin MFA');
   if(s.failVisits)return {data:null,error:{message:'TOKEN_MUST_NOT_APPEAR'}};
@@ -51,19 +68,21 @@ function createClient(){const s=window.__fixture;return {
   q.update=value=>{action='update';payload=value;return q;};
   q.then=(ok,fail)=>Promise.resolve().then(()=>{
    s.calls.push({table,action,payload,columns,options,filters,range:[start,start+limit-1],orders});
-   if(table!=='signup_notifications')throw Error('Unexpected admin fixture table');
-   if(!s.signedIn||!s.role||s.aal!=='aal2')throw Error('Notification read attempted before private admin MFA');
-   if(s.failSelect&&action==='select')return {data:null,error:{message:'PASSWORD_MUST_NOT_APPEAR'}};
+   if(!['signup_notifications','research_orders'].includes(table))throw Error('Unexpected admin fixture table');
+   if(!s.signedIn||!s.role||s.aal!=='aal2')throw Error('Admin data read attempted before private admin MFA');
+   if((table==='signup_notifications'?s.failSelect:s.failOrderRead)&&action==='select')return {data:null,error:{message:'PASSWORD_MUST_NOT_APPEAR'}};
    const matches=row=>filters.every(f=>f.op==='in'?f.value.includes(row[f.key]):row[f.key]===f.value);
-   const selected=s.rows.filter(matches).sort((a,b)=>{for(const [key,opts] of orders){const result=String(a[key]).localeCompare(String(b[key]));if(result)return opts?.ascending===false?-result:result;}return 0;});
+   const selected=(table==='signup_notifications'?s.rows:s.researchRows).filter(matches).sort((a,b)=>{for(const [key,opts] of orders){const result=String(a[key]).localeCompare(String(b[key]));if(result)return opts?.ascending===false?-result:result;}return 0;});
    if(action==='update'){
+    if(table!=='signup_notifications')throw Error('Research updates must use trusted RPC');
     if(Object.keys(payload).join(',')!=='seen_at')throw Error('Unexpected notification field update');
     selected.forEach(row=>{row.seen_at=payload.seen_at;});
     return {data:selected.map(row=>({id:row.id})),error:null};
    }
    if(options.head)return {data:null,count:selected.length,error:null};
    const result={data:selected.slice(start,start+limit).map(row=>({...row})),error:null};
-   if(s.holdReads)return new Promise(resolve=>s.pendingReads.push(()=>resolve(result)));
+   if(table==='research_orders'&&s.holdOrderReads)return new Promise(resolve=>s.pendingOrderReads.push(()=>resolve(result)));
+   if(table==='signup_notifications'&&s.holdReads)return new Promise(resolve=>s.pendingReads.push(()=>resolve(result)));
    return result;
   }).then(ok,fail);return q;
  }
@@ -92,10 +111,13 @@ def wait_text(page, selector, value):
 
 def assert_no_notifications(page):
     assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='signup_notifications').length") == 0
+    assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='research_orders'||call.rpc==='review_research_order').length") == 0
     assert page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='admin_site_visits').length") == 0
     assert page.locator('#adminContent').is_hidden()
     assert page.locator('#visitsToday').inner_text() == '—'
     assert page.locator('#notificationList').inner_text() == ''
+    assert page.locator('#researchOrderList').inner_text() == ''
+    assert page.locator('#researchPendingCount').inner_text() == '—'
 
 
 def assert_secret_not_persisted(page, logs):
@@ -129,6 +151,32 @@ def assert_visits(page):
     assert 'الطقس' in page.locator('#visitPages').inner_text()
     assert page.locator('#visitDays tr').count() == 30
     assert page.locator('#visitDetails').is_visible()
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+
+
+def assert_research_orders(page):
+    page.wait_for_function("document.querySelectorAll('#researchOrderList .research-order').length===2")
+    assert page.locator('#researchOrderFilter').input_value() == 'waiting_payment'
+    assert page.locator('#researchPendingCount').inner_text() == page.evaluate("new Intl.NumberFormat('ar-IQ').format(2)")
+    text = page.locator('#researchOrderList').inner_text()
+    assert '<img src=x onerror=window.__researchXss=true>' in text
+    assert page.locator('#researchOrderList img').count() == 0
+    assert page.evaluate('window.__researchXss') is None
+    assert 'TRANSFER-QA-25000' in text
+    assert page.evaluate("new Intl.NumberFormat('ar-IQ').format(25000)") in text
+    assert 'بعد التأكيد يستطيع الباحث بدء التنفيذ الآلي من صفحة الخدمة.' in page.locator('#adminContent').inner_text()
+    for forbidden in ('RAW_CSV_MUST_NOT_APPEAR','fixture-researcher','PAYMENT_PROVIDER_SECRET_MUST_NOT_APPEAR'):
+        assert forbidden not in text
+    allowed = {'id','owner_id','topic','task_type','fee_iqd','status','payment_reference','admin_note','approved_at','created_at','updated_at','attempt_count','started_at','result_status'}
+    calls = page.evaluate("window.__fixture.calls.filter(call=>call.table==='research_orders')")
+    assert calls and any(call['options'].get('head') and call['options'].get('count') == 'exact' and call['filters'] == [{'op':'eq','key':'status','value':'waiting_payment'}] for call in calls)
+    for call in calls:
+        assert call['action'] == 'select' and '*' not in call['columns']
+        assert set(call['columns'].split(',')) <= allowed
+        if not call['options'].get('head'):
+            assert set(call['columns'].split(',')) == allowed
+            assert call['orders'] == [['created_at',{'ascending':False}],['id',{'ascending':False}]]
+    assert page.locator('#researchOrderList textarea').first.get_attribute('maxlength') == '1000'
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
 
 
@@ -171,6 +219,7 @@ with sync_playwright() as playwright:
         page.click('#verifyMfaButton')
         assert_notifications(page)
         assert_visits(page)
+        assert_research_orders(page)
         assert page.locator('#mfaSecret').input_value() == ''
         assert page.locator('#mfaQr').get_attribute('src') is None
         assert page.locator('#mfaCode').input_value() == ''
@@ -197,6 +246,7 @@ with sync_playwright() as playwright:
         page.click('#verifyMfaButton')
         assert_notifications(page)
         assert_visits(page)
+        assert_research_orders(page)
         assert page.evaluate("window.__fixture.mfaCalls.filter(call=>call.method==='enroll').length") == 0
         assert page.evaluate("window.__fixture.mfaCalls.filter(call=>call.method==='verify').at(-1).input.factorId") == 'factor-existing'
 
@@ -204,6 +254,43 @@ with sync_playwright() as playwright:
         page.goto('https://ur-smart.test/admin.html')
         assert_notifications(page)
         assert_visits(page)
+        assert_research_orders(page)
+
+        # A trusted MFA administrator may review their own QA order. The
+        # confirmation checkbox is required before any approval RPC is sent.
+        order = page.locator('#researchOrderList .research-order').first
+        order.get_by_role('button', name='تأكيد الدفع والسماح بالتنفيذ', exact=True).click()
+        assert page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='review_research_order').length") == 0
+        order.locator('textarea').fill('وصل المبلغ وتمت مراجعة نطاق الدراسة')
+        order_reads = page.evaluate("window.__fixture.calls.filter(call=>call.table==='research_orders').length")
+        page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+        assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='research_orders').length") == order_reads
+        assert order.locator('textarea').input_value() == 'وصل المبلغ وتمت مراجعة نطاق الدراسة'
+        order.locator('input[type=checkbox]').check()
+        page.evaluate('window.__fixture.failReview=true')
+        order.get_by_role('button', name='تأكيد الدفع والسماح بالتنفيذ', exact=True).click()
+        wait_text(page, '#researchOrdersStatus', 'تعذر تأكيد قرار المراجعة')
+        assert 'تم تأكيد الدفع' not in page.locator('#researchOrdersStatus').inner_text()
+        assert 'PAYMENT_PROVIDER_SECRET_MUST_NOT_APPEAR' not in page.locator('#researchOrdersStatus').inner_text()
+        assert page.locator('#researchOrderList .research-order').count() == 2
+        page.evaluate('window.__fixture.failReview=false')
+        order.get_by_role('button', name='تأكيد الدفع والسماح بالتنفيذ', exact=True).click()
+        wait_text(page, '#researchOrdersStatus', 'تم تأكيد الدفع والسماح بالتنفيذ')
+        assert page.locator('#researchOrderList .research-order').count() == 1
+        assert page.locator('#researchPendingCount').inner_text() == page.evaluate("new Intl.NumberFormat('ar-IQ').format(1)")
+        assert page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='review_research_order').at(-1).input") == {
+            'p_order_id':'33333333-3333-4333-8333-333333333333','p_decision':'approve','p_note':'وصل المبلغ وتمت مراجعة نطاق الدراسة'}
+        # Rejection can leave the optional note empty and does not claim payment.
+        page.locator('#researchOrderList .research-order').first.get_by_role('button', name='رفض الطلب', exact=True).click()
+        wait_text(page, '#researchOrdersStatus', 'تم رفض الطلب')
+        assert page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='review_research_order').at(-1).input") == {
+            'p_order_id':'44444444-4444-4444-8444-444444444444','p_decision':'reject','p_note':None}
+        assert page.locator('#researchOrderList .research-order').count() == 0
+        page.select_option('#researchOrderFilter', 'approved')
+        page.wait_for_function("document.querySelectorAll('#researchOrderList .research-order').length===2")
+        assert 'وصل المبلغ وتمت مراجعة نطاق الدراسة' in page.locator('#researchOrderList').inner_text()
+        assert page.locator('#researchOrderList form').count() == 0
+        assert page.evaluate("window.__fixture.calls.filter(call=>call.rpc&&call.rpc.includes('research')&&call.rpc!=='review_research_order').length") == 0
         page.locator('#notificationList .notification').first.get_by_role('button', name='تعليم كمقروء', exact=True).click()
         page.wait_for_function("window.__fixture.rows[0].seen_at!==null&&document.querySelectorAll('#notificationList .notification.seen').length===1")
         page.click('#markAllSeen')
@@ -231,25 +318,58 @@ with sync_playwright() as playwright:
         assert_visits(page)
 
         # Queued stats and notification responses must not restore data after sign-out.
-        page.evaluate('window.__fixture.holdReads=true;window.__fixture.holdVisits=true')
+        page.evaluate('window.__fixture.holdReads=true;window.__fixture.holdVisits=true;window.__fixture.holdOrderReads=true')
         page.click('#refreshVisits')
         page.wait_for_function('window.__fixture.pendingVisits.length===1')
         page.click('#refreshNotifications')
         page.wait_for_function('window.__fixture.pendingReads.length===1')
+        page.click('#refreshResearchOrders')
+        page.wait_for_function('window.__fixture.pendingOrderReads.length===1')
         page.click('#logoutAdmin')
         wait_text(page, '#adminStatus', 'تم تسجيل الخروج')
         assert page.locator('#adminContent').is_hidden()
         assert page.locator('#notificationList').inner_text() == ''
-        page.evaluate("async()=>{const pending=[...window.__fixture.pendingReads.splice(0),...window.__fixture.pendingVisits.splice(0)];for(const resolve of pending)resolve();await new Promise(resolve=>setTimeout(resolve,0));}")
+        assert page.locator('#researchOrderList').inner_text() == ''
+        page.evaluate("async()=>{const pending=[...window.__fixture.pendingReads.splice(0),...window.__fixture.pendingVisits.splice(0),...window.__fixture.pendingOrderReads.splice(0)];for(const resolve of pending)resolve();await new Promise(resolve=>setTimeout(resolve,0));}")
         assert page.locator('#adminContent').is_hidden() and page.locator('#notificationList').inner_text() == ''
         assert page.locator('#visitsToday').inner_text() == '—'
         assert page.locator('#visitPages').inner_text() == ''
+        assert page.locator('#researchOrderList').inner_text() == ''
+        assert page.locator('#researchPendingCount').inner_text() == '—'
         assert_secret_not_persisted(page, logs)
+
+        # A delayed approval response must not restore forms or claim success
+        # after sign-out, an assurance downgrade, or leaving the page.
+        for lock_kind in ('signout', 'downgrade', 'pagehide'):
+            STATE['mode'] = 'admin'
+            page.goto('https://ur-smart.test/admin.html')
+            assert_research_orders(page)
+            page.evaluate('window.__fixture.holdReview=true')
+            first = page.locator('#researchOrderList .research-order').first
+            first.locator('input[type=checkbox]').check()
+            first.get_by_role('button', name='تأكيد الدفع والسماح بالتنفيذ', exact=True).click()
+            page.wait_for_function('window.__fixture.pendingReviews.length===1')
+            if lock_kind == 'signout':
+                page.click('#logoutAdmin')
+                wait_text(page, '#adminStatus', 'تم تسجيل الخروج')
+            elif lock_kind == 'downgrade':
+                page.evaluate("()=>{window.__fixture.aal='aal1';for(const callback of window.__fixture.listeners)callback('TOKEN_REFRESHED',{user:{id:'fixture-admin'}});}")
+                wait_text(page, '#adminStatus', 'يلزم التحقق')
+            else:
+                page.evaluate("window.dispatchEvent(new Event('pagehide'))")
+            assert page.locator('#adminContent').is_hidden()
+            assert page.locator('#researchOrderList').inner_text() == ''
+            assert page.locator('#researchOrderList form').count() == 0
+            page.evaluate("async()=>{for(const resolve of window.__fixture.pendingReviews.splice(0))resolve();await new Promise(resolve=>setTimeout(resolve,0));}")
+            assert page.locator('#adminContent').is_hidden()
+            assert page.locator('#researchOrderList').inner_text() == ''
+            assert 'تم تأكيد الدفع' not in page.locator('#researchOrdersStatus').inner_text()
 
         # Every stored registration remains reachable beyond the first batch.
         STATE['mode'] = 'pagination'
         page.goto('https://ur-smart.test/admin.html')
         page.wait_for_function("document.querySelectorAll('#notificationList .notification').length===50")
+        page.wait_for_function("document.querySelectorAll('#researchOrderList .research-order').length===50")
         assert page.locator('#loadOlderNotifications').is_visible()
         page.click('#loadOlderNotifications')
         page.wait_for_function("document.querySelectorAll('#notificationList .notification').length===65")
@@ -261,9 +381,11 @@ with sync_playwright() as playwright:
         before = len(queries)
         assert_visits(page)
         visits_before = page.evaluate("window.__fixture.calls.filter(call=>call.rpc==='admin_site_visits').length")
+        research_before = page.evaluate("window.__fixture.calls.filter(call=>call.table==='research_orders'&&!call.options.head).length")
         page.evaluate("async()=>{document.dispatchEvent(new Event('visibilitychange'));await new Promise(resolve=>setTimeout(resolve,0));}")
         assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='signup_notifications'&&call.action==='select'&&!call.options.head).length") == before
         page.wait_for_function("before=>window.__fixture.calls.filter(call=>call.rpc==='admin_site_visits').length>before",arg=visits_before)
+        page.wait_for_function("before=>window.__fixture.calls.filter(call=>call.table==='research_orders'&&!call.options.head).length>before",arg=research_before)
         old = page.locator('#notificationList .notification').filter(has_text='old-62@example.test')
         old.get_by_role('button', name='تعليم كمقروء', exact=True).click()
         page.wait_for_function("window.__fixture.rows.find(row=>row.email==='old-62@example.test').seen_at!==null&&[...document.querySelectorAll('#notificationList .notification.seen')].some(row=>row.textContent.includes('old-62@example.test'))")
@@ -271,7 +393,19 @@ with sync_playwright() as playwright:
         page.click('#refreshNotifications')
         page.wait_for_function("document.querySelectorAll('#notificationList .notification').length===50")
         assert page.locator('#loadOlderNotifications').is_visible()
+        page.click('#loadOlderResearchOrders')
+        page.wait_for_function("document.querySelectorAll('#researchOrderList .research-order').length===65")
+        assert page.locator('#loadOlderResearchOrders').is_hidden()
+        assert page.evaluate("new Set([...document.querySelectorAll('#researchOrderList .research-order')].map(row=>row.dataset.orderId)).size") == 65
+        research_queries = page.evaluate("window.__fixture.calls.filter(call=>call.table==='research_orders'&&!call.options.head)")
+        assert research_queries[-1]['range'] == [50,99]
+        page.select_option('#researchOrderFilter', 'approved')
+        page.wait_for_function("document.querySelectorAll('#researchOrderList .research-order').length===1")
+        assert 'طلب سابق معتمد' in page.locator('#researchOrderList').inner_text()
+        page.select_option('#researchOrderFilter', 'waiting_payment')
+        page.wait_for_function("document.querySelectorAll('#researchOrderList .research-order').length===50")
+        assert page.locator('#loadOlderResearchOrders').is_visible()
         assert not errors, errors
-        print(('Mobile' if mobile else 'Desktop')+': strict CSP, anonymous/nonadmin denial, MFA enrollment/challenge gates, secret cleanup, safe signup fields, read markers, stale sign-out responses, older-registration pagination, MFA-protected visit statistics with errors and stale-result cleanup, and no secret storage pass using fixtures only.')
+        print(('Mobile' if mobile else 'Desktop')+': strict CSP, private admin MFA gates, safe signup/order fields, payment checkbox and review RPC, provider errors, order filters/pagination, draft-preserving polling, stale read/review cleanup, assurance downgrade, existing notifications/visits, and no secret storage pass using fixtures only.')
         context.close()
     browser.close()

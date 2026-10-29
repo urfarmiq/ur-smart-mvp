@@ -1,6 +1,7 @@
 import {handleGeminiAdvice,geminiStatus} from './gemini-advisor.mjs';
 import {readSatelliteRequest,validateSatellitePolygon,satelliteFetch,SatelliteRequestError} from './satellite-security.mjs';
 import {handleWeather} from './met-weather.mjs';
+import {handleResearch,researchStatus} from './research-service.mjs';
 // UR Smart Sentinel-2 analytics gateway (Cloudflare Worker).
 // Required secrets: SENTINEL_CLIENT_ID, SENTINEL_CLIENT_SECRET.
 // Required variable: SUPABASE_URL. Optional: SUPABASE_PUBLISHABLE_KEY, ALLOWED_ORIGIN.
@@ -35,7 +36,7 @@ function toUtm(lon,lat,zone){
  if(lat<0)y+=10000000;
  return [x,y];
 }
-export default {async fetch(req,env){
+const platformWorker={async fetch(req,env){
  const origin=req.headers.get('Origin')||'';
  const defaultOrigin=env.ALLOWED_ORIGIN||'https://urfarmiq.github.io';
  const allowedOrigins=new Set([defaultOrigin,'https://urfarmiq.github.io','https://ur-smart-urfarmiq.pages.dev']);
@@ -46,6 +47,8 @@ export default {async fetch(req,env){
  if(path==='/weather')return handleWeather(req,env,allowed);
  if(path==='/advice/status'&&req.method==='GET')return reply(geminiStatus(env),200,allowed);
  if(path==='/advice')return handleGeminiAdvice(req,env,{reply,origin:allowed});
+ if(path==='/research/status'&&req.method==='GET')return reply(researchStatus(env),200,allowed);
+ if(path==='/research')return handleResearch(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>platformWorker.fetch(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env)});
  if(req.method!=='POST')return reply({error:'POST only'},405,allowed);
  try{
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
@@ -120,3 +123,4 @@ function evaluatePixel(s){
  const newest=items.filter(x=>x.validPixels>=3).sort((a,b)=>b.date.localeCompare(a.date))[0];const best=newest||items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;const series=items.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>({date:x.date,indices:x.indices,ndvi:x.ndvi,ndmi:x.ndmi,valid_pixels:x.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:Number.isFinite(totalPixels)&&totalPixels>0?Math.round(x.validPixels/totalPixels*1000)/10:null}));return reply({field_id,geometry,series,ndvi:best.ndvi,ndmi:best.ndmi,indices:best.indices,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,search_window_days:searchedDays,note:searchedDays>65?'لم يتوفر مشهد صالح في آخر 65 يومًا؛ عُرض أحدث مشهد صالح من نافذة بحث موسعة حتى 180 يومًا.':'مشهد صالح ضمن آخر 65 يومًا. القيم متوسطات بكسلات صالحة بعد قناع السحب.'},200,allowed);
  }catch(e){if(e instanceof SatelliteRequestError)return reply({error:e.message},e.status,allowed);if(e?.name==='AbortError'||e?.name==='TimeoutError')return reply({error:'Satellite upstream timed out'},504,allowed);return reply({error:'Analysis temporarily unavailable'},500,allowed)}
 }};
+export default platformWorker;

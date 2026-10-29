@@ -33,6 +33,15 @@
 <p id="mfaStatus" role="status" aria-live="polite"></p>
 </section>
 <section id="adminContent" hidden>
+<section class="panel" aria-labelledby="researchOrdersHeading">
+<div class="heading-row"><div><p class="eyebrow">مراجعة الدفع يدويًا</p><h2 id="researchOrdersHeading">طلبات الباحثين</h2><p class="muted">بانتظار مراجعة الدفع: <strong id="researchPendingCount">—</strong></p></div><button id="refreshResearchOrders" type="button" class="secondary">تحديث الطلبات</button></div>
+<p class="note">أجرة الخدمة ٢٥٬٠٠٠ دينار عراقي لكل طلب. تحقّق من استلام المبلغ ومن نطاق الطلب قبل الموافقة. بعد التأكيد يستطيع الباحث بدء التنفيذ الآلي من صفحة الخدمة.</p>
+<label for="researchOrderFilter">حالة الطلبات</label><select id="researchOrderFilter"><option value="waiting_payment">بانتظار مراجعة الدفع</option><option value="approved">مسموح بالتنفيذ</option><option value="running">قيد التنفيذ</option><option value="completed">مكتمل</option><option value="needs_review">يحتاج مراجعة</option><option value="failed">تعذّر التنفيذ</option><option value="rejected">مرفوض</option><option value="all">كل الحالات</option></select>
+<p id="researchOrdersStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الطلبات بعد.</p>
+<div id="researchOrderList" class="research-orders"></div>
+<p id="researchOrderPaginationStatus" class="muted" role="status"></p><button id="loadOlderResearchOrders" type="button" class="secondary" hidden>عرض طلبات أقدم</button>
+<p class="muted">تُعرض بيانات الطلب ومرجع الدفع فقط؛ لا تُحمّل ملفات الباحثين أو النتائج الكبيرة في هذه اللوحة. تظهر الطلبات من الأحدث في دفعات من ٥٠.</p>
+</section>
 <section class="panel" aria-labelledby="visitsHeading">
 <div class="heading-row"><div><p class="eyebrow">حركة الموقع</p><h2 id="visitsHeading">مشاهدات صفحات المنصة</h2></div><button id="refreshVisits" type="button" class="secondary">تحديث الإحصاءات</button></div>
 <p id="visitsStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الإحصاءات بعد.</p>
