@@ -21,3 +21,11 @@
 ## التحقق
 
 اختبارات المصدر والواجهة تغطي الهطول والصفر والبيانات المفقودة والتغطية الجزئية والفترات ذات الست ساعات وعدم تكرار الكميات، والهطول خارج أول ٢٤ ساعة، وتوقيت بغداد. اختبار المتصفح يستخدم توقعات اصطناعية معروفة على الهاتف والحاسوب؛ فحص الرابط العام يتحقق من الملفات المنشورة والاستجابة الحية دون قراءة حسابات أو تعديل حقول.
+
+## Compact weather interface
+
+The weather screen now opens with the location, current model condition and four main metrics. The location picker collapses after a successful load, hourly cards scroll, and seven day rows expand for their original details. Source and coverage explanations remain in expandable details.
+
+The rain card displays a short 24-hour amount and the next wet period, with interactive bars for the original forecast intervals. Bar width follows interval duration and height represents the total millimetres for that interval, not a rate. Tap or keyboard activation reveals its date, start/end and full-period quantity. Unknown quantities and uncovered gaps are hatched, distinct from known zero. No six-hour interval is interpolated into invented hourly amounts.
+
+The layout uses local CSS and inline SVG icons, with no new external service, account, paid API or database migration. Browser acceptance covers 1280px desktop, 390px mobile and 320px narrow mobile, including touch/keyboard, unknown/zero/partial/six-hour rainfall and existing account ownership guards.

@@ -146,6 +146,70 @@ def has_number(value, expected):
     return any(abs(float(number) - expected) < 1e-9 for number in numbers)
 
 
+def open_location_picker(page):
+    picker = page.locator('#weatherLocationPicker')
+    if picker.count() and not picker.evaluate('node=>node.open'):
+        picker.locator('summary').first.click()
+        assert picker.evaluate('node=>node.open')
+
+
+def show_rain_details(page):
+    details = page.locator('#rainForecastDetails')
+    assert details.count() == 1
+    if not details.evaluate('node=>node.open'):
+        details.locator('summary').first.click()
+    assert details.evaluate('node=>node.open')
+
+
+def rain_chart_case(page, summary, mode, mobile):
+    # A short visual summary replaces the old1147px mobile report. Precise
+    # coverage and interval notes stay available under a native details control.
+    details = page.locator('#rainForecastDetails')
+    assert not details.evaluate('node=>node.open'), mode
+    height = page.locator('#weatherRainSummary').bounding_box()['height']
+    STATE.setdefault('visual_metrics', []).append({'mode': mode, 'width': page.viewport_size['width'], 'rain_height': round(height, 1)})
+    if mobile:
+        assert height <= 700, (mode, height)
+    bars = page.locator('#rainChart .rain-bar')
+    assert bars.count() == len(summary['periods']), (mode, bars.count(), len(summary['periods']))
+    for index, period in enumerate(summary['periods']):
+        bar = bars.nth(index)
+        assert bar.get_attribute('data-start') == period['start']
+        assert bar.get_attribute('data-end') == period['end']
+        assert float(bar.get_attribute('data-hours')) == period['interval_seconds'] / 3600
+        amount = bar.get_attribute('data-mm')
+        if period['precipitation_mm'] is None:
+            assert amount == '', (mode, amount)
+        else:
+            assert float(amount) == period['precipitation_mm'], (mode, amount)
+    selected = next((i for i, row in enumerate(summary['periods']) if row['precipitation_mm'] is not None and row['precipitation_mm'] > 0), 0)
+    if bars.count():
+        bar = bars.nth(selected)
+        bar.scroll_into_view_if_needed()
+        if mobile:
+            bar.tap()
+        else:
+            bar.focus()
+            bar.press('Enter')
+        text = ascii_text(page.locator('#rainChartSelection').inner_text())
+        period = summary['periods'][selected]
+        assert period['start'][11:16] in text and period['end'][11:16] in text, text
+        if period['precipitation_mm'] is None:
+            assert 'غير متاح' in text, text
+        else:
+            assert has_number(text, period['precipitation_mm']), text
+        if mode == 'six_hour':
+            assert has_number(text, 6) and ('ساعات' in text or 'فترة' in text), text
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'), mode
+    if mode in ('wet', 'partial', 'six_hour', 'missing'):
+        size = 'narrow' if page.viewport_size['width'] < 360 else ('mobile' if mobile else 'desktop')
+        page.locator('#weatherRainSummary').screenshot(path='/tmp/ur-weather-app-'+mode+'-'+size+'.png')
+        if mode == 'wet':
+            page.evaluate("async()=>{window.scrollTo(0,0);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));}")
+            page.screenshot(path='/tmp/ur-weather-app-full-'+size+'.png', full_page=True)
+    show_rain_details(page)
+
+
 def rain_cases(page, mobile):
     for mode in ('wet', 'dry', 'missing', 'partial', 'six_hour', 'later', 'probability'):
         STATE['mode'] = 'rain_' + mode
@@ -155,6 +219,7 @@ def rain_cases(page, mobile):
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'), mode
         forecast = STATE['last_forecast']
         summary = page.evaluate("async data=>(await import('./weather-core.mjs')).normalizeWeather(data).rain_forecast", forecast)
+        rain_chart_case(page, summary, mode, mobile)
         amount = ascii_text(page.locator('#rainForecastAmount').inner_text())
         title = page.locator('#rainForecastTitle').inner_text()
         coverage = ascii_text(page.locator('#rainForecastCoverage').inner_text())
@@ -174,7 +239,7 @@ def rain_cases(page, mobile):
         elif mode == 'dry':
             assert summary['complete'] and summary['precipitation_mm'] == 0
             assert has_number(amount, 0), amount
-            assert 'لا' in title and ('هطول' in title or 'مطر' in title), title
+            assert page.locator('#weatherRainSummary').get_attribute('data-rain-state') == 'dry', title
             assert summary['next_rain'] is None
         elif mode == 'missing':
             assert not summary['complete'] and summary['precipitation_mm'] is None
@@ -240,11 +305,16 @@ with sync_playwright() as p:
         assert page.locator('#weatherHourly .hour-card').count() == 24
         assert page.locator('#weatherDaily .day-card').count() == 7
         assert page.locator('#weatherCurrent .metric').filter(has_text='الرطوبة النسبية').locator('strong').inner_text() == '—'
-        assert page.locator('#weatherDaily .day-card').first.locator('dl > div').filter(has_text='التبخر المرجعي').locator('dd').inner_text() == 'غير متاح'
+        first_day = page.locator('#weatherDaily .day-card').first
+        first_day.locator('summary').click()
+        assert first_day.evaluate('node=>node.open')
+        assert first_day.locator('dl > div').filter(has_text='التبخر المرجعي').locator('dd').inner_text() == 'غير متاح'
+        first_day.locator('summary').click()
+        assert not first_day.evaluate('node=>node.open')
         assert 'فترة' in page.locator('#weatherCurrent').inner_text()
         assert page.locator('#weatherRainSummary').is_visible()
-        assert 'مجموع الهطول ليوم كامل' in page.locator('#weatherDaily').inner_text()
-        assert 'تقديرات نماذج الطقس' in page.locator('#weatherResult').inner_text()
+        assert 'مجموع الهطول ليوم كامل' in page.locator('#weatherDaily').text_content()
+        assert 'تقديرات نماذج الطقس' in page.locator('#weatherResult').text_content()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
         request = STATE['requests'][-1]
         assert set(request['query']) == {'lat', 'lon'}
@@ -258,6 +328,7 @@ with sync_playwright() as p:
         # An unavailable boundary must never become a reference-city forecast silently.
         before = len(STATE['requests'])
         page.evaluate('id=>{window.__fixture.missingBoundary=id;}', FIELD_B)
+        open_location_picker(page)
         page.select_option('#weatherField', FIELD_B)
         wait_text(page, '#weatherStatus', 'لا توجد حدود محفوظة')
         assert page.locator('#weatherResult').is_hidden()
@@ -265,8 +336,10 @@ with sync_playwright() as p:
 
         # A delayed A boundary cannot replace B or launch A's stale forecast request.
         page.evaluate("()=>{window.__fixture.missingBoundary=null;window.__fixture.holdBoundary=true;}")
+        open_location_picker(page)
         page.select_option('#weatherField', FIELD_A)
         page.wait_for_function('!!window.__fixture.pendingBoundary')
+        open_location_picker(page)
         page.select_option('#weatherField', FIELD_B)
         wait_text(page, '#weatherLocation', 'حقل الاختبار الثاني')
         before = len(STATE['requests'])
@@ -276,6 +349,7 @@ with sync_playwright() as p:
         page.evaluate('window.__fixture.holdBoundary=false')
 
         STATE['mode'] = 'quota'
+        open_location_picker(page)
         page.click('#refreshWeather')
         wait_text(page, '#weatherStatus', 'حد الطلبات')
         assert page.locator('#weatherResult').is_hidden()
@@ -288,6 +362,7 @@ with sync_playwright() as p:
         assert page.locator('#weatherField').input_value() == ''
         assert page.evaluate("window.__fixture.calls.filter(call=>call.table==='field_boundaries').length") == 0
         assert len(STATE['requests']) == before
+        open_location_picker(page)
         page.select_option('#locationMode', 'city')
         page.select_option('#weatherCity', 'basra')
         wait_text(page, '#weatherStatus', 'طقس المدينة المرجعية')
@@ -305,7 +380,18 @@ with sync_playwright() as p:
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
         assert page.evaluate("window.__fixture.calls.every(call=>call.action==='select')")
         rain_cases(page, mobile)
+        if mobile:
+            page.set_viewport_size({'width': 320, 'height': 740})
+            STATE['mode'] = 'rain_wet'
+            page.goto('https://ur-smart.test/weather.html?field=' + FIELD_A)
+            wait_text(page, '#weatherStatus', 'تم تحديث توقعات موقع الحقل')
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
+            forecast = STATE['last_forecast']
+            rain = page.evaluate("async data=>(await import('./weather-core.mjs')).normalizeWeather(data).rain_forecast", forecast)
+            rain_chart_case(page, rain, 'wet', mobile)
+            page.screenshot(path='/tmp/ur-weather-app-narrow-mobile.png', full_page=True)
         assert not errors, errors
         print(('Mobile' if mobile else 'Desktop')+': rain quantity/time/coverage, unknown probability, dry versus missing, partial-day and6-hour periods, later wet-day visibility, session cleanup, existing field/current/daily forecast, city attribution, stale field suppression, quota/foreign-field guards and dashboard summary pass; no cloud writes.')
         context.close()
     browser.close()
+    print('Compact rain layout metrics: ' + json.dumps(STATE.get('visual_metrics', [])))
