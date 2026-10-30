@@ -19,4 +19,4 @@ jobs:
         run: |
           node --test tests/*.test.mjs
           python3 tests/check_pages.py
-          python3 -m py_compile tests/browser_satellite.py tests/browser_management.py tests/browser_weather.py tests/browser_admin.py tests/browser_auth.py tests/browser_visits.py tests/browser_login_recovery.py tests/browser_local_sdk.py tests/browser_research_lab.py tests/browser_research_image.py
+          python3 -m py_compile tests/browser_satellite.py tests/browser_management.py tests/browser_weather.py tests/browser_admin.py tests/browser_auth.py tests/browser_visits.py tests/browser_login_recovery.py tests/browser_local_sdk.py tests/browser_research_lab.py tests/browser_research_image.py tests/browser_farm_budget.py

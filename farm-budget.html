@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+  <meta name="theme-color" content="#123d2d">
+  <meta name="description" content="احسب تكاليف الموسم الزراعي والإنتاج المتوقع ونقطة التعادل من أرقامك، بالدونم العراقي والدينار العراقي.">
+  <title>ميزانية الموسم الزراعي | أور الزراعية</title>
+  <link rel="stylesheet" href="./farm-budget.css">
+  <script type="module" src="./farm-budget.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">انتقل إلى المحتوى</a>
+  <header><div class="wrap header-inner">
+    <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true">🌱</span><span>أور الزراعية<small lang="en" dir="ltr">UR SMART AGRICULTURE</small></span></a>
+    <nav aria-label="التنقل الرئيسي"><a href="./services.html">الخدمات</a><a href="./dashboard.html">لوحة المزارع</a><a href="./index.html">الرئيسية</a></nav>
+  </div></header>
+  <main id="main">
+    <section class="hero"><div class="wrap hero-inner"><div><p class="eyebrow">قرار أوضح للموسم</p><h1>ميزانية الموسم الزراعي</h1><p>اجمع مصروفاتك، وافهم تكلفة الدونم، وقارنها بإيرادات تقديرية من الأرقام التي تدخلها أنت.</p></div><div class="hero-fact"><strong>١ دونم عراقي</strong><span>٢٬٥٠٠ متر مربع</span><small>الحسابات بالدينار العراقي</small></div></div></section>
+    <div class="wrap workspace">
+      <div class="intro-grid"><p class="notice">هذه أداة حساب أولية، وليست دراسة جدوى معتمدة أو وعدًا بالربح. الأسعار والإنتاج افتراضات تدخلها أنت؛ لا تجلب الصفحة أسعار سوق أو توقعات إنتاج تلقائية.</p><p class="privacy">مدخلاتك تبقى داخل هذه الصفحة، ولا تُرسل إلى خادم أو مساعد ذكي. نزّل نسخة لحفظها؛ تحديث الصفحة أو إغلاقها يمسح المدخلات.</p></div>
+      <noscript><p class="notice error">يتطلب الحساب تفعيل JavaScript. لا تُرسل هذه الصفحة المدخلات في نموذج إلى أي جهة.</p></noscript>
+      <form id="budgetForm" novalidate autocomplete="off">
+        <section class="panel" aria-labelledby="areaTitle"><div class="section-heading"><span class="step" aria-hidden="true">١</span><div><h2 id="areaTitle">مساحة الموسم</h2><p class="hint">أدخل مساحة الأرض التي تغطيها هذه الميزانية.</p></div></div>
+          <div class="area-grid"><div class="field"><label for="areaValue">المساحة</label><input id="areaValue" inputmode="decimal" type="text" required aria-describedby="areaHint" placeholder="أدخل المساحة"></div><div class="field"><label for="areaUnit">وحدة المساحة</label><select id="areaUnit"><option value="donum">دونم عراقي</option><option value="m2">متر مربع</option></select></div></div>
+          <p class="hint" id="areaHint">الدونم العراقي = ٢٬٥٠٠ م². تبديل الوحدة يحافظ على المساحة التي أدخلتها.</p>
+          <p id="areaEquivalent" class="area-equivalent" role="status"></p>
+        </section>
+        <section class="panel" aria-labelledby="costTitle"><div class="section-heading"><span class="step" aria-hidden="true">٢</span><div><h2 id="costTitle">مصروفات الموسم</h2><p class="hint">مثل البذور، والسماد، والوقود، والأجور. أدخل الكمية وسعر وحدتها لكل بند.</p></div></div>
+          <p class="hint basis-help">«للمزرعة كلها» يحسب الكمية × سعر الوحدة مرة واحدة. «لكل دونم عراقي» يضرب النتيجة في مساحة الموسم أيضًا.</p>
+          <div id="costRows" class="cost-rows"></div><div class="cost-actions"><button id="addCost" type="button" class="button secondary">＋ أضف بند مصروف</button><span id="costCount" class="hint" aria-live="polite"></span></div>
+        </section>
+        <section class="panel" aria-labelledby="revenueTitle"><div class="section-heading"><span class="step" aria-hidden="true">٣</span><div><h2 id="revenueTitle">إنتاج وسعر تقديريان <span class="optional">(اختياري)</span></h2><p class="hint">يمكن تركهما فارغين لحساب المصروفات فقط. الصفر المدخل يُحسب صفرًا؛ الفراغ يعني غير متاح.</p></div></div>
+          <div class="area-grid"><div class="field"><label for="yieldKgPerDonum">الإنتاج المتوقع لكل دونم عراقي <span class="unit">كغم / دونم</span></label><input id="yieldKgPerDonum" inputmode="decimal" type="text" placeholder="أدخل افتراضك للإنتاج"></div><div class="field"><label for="salePriceIqdPerKg">سعر البيع المتوقع للكيلوغرام <span class="unit">دينار عراقي / كغم</span></label><input id="salePriceIqdPerKg" inputmode="decimal" type="text" placeholder="أدخل افتراضك للسعر"></div></div>
+          <p class="hint">أدخل جميع التكاليف ذات الصلة. النتيجة لا تشمل أي نفقة أو خسارة أو التزام لم تضفه بنفسك.</p>
+        </section>
+        <div class="form-actions"><button type="submit" id="calculateBudget" class="button primary" disabled>احسب ميزانية الموسم</button><button type="button" id="clearBudget" class="button quiet" disabled>مسح جميع المدخلات</button></div>
+        <p id="formStatus" class="status" role="status" aria-live="polite">جارٍ تجهيز أداة الحساب. إذا بقي الزر غير متاح، أعد تحميل الصفحة.</p>
+      </form>
+      <section id="resultSection" class="panel results" hidden aria-labelledby="resultTitle">
+        <div class="result-heading"><div><p class="eyebrow">من أرقامك أنت</p><h2 id="resultTitle" tabindex="-1">ملخص الميزانية</h2><p id="calculatedAt" class="hint"></p></div><span class="result-tag">تقديري</span></div>
+        <p id="staleNotice" class="notice" hidden>تغيّرت المدخلات. هذه نتيجة سابقة؛ اضغط «احسب ميزانية الموسم» لتحديثها قبل التنزيل أو الطباعة.</p>
+        <dl class="metrics"><div><dt>إجمالي التكاليف</dt><dd id="totalCost">غير متاح</dd><span>دينار عراقي</span></div><div><dt>تكلفة الدونم العراقي</dt><dd id="costPerDonum">غير متاح</dd><span>دينار / دونم</span></div><div><dt>الإنتاج المتوقع للموسم</dt><dd id="expectedProduction">غير متاح</dd><span>كغم</span></div><div><dt>الإيراد المتوقع</dt><dd id="expectedRevenue">غير متاح</dd><span>دينار عراقي</span></div><div class="margin-metric"><dt>الفرق المتوقع: الإيراد − التكاليف</dt><dd id="expectedMargin">غير متاح</dd><span>دينار عراقي؛ ليس ربحًا مضمونًا</span></div></dl>
+        <div class="break-even"><h3>نقطة التعادل الحسابية التقريبية</h3><div><p><span>سعر البيع اللازم لتغطية التكاليف</span><strong id="breakEvenPrice">غير متاح</strong><small>دينار عراقي / كغم، حسب الإنتاج المدخل</small></p><p><span>الإنتاج اللازم لتغطية التكاليف</span><strong id="breakEvenYield">غير متاح</strong><small>كغم / دونم عراقي، حسب سعر البيع المدخل</small></p></div></div>
+        <h3>الافتراضات المستخدمة</h3><dl id="assumptions" class="assumptions"></dl>
+        <h3>تفصيل التكاليف</h3><div class="table-scroll"><table id="costBreakdown"><thead><tr><th scope="col">البند</th><th scope="col">الكمية</th><th scope="col">سعر الوحدة (د.ع)</th><th scope="col">طريقة الحساب</th><th scope="col">الكلفة (د.ع)</th></tr></thead><tbody></tbody></table></div>
+        <ul id="budgetWarnings" class="warnings"></ul>
+        <p class="hint">تُقرب كلفة كل بند إلى أقرب دينار قبل جمع التكاليف. القيم الأخرى قد تُقرب للعرض؛ احتفظ بملف JSON لمراجعة الأرقام المحسوبة.</p>
+        <div class="export-actions"><button type="button" id="downloadBudgetCsv" class="button secondary" disabled>تنزيل الجداول CSV</button><button type="button" id="downloadBudgetJson" class="button secondary" disabled>تنزيل الميزانية JSON</button><button type="button" id="printBudget" class="button primary" disabled>طباعة / حفظ PDF</button></div>
+      </section>
+    </div>
+  </main>
+  <footer><div class="wrap"><strong>أور الزراعية الذكية</strong><p>حسابات واضحة وافتراضات تستطيع مراجعتها.</p></div></footer>
+</body>
+</html>
