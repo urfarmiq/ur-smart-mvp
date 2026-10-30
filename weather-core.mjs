@@ -66,7 +66,40 @@ function checkUnits(data){
   const reported=data[group+'_units']?.[key];if(reported!==undefined&&reported!==unit)throw Error('وحدات استجابة الطقس لا تطابق الوحدات المطلوبة.');
  }
 }
-function alertsFor(current,daily){
+function localTimestamp(instant,offset){return new Date(instant+offset*1000).toISOString().slice(0,19);}
+
+// A period is an accumulation over [start,end], never an hourly rate. Only
+// complete, non-overlapping source periods enter the displayed window total.
+function precipitationForecast(data,hourly,{nowMs,offset,horizonEnd}){
+ const input=Array.isArray(data.precipitation_periods)&&data.precipitation_periods.length?data.precipitation_periods:hourly.map(row=>({start:row.time,end:row.end_time,precipitation_mm:row.precipitation_mm,rain_probability_percent:row.rain_probability_percent,interval_seconds:row.interval_seconds,weather_code:row.weather_code}));
+ const candidates=[];
+ for(const row of input.slice(0,336)){
+  const start=timeInstant(row?.start,offset),end=timeInstant(row?.end,offset);
+  if(start===null||end===null||end<=start||end-start>12*HOUR||start<nowMs||start>=horizonEnd)continue;
+  const interval=(end-start)/1000,reported=bounded(row.interval_seconds,1,43200);
+  if(!Number.isInteger(interval)||(row.interval_seconds!==undefined&&reported!==interval))continue;
+  candidates.push({start:row.start,end:row.end,precipitation_mm:bounded(row.precipitation_mm,0),rain_probability_percent:bounded(row.rain_probability_percent,0,100),interval_seconds:interval,weather_code:integer(row.weather_code),_start:start,_end:end});
+ }
+ candidates.sort((a,b)=>a._start-b._start||Number(a.precipitation_mm===null)-Number(b.precipitation_mm===null)||a.interval_seconds-b.interval_seconds);
+ const canonical=[];let lastEnd=-Infinity;
+ for(const row of candidates){if(row._start<lastEnd)continue;canonical.push(row);lastEnd=row._end;}
+ let future=canonical.filter(row=>row._start>=nowMs);
+ const declaredStart=timeInstant(data.rain_forecast?.start,offset),declaredEnd=timeInstant(data.rain_forecast?.end,offset);
+ const futureHour=hourly.map(row=>timeInstant(row.time,offset)).find(value=>value!==null&&value>=nowMs);
+ const start=declaredStart!==null&&declaredEnd===declaredStart+24*HOUR&&declaredStart>=nowMs&&declaredStart<horizonEnd?declaredStart:futureHour??future[0]?._start??null;
+ const end=start===null?null:start+24*HOUR,declaredLimit=timeInstant(data.rain_forecast?.search_limit_end,offset);
+ const limit=start===null?null:declaredLimit!==null&&declaredLimit>start&&declaredLimit<=start+7*DAY?declaredLimit:start+7*DAY;
+ future=future.filter(row=>limit===null||row._end<=limit);
+ const window=future.filter(row=>start!==null&&row._start>=start&&row._end<=end);
+ const known=window.filter(row=>row.precipitation_mm!==null),covered=known.reduce((sum,row)=>sum+row.interval_seconds,0),amount=known.length?Math.round(known.reduce((sum,row)=>sum+row.precipitation_mm,0)*1000)/1000:null;
+ const complete=start!==null&&covered===86400&&known[0]?._start===start&&known.at(-1)?._end===end;
+ const clean=row=>{const {_start,_end,...publicRow}=row;return publicRow;};
+ const next=future.find(row=>row.precipitation_mm!==null&&row.precipitation_mm>0);
+ const probabilities=window.map(row=>row.rain_probability_percent).filter(value=>value!==null);
+ return {periods:future.map(clean),summary:{start:start===null?null:localTimestamp(start,offset),end:end===null?null:localTimestamp(end,offset),precipitation_mm:complete?amount:null,known_precipitation_mm:amount,covered_hours:covered/3600,total_hours:24,complete,search_end:future.at(-1)?.end??null,search_limit_end:limit===null?null:localTimestamp(limit,offset),periods:window.map(clean),next_rain:next?clean(next):null,rain_probability_percent_max:probabilities.length?Math.max(...probabilities):null}};
+}
+
+function alertsFor(current,daily,rainForecast){
  const rows=daily.slice(0,3),alerts=[];
  const add=(kind,title,text)=>alerts.push({kind,level:'تنبيه إرشادي',title,text});
  const cold=rows.find(x=>x.tmin_c!==null&&x.tmin_c<=2);
@@ -76,8 +109,8 @@ function alertsFor(current,daily){
  const windy=rows.some(x=>x.wind_max_kmh!==null&&x.wind_max_kmh>=35||x.wind_gusts_max_kmh!==null&&x.wind_gusts_max_kmh>=50);
  if(windy||(current&&!current.stale&&(current.wind_kmh!==null&&current.wind_kmh>=35||current.wind_gusts_kmh!==null&&current.wind_gusts_kmh>=50)))add('wind','رياح قوية محتملة','راجع سرعة الرياح الفعلية وتعليمات المنتج قبل الرش، وافحص تثبيت الأغطية والأدوات الخفيفة.');
  if(rows.some(x=>x.weather_code!==null&&x.weather_code>=95&&x.weather_code<=99)||(current&&!current.stale&&current.weather_code!==null&&current.weather_code>=95&&current.weather_code<=99))add('storm','احتمال عواصف رعدية','تابع تحذيرات الأرصاد الرسمية قبل العمل في المناطق المكشوفة. هذه ملاحظة من التوقع النموذجي وليست إنذارًا رسميًا.');
- const rain=rows.find(x=>x.precipitation_mm!==null&&x.precipitation_mm>=5&&x.rain_probability_percent!==null&&x.rain_probability_percent>=60);
- if(rain)add('rain','مطر محتمل','المطر المتوقع في '+rain.date+' قد يؤثر في العمل والرش. راجع التوقعات الأحدث وقس رطوبة الجذور قبل تعديل جدول الري.');
+ const rain=rows.find(x=>x.precipitation_mm!==null&&x.precipitation_mm>=5);
+ if(rain||rainForecast?.known_precipitation_mm>=5)add('rain','هطول متوقع','تتضمن الفترات المتاحة كمية هطول قد تؤثر في العمل والرش'+(rain?' في '+rain.date:'')+'. راجع نافذة المطر وتحديث المصدر وقس رطوبة الجذور قبل تعديل جدول الري؛ عدم توفر نسبة احتمال لا يلغي كمية الهطول المتوقعة.');
  return alerts;
 }
 
@@ -93,15 +126,17 @@ export function normalizeWeather(data,{fetchedAt,now=new Date()}={}){
  const raw=data.current,instant=timeInstant(raw?.time,offset);
  if(instant!==null){
   const age=(nowMs-instant)/60000,interval=bounded(raw.interval,1,86400);
-  current={time:raw.time,temperature_c:bounded(raw.temperature_2m,-100,70),feels_like_c:bounded(raw.apparent_temperature,-150,100),humidity_percent:bounded(raw.relative_humidity_2m,0,100),precipitation_mm:bounded(raw.precipitation,0),wind_kmh:bounded(raw.wind_speed_10m,0),wind_gusts_kmh:bounded(raw.wind_gusts_10m,0),wind_direction_deg:bounded(raw.wind_direction_10m,0,360),weather_code:integer(raw.weather_code),is_day:[0,1].includes(integer(raw.is_day))?integer(raw.is_day):null,interval_seconds:interval,interval_minutes:interval===null?null:interval/60,age_minutes:Math.max(0,Math.round(age)),stale:age>(interval===null?90:interval/60+90)||age< -15};
+  current={time:raw.time,end_time:interval===null?null:localTimestamp(instant+interval*1000,offset),temperature_c:bounded(raw.temperature_2m,-100,70),feels_like_c:bounded(raw.apparent_temperature,-150,100),humidity_percent:bounded(raw.relative_humidity_2m,0,100),precipitation_mm:bounded(raw.precipitation,0),wind_kmh:bounded(raw.wind_speed_10m,0),wind_gusts_kmh:bounded(raw.wind_gusts_10m,0),wind_direction_deg:bounded(raw.wind_direction_10m,0,360),weather_code:integer(raw.weather_code),is_day:[0,1].includes(integer(raw.is_day))?integer(raw.is_day):null,interval_seconds:interval,interval_minutes:interval===null?null:interval/60,age_minutes:Math.max(0,Math.round(age)),stale:age>(interval===null?90:interval/60+90)||age< -15};
   if(['temperature_c','humidity_percent','precipitation_mm','wind_kmh','weather_code'].every(key=>current[key]===null))current=null;
  }
  const arrayValue=(group,key,i)=>Array.isArray(group?.[key])?group[key][i]:undefined;
  const hourly=[],seenHours=new Set();
  (Array.isArray(data.hourly?.time)?data.hourly.time:[]).forEach((time,i)=>{
   const timestamp=timeInstant(time,offset);if(timestamp===null||timestamp<firstHour||timestamp>=firstHour+24*HOUR||seenHours.has(time))return;seenHours.add(time);
-  const h=data.hourly;
-  hourly.push({time,temperature_c:bounded(arrayValue(h,'temperature_2m',i),-100,70),humidity_percent:bounded(arrayValue(h,'relative_humidity_2m',i),0,100),precipitation_mm:bounded(arrayValue(h,'precipitation',i),0),rain_probability_percent:bounded(arrayValue(h,'precipitation_probability',i),0,100),wind_kmh:bounded(arrayValue(h,'wind_speed_10m',i),0),wind_gusts_kmh:bounded(arrayValue(h,'wind_gusts_10m',i),0),weather_code:integer(arrayValue(h,'weather_code',i))});
+  const h=data.hourly,rawInterval=bounded(arrayValue(h,'interval',i),1,43200),interval=rawInterval!==null&&Number.isInteger(rawInterval)?rawInterval:null;
+  const reportedEnd=arrayValue(h,'interval_end',i),endTime=interval===null?null:localTimestamp(timestamp+interval*1000,offset);
+  const consistentEnd=reportedEnd===undefined||timeInstant(reportedEnd,offset)===timestamp+(interval??0)*1000;
+  hourly.push({time,interval_seconds:consistentEnd?interval:null,end_time:consistentEnd?endTime:null,temperature_c:bounded(arrayValue(h,'temperature_2m',i),-100,70),humidity_percent:bounded(arrayValue(h,'relative_humidity_2m',i),0,100),precipitation_mm:bounded(arrayValue(h,'precipitation',i),0),rain_probability_percent:bounded(arrayValue(h,'precipitation_probability',i),0,100),wind_kmh:bounded(arrayValue(h,'wind_speed_10m',i),0),wind_gusts_kmh:bounded(arrayValue(h,'wind_gusts_10m',i),0),weather_code:integer(arrayValue(h,'weather_code',i))});
  });
  hourly.sort((a,b)=>a.time.localeCompare(b.time));
  const daily=[],seenDays=new Set();
@@ -116,7 +151,9 @@ export function normalizeWeather(data,{fetchedAt,now=new Date()}={}){
  const usableHourly=hourly.some(row=>hasValues(row,['temperature_c','humidity_percent','precipitation_mm','rain_probability_percent','wind_kmh','wind_gusts_kmh']));
  const usableDaily=daily.some(row=>hasValues(row,['tmax_c','tmin_c','precipitation_mm','rain_probability_percent','wind_max_kmh','wind_gusts_max_kmh','et0_mm']));
  if(!usableCurrent&&!usableHourly&&!usableDaily)throw Error('لم تتوفر بيانات طقس مؤرخة لهذا الموقع الآن.');
- return {source:WEATHER_SOURCE,source_url:WEATHER_SOURCE_URL,source_license:WEATHER_SOURCE_LICENSE,source_license_url:WEATHER_SOURCE_LICENSE_URL,timezone,utc_offset_seconds:offset,fetched_at:fetched.toISOString(),modeled:true,note:'تقديرات نموذجية قرب الموقع من MET Norway بترخيص CC BY 4.0، وليست قياس محطة داخل الحقل. العظمى والصغرى من عينات التوقع المتاحة؛ تبقى فترات المطر غير المكتملة والبيانات غير المتاحة فارغة. راجع القياسات والنشرة الرسمية قبل القرار.',current,hourly,daily,alerts:alertsFor(current,daily)};
+ const modelTime=data.model_updated_at,modelUpdated=typeof modelTime==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(modelTime)&&validDay(modelTime.slice(0,10))?new Date(modelTime):null;
+ const rain=precipitationForecast(data,hourly,{nowMs,offset,horizonEnd:nowMs+8*DAY});
+ return {source:WEATHER_SOURCE,source_url:WEATHER_SOURCE_URL,source_license:WEATHER_SOURCE_LICENSE,source_license_url:WEATHER_SOURCE_LICENSE_URL,timezone,utc_offset_seconds:offset,fetched_at:fetched.toISOString(),model_updated_at:modelUpdated&&Number.isFinite(modelUpdated.getTime())?modelUpdated.toISOString():null,modeled:true,note:'تقديرات نموذجية قرب الموقع من MET Norway بترخيص CC BY 4.0، وليست قياس محطة داخل الحقل. العظمى والصغرى من عينات التوقع المتاحة؛ تبقى فترات المطر غير المكتملة والبيانات غير المتاحة فارغة. راجع القياسات والنشرة الرسمية قبل القرار.',current,hourly,daily,precipitation_periods:rain.periods,rain_forecast:rain.summary,alerts:alertsFor(current,daily,rain.summary)};
 }
 
 export async function fetchWeather({latitude,longitude,signal,fetchImpl=globalThis.fetch,timeoutMs=15000,now}={}){

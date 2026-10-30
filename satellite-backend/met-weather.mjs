@@ -5,7 +5,7 @@ const HOUR=3600000,DAY=24*HOUR,OFFSET=10800,MAX_BYTES=1024*1024;
 const ENDPOINT='https://api.met.no/weatherapi/locationforecast/2.0/compact';
 export const MET_USER_AGENT='URSmart/1.0 (https://ur-smart-urfarmiq.pages.dev/; contact: https://www.instagram.com/ur.farm.iq/)';
 export const MET_SOURCE=Object.freeze({name:'MET Norway',url:'https://www.met.no/',license:'CC BY 4.0',license_url:'https://creativecommons.org/licenses/by/4.0/'});
-const NOTE='توقعات نموذجية من MET Norway أُعيد تنسيقها إلى توقيت بغداد. دقة النموذج العالمي نحو 9 كم، وقد تتباعد العينات إلى 6 ساعات. أعلى وأدنى حرارة محسوبتان من العينات المتاحة وليستا القيم القصوى الرسمية. مجموع المطر غير متاح إذا لم تغطِ الفترات اليوم كاملًا؛ الحقول المفقودة لا تعني صفرًا.';
+const NOTE='توقعات نموذجية من MET Norway أُعيد تنسيقها إلى توقيت بغداد. دقة النموذج العالمي نحو 9 كم، وقد تتباعد العينات إلى 6 ساعات. كميات الهطول تراكمات للفترة المحددة وليست قياسًا لحظيًا، وقد تشمل الثلج أو الهطول المختلط. لا يُقسّم تراكم الست ساعات بين الأيام ولا يُستكمل الناقص بأصفار. أعلى وأدنى حرارة من العينات المتاحة وليستا القيم القصوى الرسمية. لا يوفّر النموذج العالمي احتمال الهطول؛ تُعرض النسبة فقط إذا أرسلها المصدر.';
 const n=(value,min=-Infinity,max=Infinity)=>typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max?value:null;
 const ms=value=>{if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value))return null;const timestamp=Date.parse(value);return Number.isFinite(timestamp)&&new Date(timestamp).toISOString().replace('.000Z','Z')===value?timestamp:null};
 const local=time=>new Date(time+OFFSET*1000).toISOString().slice(0,16);
@@ -19,12 +19,13 @@ export function metSymbolToWMO(symbol){
  return Object.hasOwn(SYMBOLS,base)?SYMBOLS[base]:null;
 }
 function period(row){
- for(const hours of [1,6,12]){const value=row.data?.['next_'+hours+'_hours'];if(value&&typeof value==='object')return {hours,...value};}
- return null;
+ const values=[1,6,12].flatMap(hours=>{const value=row.data?.['next_'+hours+'_hours'];return value&&typeof value==='object'?[{...value,hours}]:[]});
+ // An empty next_1_hours block must not hide an actual six-hour amount.
+ return values.find(value=>n(value.details?.precipitation_amount,0)!==null)||values[0]||null;
 }
 function decoded(row){
  const details=row.data?.instant?.details||{},p=period(row),symbol=p?.summary?.symbol_code;
- return {time:local(row.timestamp),temperature_2m:n(details.air_temperature,-100,70),relative_humidity_2m:n(details.relative_humidity,0,100),apparent_temperature:null,
+ return {time:local(row.timestamp),interval_end:p?local(row.timestamp+p.hours*HOUR):null,temperature_2m:n(details.air_temperature,-100,70),relative_humidity_2m:n(details.relative_humidity,0,100),apparent_temperature:null,
   precipitation:n(p?.details?.precipitation_amount,0),precipitation_probability:n(p?.details?.probability_of_precipitation,0,100),
   weather_code:metSymbolToWMO(symbol),wind_speed_10m:kmh(details.wind_speed),wind_direction_10m:n(details.wind_from_direction,0,360),wind_gusts_10m:kmh(details.wind_speed_of_gust),
   is_day:typeof symbol==='string'&&symbol.endsWith('_day')?1:typeof symbol==='string'&&symbol.endsWith('_night')?0:null,interval:p?p.hours*3600:null};
@@ -43,6 +44,32 @@ function rainForDay(rows,start){
  }
  return round(sum);
 }
+function precipitationPeriods(rows,start,end){
+ // Keep one native accumulation at a time. Longer fallback intervals suppress
+ // overlapping rows; quantities are never prorated or added more than once.
+ const result=[];let cursor=start;
+ for(const row of rows){
+  if(row.timestamp<cursor||row.timestamp>=end)continue;
+  const p=period(row);if(!p||row.timestamp+p.hours*HOUR>end)continue;
+  const finish=row.timestamp+p.hours*HOUR;
+  result.push({start:local(row.timestamp),end:local(finish),precipitation_mm:n(p.details?.precipitation_amount,0),rain_probability_percent:n(p.details?.probability_of_precipitation,0,100),interval_seconds:p.hours*3600,weather_code:metSymbolToWMO(p.summary?.symbol_code)});
+  cursor=finish;
+ }
+ return result;
+}
+function rainForecast(rows,periods,nowMs){
+ const start=rows.find(row=>row.timestamp>=nowMs)?.timestamp??null,end=start===null?null:start+DAY;
+ const instant=value=>Date.parse(value+':00+03:00');
+ const window=periods.filter(p=>start!==null&&instant(p.start)>=start&&instant(p.end)<=end);
+ const known=window.filter(p=>p.precipitation_mm!==null),covered=known.reduce((sum,p)=>sum+p.interval_seconds/3600,0);
+ let cursor=start,contiguous=start!==null;
+ for(const p of window){const from=instant(p.start);if(from!==cursor||p.precipitation_mm===null)contiguous=false;cursor=instant(p.end);}
+ const complete=contiguous&&cursor===end&&covered===24;
+ const sum=known.length?round(known.reduce((amount,p)=>amount+p.precipitation_mm,0)):null;
+ const wet=periods.find(p=>instant(p.start)>=nowMs&&p.precipitation_mm!==null&&p.precipitation_mm>0)||null;
+ const probabilities=window.map(p=>p.rain_probability_percent).filter(value=>value!==null);
+ return {start:start===null?null:local(start),end:end===null?null:local(end),precipitation_mm:complete?sum:null,known_precipitation_mm:sum,covered_hours:covered,total_hours:24,complete,periods:window,next_rain:wet?{...wet}:null,rain_probability_percent_max:probabilities.length?Math.max(...probabilities):null,search_end:periods.at(-1)?.end??null,search_limit_end:local(Math.floor(nowMs/HOUR)*HOUR+7*DAY)};
+}
 function validateUnits(payload){
  const expected={air_temperature:'celsius',relative_humidity:'%',precipitation_amount:'mm',wind_speed:'m/s',wind_speed_of_gust:'m/s',wind_from_direction:'degrees',probability_of_precipitation:'%'};
  for(const [key,value] of Object.entries(expected)){const unit=payload.properties?.meta?.units?.[key];if(unit!==undefined&&unit!==value)throw Error('Invalid weather units');}
@@ -57,7 +84,8 @@ export function adaptMETPayload(payload,now=new Date()){
  const currentRow=rows.filter(row=>row.timestamp<=nowMs&&row.timestamp>=nowMs-6*HOUR).at(-1)||rows.find(row=>row.timestamp>nowMs&&row.timestamp<=nowMs+HOUR);
  const current=currentRow?decoded(currentRow):null;
  const hourlyRows=rows.filter(row=>row.timestamp>=firstHour&&row.timestamp<firstHour+24*HOUR).map(decoded);
- const hourly={};for(const key of ['time','temperature_2m','relative_humidity_2m','precipitation','precipitation_probability','weather_code','wind_speed_10m','wind_gusts_10m','interval'])hourly[key]=hourlyRows.map(row=>row[key]);
+ const hourly={};for(const key of ['time','interval_end','temperature_2m','relative_humidity_2m','precipitation','precipitation_probability','weather_code','wind_speed_10m','wind_gusts_10m','interval'])hourly[key]=hourlyRows.map(row=>row[key]);
+ const precipitation_periods=precipitationPeriods(rows,nowMs,firstHour+7*DAY),rain_forecast=rainForecast(rows,precipitation_periods,nowMs);
  const daily={time:[],weather_code:[],temperature_2m_max:[],temperature_2m_min:[],precipitation_sum:[],precipitation_probability_max:[],wind_speed_10m_max:[],wind_gusts_10m_max:[],et0_fao_evapotranspiration:[],sunrise:[],sunset:[]};
  for(let i=0;i<7;i++){
   const start=dayStart+i*DAY,dayRows=rows.filter(row=>row.timestamp>=start&&row.timestamp<start+DAY).map(decoded),codes=dayRows.map(row=>row.weather_code).filter(value=>value!==null);
@@ -68,11 +96,11 @@ export function adaptMETPayload(payload,now=new Date()){
   daily.wind_speed_10m_max.push(max(dayRows,'wind_speed_10m'));daily.wind_gusts_10m_max.push(max(dayRows,'wind_gusts_10m'));
   daily.et0_fao_evapotranspiration.push(null);daily.sunrise.push(null);daily.sunset.push(null);
  }
- const common={time:'iso8601',temperature_2m:'°C',relative_humidity_2m:'%',precipitation:'mm',precipitation_probability:'%',weather_code:'wmo code',wind_speed_10m:'km/h',wind_gusts_10m:'km/h',interval:'seconds'};
+ const common={time:'iso8601',interval_end:'iso8601',temperature_2m:'°C',relative_humidity_2m:'%',precipitation:'mm',precipitation_probability:'%',weather_code:'wmo code',wind_speed_10m:'km/h',wind_gusts_10m:'km/h',interval:'seconds'};
  return {latitude:n(payload.geometry?.coordinates?.[1],-90,90),longitude:n(payload.geometry?.coordinates?.[0],-180,180),timezone:'Asia/Baghdad',timezone_abbreviation:'+03',utc_offset_seconds:OFFSET,
   current,current_units:{...common,apparent_temperature:'°C',wind_direction_10m:'°',is_day:''},hourly,hourly_units:{...common},daily,
   daily_units:{time:'iso8601',weather_code:'wmo code',temperature_2m_max:'°C',temperature_2m_min:'°C',precipitation_sum:'mm',precipitation_probability_max:'%',wind_speed_10m_max:'km/h',wind_gusts_10m_max:'km/h',et0_fao_evapotranspiration:'mm',sunrise:'iso8601',sunset:'iso8601'},
-  source:{...MET_SOURCE},note:NOTE,model_updated_at:payload.properties?.meta?.updated_at||null};
+  precipitation_periods,rain_forecast,source:{...MET_SOURCE},note:NOTE,model_updated_at:payload.properties?.meta?.updated_at||null};
 }
 class WeatherError extends Error{constructor(status,code,message){super(message);this.status=status;this.code=code;}}
 function coordinates(url){

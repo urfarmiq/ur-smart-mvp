@@ -103,3 +103,85 @@ test('timeouts and external cancellation reject without returning old or partial
  const controller=new AbortController();const request=fetchWeather({latitude:33,longitude:44,signal:controller.signal,fetchImpl:waitForAbort});controller.abort();await assert.rejects(request,error=>error.name==='AbortError');
  let fetched=false;await assert.rejects(fetchWeather({latitude:33,longitude:44,signal:controller.signal,fetchImpl:async()=>{fetched=true}}),error=>error.name==='AbortError');assert.equal(fetched,false);
 });
+
+function rainPeriod(index,amount,{hours=1,probability=null}={}){
+ const base=Date.parse('2026-10-27T09:00:00Z'),start=new Date(base+index*3600000).toISOString().slice(0,19),end=new Date(base+(index+hours)*3600000).toISOString().slice(0,19);
+ return {start,end,precipitation_mm:amount,rain_probability_percent:probability,interval_seconds:hours*3600,weather_code:amount>0?61:3};
+}
+function rainFixture(amounts=Array(24).fill(0)){
+ const data=fixture();data.hourly.interval=[3600,3600,3600];
+ data.precipitation_periods=amounts.map((amount,i)=>rainPeriod(i,amount));
+ data.rain_forecast={start:'2026-10-27T09:00:00',end:'2026-10-28T09:00:00',precipitation_mm:999,covered_hours:999,complete:true,search_limit_end:'2026-11-03T09:00:00'};
+ return data;
+}
+
+test('rain summary gives actual24-hour quantity and a dated wet period without requiring unavailable probability',()=>{
+ const data=rainFixture();data.precipitation_periods[2]=rainPeriod(2,8);
+ const result=normalizeWeather(data,{now:NOW}),rain=result.rain_forecast;
+ assert.equal(rain.precipitation_mm,8);assert.equal(rain.known_precipitation_mm,8);assert.equal(rain.covered_hours,24);assert.equal(rain.complete,true);
+ assert.equal(rain.start,'2026-10-27T09:00:00');assert.equal(rain.end,'2026-10-28T09:00:00');assert.equal(rain.next_rain.start,'2026-10-27T11:00:00');assert.equal(rain.next_rain.end,'2026-10-27T12:00:00');
+ assert.equal(rain.rain_probability_percent_max,null);assert.equal(rain.next_rain.rain_probability_percent,null);
+ assert.ok(result.alerts.some(row=>row.kind==='rain'));
+});
+
+test('complete dry, partial dry and entirely missing precipitation are distinct states',()=>{
+ let data=rainFixture(),rain=normalizeWeather(data,{now:NOW}).rain_forecast;
+ assert.equal(rain.complete,true);assert.equal(rain.precipitation_mm,0);assert.equal(rain.next_rain,null);
+ data.precipitation_periods[0].precipitation_mm=null;rain=normalizeWeather(data,{now:NOW}).rain_forecast;
+ assert.equal(rain.complete,false);assert.equal(rain.precipitation_mm,null);assert.equal(rain.known_precipitation_mm,0);assert.equal(rain.covered_hours,23);
+ data=rainFixture(Array(24).fill(null));rain=normalizeWeather(data,{now:NOW}).rain_forecast;
+ assert.equal(rain.complete,false);assert.equal(rain.precipitation_mm,null);assert.equal(rain.known_precipitation_mm,null);assert.equal(rain.covered_hours,0);
+});
+
+test('an unknown initial forecast gap is not shifted away when deriving the24-hour total',()=>{
+ const data=rainFixture();data.precipitation_periods.shift();data.precipitation_periods[1]=rainPeriod(2,2);
+ const rain=normalizeWeather(data,{now:NOW}).rain_forecast;
+ assert.equal(rain.start,'2026-10-27T09:00:00');assert.equal(rain.covered_hours,23);assert.equal(rain.precipitation_mm,null);assert.equal(rain.known_precipitation_mm,2);
+});
+
+test('six-hour accumulations keep their period and are counted once rather than rendered as hourly rates',()=>{
+ const data=rainFixture();data.precipitation_periods=[rainPeriod(0,1,{hours:6}),rainPeriod(6,0,{hours:6}),rainPeriod(12,2,{hours:6}),rainPeriod(18,4,{hours:6})];
+ data.hourly.interval[2]=21600;data.hourly.interval_end=[undefined,undefined,'2026-10-27T15:00:00'];
+ const result=normalizeWeather(data,{now:NOW}),rain=result.rain_forecast;
+ assert.equal(rain.complete,true);assert.equal(rain.covered_hours,24);assert.equal(rain.precipitation_mm,7);assert.equal(rain.periods.length,4);assert.equal(rain.next_rain.interval_seconds,21600);
+ assert.equal(result.hourly[1].interval_seconds,21600);assert.equal(result.hourly[1].end_time,'2026-10-27T15:00:00');
+});
+
+test('a period crossing the24-hour boundary is not prorated into the total',()=>{
+ const data=rainFixture();data.precipitation_periods[23]=rainPeriod(23,100,{hours:6});
+ const rain=normalizeWeather(data,{now:NOW}).rain_forecast;
+ assert.equal(rain.complete,false);assert.equal(rain.covered_hours,23);assert.equal(rain.known_precipitation_mm,0);assert.equal(rain.precipitation_mm,null);
+ assert.equal(rain.next_rain.precipitation_mm,100);assert.equal(rain.next_rain.interval_seconds,21600);
+});
+
+test('a later wet period remains visible beyond a complete dry24-hour window',()=>{
+ const data=rainFixture();data.precipitation_periods.push(rainPeriod(36,4,{hours:6}));
+ const result=normalizeWeather(data,{now:NOW}),rain=result.rain_forecast;
+ assert.equal(rain.complete,true);assert.equal(rain.precipitation_mm,0);assert.equal(rain.next_rain.start,'2026-10-28T21:00:00');assert.equal(rain.next_rain.end,'2026-10-29T03:00:00');
+ assert.equal(result.precipitation_periods.at(-1).precipitation_mm,4);
+});
+
+test('overlaps and false upstream summary fields cannot double-count rain or invent full coverage',()=>{
+ const data=rainFixture();data.precipitation_periods[2]=rainPeriod(2,8);data.precipitation_periods.push(rainPeriod(2,900),{start:'invalid',end:'invalid',precipitation_mm:900});
+ let rain=normalizeWeather(data,{now:NOW}).rain_forecast;assert.equal(rain.precipitation_mm,8);assert.equal(rain.covered_hours,24);
+ data.precipitation_periods[0].precipitation_mm=-1;rain=normalizeWeather(data,{now:NOW}).rain_forecast;assert.equal(rain.precipitation_mm,null);assert.equal(rain.covered_hours,23);
+});
+
+test('legacy missing intervals do not invent accumulation duration or turn missing rain into zero',()=>{
+ const data=fixture();data.hourly.precipitation_probability.fill(null);const result=normalizeWeather(data,{now:NOW});
+ assert.ok(result.hourly.every(row=>row.interval_seconds===null&&row.end_time===null));assert.equal(result.rain_forecast.precipitation_mm,null);assert.equal(result.rain_forecast.known_precipitation_mm,null);
+ assert.equal(result.rain_forecast.rain_probability_percent_max,null);
+});
+
+test('source-provided interval probabilities are retained only as actual period maxima',()=>{
+ const data=rainFixture();data.precipitation_periods[2]=rainPeriod(2,8,{probability:70});data.precipitation_periods[3]=rainPeriod(3,0,{probability:101});
+ const rain=normalizeWeather(data,{now:NOW}).rain_forecast;assert.equal(rain.rain_probability_percent_max,70);assert.equal(rain.next_rain.rain_probability_percent,70);assert.equal(rain.periods[3].rain_probability_percent,null);
+});
+
+
+test('an ongoing six-hour source period cannot suppress finer future precipitation periods',()=>{
+ const data=rainFixture();data.precipitation_periods[1]=rainPeriod(1,2);
+ data.precipitation_periods.unshift({start:'2026-10-27T08:00:00',end:'2026-10-27T14:00:00',precipitation_mm:100,interval_seconds:21600});
+ const rain=normalizeWeather(data,{now:NOW}).rain_forecast;
+ assert.equal(rain.complete,true);assert.equal(rain.covered_hours,24);assert.equal(rain.precipitation_mm,2);assert.equal(rain.next_rain.start,'2026-10-27T10:00:00');
+});

@@ -1,7 +1,7 @@
 import {fetchWeather,fieldWeatherLocation,weatherCode} from './weather-core.mjs';
 
 const metric=(value,unit)=>typeof value==='number'&&Number.isFinite(value)?new Intl.NumberFormat('ar-IQ',{maximumFractionDigits:1}).format(value)+' '+unit:'غير متاح';
-const clock=value=>{const time=Date.parse(value);return Number.isFinite(time)?new Intl.DateTimeFormat('ar-IQ',{timeZone:'Asia/Baghdad',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}).format(time):'غير متاح';};
+const clock=value=>{const zoned=typeof value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value)?value+'+03:00':value;const time=Date.parse(zoned);return Number.isFinite(time)?new Intl.DateTimeFormat('ar-IQ',{timeZone:'Asia/Baghdad',hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}).format(time):'غير متاح';};
 
 export function createDashboardWeather({client}){
  const node=(tag,text)=>{const el=document.createElement(tag);if(text)el.textContent=text;return el;};
@@ -37,11 +37,12 @@ export function createDashboardWeather({client}){
    if(!data?.geometry)throw Error('احفظ حدود هذا الحقل على الخريطة أولًا، أو اختر مدينة مرجعية من صفحة الطقس.');
    const location=fieldWeatherLocation(data.geometry),weather=await fetchWeather({...location,signal:activeController.signal});
    if(!isCurrent())return;
-   const today=new Date(Date.now()+3*3600000).toISOString().slice(0,10),current=weather.current,day=weather.daily.find(row=>row.date===today);
-   const cards=[['الحرارة المتوقعة الآن',metric(current?.temperature_c,'°م')],['حالة الجو المتوقعة',weatherCode(current?.weather_code).label],['الرطوبة النسبية',metric(current?.humidity_percent,'%')],['الرياح',metric(current?.wind_kmh,'كم/س')],['مطر اليوم المتوقع',metric(day?.precipitation_mm,'ملم')],['احتمال المطر اليوم',metric(day?.rain_probability_percent,'%')]];
+   const current=weather.current,rain=weather.rain_forecast,next=rain?.next_rain;
+   const rainAmount=rain?.complete?metric(rain.precipitation_mm,'ملم'):rain?.covered_hours>0?metric(rain.known_precipitation_mm,'ملم')+' للفترات المتاحة':'غير متاح';
+   const cards=[['الحرارة المتوقعة الآن',metric(current?.temperature_c,'°م')],['حالة الجو المتوقعة',weatherCode(current?.weather_code).label],['الرطوبة النسبية',metric(current?.humidity_percent,'%')],['الرياح',metric(current?.wind_kmh,'كم/س')],[rain?.complete?'هطول فترة التوقع القادمة':'هطول الفترات المتاحة',rainAmount],['أقرب فترة هطول في التوقعات',next?clock(next.start)+' إلى '+clock(next.end):'لم تحدد البيانات موعدًا']];
    for(const [title,value] of cards){const card=node('div'),small=node('span',title),strong=node('strong',value);card.append(small,strong);output.append(card);}
    output.hidden=false;
-   status.textContent='قرب مركز حدود '+(field.name||'الحقل')+' — تحديث '+clock(weather.fetched_at)+' بتوقيت بغداد. المصدر: MET Norway؛ توقع نموذجي.'+(current?.stale?' بيانات التوقع الحالي قديمة؛ راجع وقتها في صفحة الطقس.':'');
+   status.textContent='قرب مركز حدود '+(field.name||'الحقل')+' — تحديث '+clock(weather.fetched_at)+' بتوقيت بغداد. المصدر: MET Norway؛ توقع نموذجي.'+(rain?.start&&rain?.end?' فترة الهطول: '+clock(rain.start)+' إلى '+clock(rain.end)+'. التغطية المتاحة '+metric(rain.covered_hours,'ساعة')+' من ٢٤.':'')+(current?.stale?' بيانات التوقع الحالي قديمة؛ راجع وقتها في صفحة الطقس.':'');
    link.href='./weather.html?field='+encodeURIComponent(field.id);
   }catch(error){if(!isCurrent())return;status.textContent=error?.message||'تعذر تحميل الطقس الآن. أعد المحاولة.';}
   finally{if(isCurrent())refresh.disabled=false;}

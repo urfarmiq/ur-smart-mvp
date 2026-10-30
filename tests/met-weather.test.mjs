@@ -114,3 +114,61 @@ test('cached raw forecasts are re-adapted after the hour and Baghdad midnight ch
   },{async match(){return stored?.clone()},async put(key,value){stored=value.clone()}});
  }finally{globalThis.Date=NativeDate;}
 });
+
+test('rain window reports actual future amounts and times when the local calendar-day total is unavailable',()=>{
+ const raw=payload(series('2026-10-29T00:00:00Z',25,i=>({periods:{1:{amount:i===2?4.5:0,probability:i===2?70:undefined}}})));
+ const result=adaptMETPayload(raw,'2026-10-29T00:00:00Z'),rain=result.rain_forecast;
+ assert.equal(result.daily.precipitation_sum[0],null);
+ assert.equal(rain.start,'2026-10-29T03:00');assert.equal(rain.end,'2026-10-30T03:00');
+ assert.equal(rain.complete,true);assert.equal(rain.covered_hours,24);assert.equal(rain.total_hours,24);
+ assert.equal(rain.precipitation_mm,4.5);assert.equal(rain.known_precipitation_mm,4.5);assert.equal(rain.rain_probability_percent_max,70);
+ assert.equal(rain.next_rain.start,'2026-10-29T05:00');assert.equal(rain.next_rain.end,'2026-10-29T06:00');assert.equal(rain.next_rain.precipitation_mm,4.5);
+ assert.equal(result.hourly.interval_end[0],'2026-10-29T04:00');assert.equal(result.hourly_units.interval_end,'iso8601');
+});
+
+test('a wholly dry future window is actual zero while missing precipitation stays unknown',()=>{
+ const dry=adaptMETPayload(payload(series('2026-10-29T00:00:00Z',24,{periods:{1:{amount:0,symbol:'clearsky_day'}}})),'2026-10-29T00:00:00Z').rain_forecast;
+ assert.equal(dry.precipitation_mm,0);assert.equal(dry.complete,true);assert.equal(dry.next_rain,null);assert.equal(dry.rain_probability_percent_max,null);
+ const absent=adaptMETPayload(payload(series('2026-10-29T00:00:00Z',24,{periods:{}})),'2026-10-29T00:00:00Z').rain_forecast;
+ assert.equal(absent.precipitation_mm,null);assert.equal(absent.known_precipitation_mm,null);assert.equal(absent.covered_hours,0);assert.equal(absent.complete,false);assert.equal(absent.next_rain,null);assert.equal(absent.search_end,null);
+});
+
+test('missing precipitation inside the window exposes partial quantity and coverage without a fabricated full total',()=>{
+ const raw=payload(series('2026-10-29T00:00:00Z',24,i=>({periods:{1:{amount:i===5?undefined:2}}})));
+ const rain=adaptMETPayload(raw,'2026-10-29T00:00:00Z').rain_forecast;
+ assert.equal(rain.precipitation_mm,null);assert.equal(rain.known_precipitation_mm,46);assert.equal(rain.covered_hours,23);assert.equal(rain.complete,false);
+ assert.equal(rain.periods[5].precipitation_mm,null);assert.equal(rain.periods[5].interval_seconds,3600);
+});
+
+test('six-hour accumulations crossing Baghdad midnight are preserved intact in the future window',()=>{
+ const origin=Date.parse('2026-10-29T18:00:00Z');
+ const raw=payload([0,6,12,18,24].map(h=>point(new Date(origin+h*HOUR).toISOString().replace('.000Z','Z'),{periods:{6:{amount:4}}})));
+ const result=adaptMETPayload(raw,'2026-10-29T18:00:00Z'),rain=result.rain_forecast;
+ assert.equal(rain.start,'2026-10-29T21:00');assert.equal(rain.end,'2026-10-30T21:00');assert.equal(rain.precipitation_mm,16);assert.equal(rain.covered_hours,24);assert.equal(rain.complete,true);
+ assert.equal(rain.periods.length,4);assert.ok(rain.periods.every(p=>p.interval_seconds===21600));
+ assert.equal(rain.periods[0].end,'2026-10-30T03:00');assert.equal(result.daily.precipitation_sum[0],null);assert.equal(result.daily.precipitation_sum[1],null);
+});
+
+test('shortest known periods win and fallback six-hour amounts never overlap later one-hour rows',()=>{
+ const raw=payload(series('2026-10-29T00:00:00Z',25,i=>({periods:i===0?{1:{amount:1},6:{amount:99}}:{1:{amount:1}}})));
+ assert.equal(adaptMETPayload(raw,'2026-10-29T00:00:00Z').rain_forecast.precipitation_mm,24);
+ raw.properties.timeseries[0]=point('2026-10-29T00:00:00Z',{periods:{1:{symbol:'rain'},6:{amount:6,symbol:'rain'}}});
+ const fallback=adaptMETPayload(raw,'2026-10-29T00:00:00Z');assert.equal(fallback.current.interval,21600);assert.equal(fallback.current.precipitation,6);
+ assert.equal(fallback.rain_forecast.precipitation_mm,24);assert.equal(fallback.rain_forecast.periods.length,19);
+ for(let i=1;i<fallback.precipitation_periods.length;i++)assert.ok(fallback.precipitation_periods[i].start>=fallback.precipitation_periods[i-1].end);
+});
+
+test('window begins at the first future model point, leaves an initial missing interval unknown and never prorates ongoing rain',()=>{
+ const raw=payload(series('2026-10-29T00:00:00Z',30,i=>({periods:i===0?{6:{amount:100}}:i===1?{}:{1:{amount:1}}})));
+ const result=adaptMETPayload(raw,'2026-10-29T00:30:00Z'),rain=result.rain_forecast;
+ assert.equal(result.current.precipitation,100);assert.equal(result.current.interval,21600);
+ assert.equal(rain.start,'2026-10-29T04:00');assert.equal(rain.end,'2026-10-30T04:00');assert.equal(rain.covered_hours,23);assert.equal(rain.precipitation_mm,null);assert.equal(rain.known_precipitation_mm,23);
+ assert.equal(result.precipitation_periods[0].start,'2026-10-29T05:00');assert.ok(!rain.periods.some(p=>p.precipitation_mm===100));
+});
+
+test('next known wet period is found beyond the first 24 hours and unavailable probability is not inferred',()=>{
+ const raw=payload(series('2026-10-29T00:00:00Z',32,i=>({periods:{1:{amount:i===30?3:0}}})));
+ const rain=adaptMETPayload(raw,'2026-10-29T00:00:00Z').rain_forecast;
+ assert.equal(rain.precipitation_mm,0);assert.equal(rain.next_rain.start,'2026-10-30T09:00');assert.equal(rain.next_rain.end,'2026-10-30T10:00');assert.equal(rain.next_rain.precipitation_mm,3);assert.equal(rain.next_rain.rain_probability_percent,null);
+ assert.equal(rain.search_end,'2026-10-30T11:00');assert.equal(rain.search_limit_end,'2026-11-05T03:00');
+});
