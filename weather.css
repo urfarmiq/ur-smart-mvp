@@ -5,3 +5,5 @@
 @media(max-width:350px){main{padding-inline:10px}.day-card>summary{grid-template-columns:55px 24px 25px minmax(20px,1fr) 25px 8px;gap:7px}.metric strong{font-size:13px}.location-change{font-size:9px}.brand{font-size:17px}.rain-next{font-size:10px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 .rain-gap{--hours:1;flex:0 0 calc(var(--hours)*35px);align-self:flex-end;min-width:3px;height:37px;margin-bottom:10px;border-radius:4px;background:repeating-linear-gradient(135deg,#e1e7ed 0 3px,#f7f9fb 3px 6px)}
+
+.account-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0}.account-actions button{background:#eef5f9;color:#246082;border:1px solid #c9dce8;padding:8px 12px;font-size:12px;cursor:pointer}.account-actions a{font-size:12px}.account-actions button:disabled{opacity:.6}

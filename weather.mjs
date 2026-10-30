@@ -1,4 +1,5 @@
 import {fieldWeatherLocation,fetchWeather,weatherCode} from './weather-core.mjs';
+import {withDeadline} from './request-deadline.mjs';
 
 const $=id=>document.getElementById(id);
 const cities=[['baghdad','بغداد',33.3152,44.3661],['basra','البصرة',30.5085,47.7804],['mosul','الموصل',36.3350,43.1189],['erbil','أربيل',36.1911,44.0092],['sulaymaniyah','السليمانية',35.5558,45.4351],['duhok','دهوك',36.8671,42.9884],['kirkuk','كركوك',35.4681,44.3922],['tikrit','تكريت',34.6071,43.6782],['baqubah','بعقوبة',33.7500,44.6333],['ramadi','الرمادي',33.4258,43.2999],['hillah','الحلة',32.4725,44.4292],['karbala','كربلاء',32.6160,44.0249],['najaf','النجف',32.0000,44.3300],['kut','الكوت',32.5128,45.8182],['diwaniyah','الديوانية',31.9905,44.9306],['samawah','السماوة',31.3319,45.2944],['nasiriyah','الناصرية',31.0431,46.2573],['amarah','العمارة',31.8359,47.1440],['halabja','حلبجة',35.1778,45.9861]];
@@ -110,7 +111,7 @@ async function loadWeather(){
  try{
   let point,locationInfo;
   if($('locationMode').value==='city'){const city=cities.find(row=>row[0]===$('weatherCity').value);if(!city)throw Error('اختر مدينة مرجعية.');point={latitude:city[2],longitude:city[3]};locationInfo={kind:'city',name:city[1]};}
-  else{const field=fields.find(row=>row.id===$('weatherField').value);if(!field||!client||!user)throw Error('اختر حقلًا من حسابك أولًا.');const result=await client.from('field_boundaries').select('geometry').eq('field_id',field.id).eq('owner_id',user.id).maybeSingle();if(token!==generation)return;if(result.error)throw Error('تعذرت قراءة حدود الحقل. أعد تسجيل الدخول أو راجع الاتصال.');if(!result.data?.geometry)throw Error('لا توجد حدود محفوظة لهذا الحقل. ارسمها من خريطة الحقول، أو اختر مدينة مرجعية بوضوح.');point=fieldWeatherLocation(result.data.geometry);locationInfo={kind:'field',name:field.name};}
+  else{const field=fields.find(row=>row.id===$('weatherField').value);if(!field||!client||!user)throw Error('اختر حقلًا من حسابك أولًا.');const result=await withDeadline(client.from('field_boundaries').select('geometry').eq('field_id',field.id).eq('owner_id',user.id).maybeSingle());if(token!==generation)return;if(result.error)throw Error('تعذرت قراءة حدود الحقل. أعد تسجيل الدخول أو راجع الاتصال.');if(!result.data?.geometry)throw Error('لا توجد حدود محفوظة لهذا الحقل. ارسمها من خريطة الحقول، أو اختر مدينة مرجعية بوضوح.');point=fieldWeatherLocation(result.data.geometry);locationInfo={kind:'field',name:field.name};}
   if(token!==generation)return;const data=await fetchWeather({...point,signal});if(token!==generation)return;render(data,locationInfo);setStatus(locationInfo.kind==='field'?'تم تحديث توقعات موقع الحقل. البيانات تقديرية من نموذج الطقس.':'تم تحديث طقس المدينة المرجعية. هذا الموقع لا يمثل إحداثيات حقل محدد.');
  }catch(error){if(token!==generation)return;$('weatherResult').hidden=true;setStatus(error?.name==='AbortError'?'انتهت مهلة الاتصال بالطقس. اضغط تحديث للمحاولة مجددًا.':('تعذر عرض الطقس: '+(error.message||'خطأ اتصال بالمصدر.')),true);}
  finally{if(token===generation){controller=null;$('refreshWeather').disabled=!hasSelection();}}
@@ -119,13 +120,61 @@ $('locationMode').onchange=()=>{const isField=$('locationMode').value==='field';
 $('weatherField').onchange=()=>{invalidate('تغيّر الحقل. جارٍ إعداد طقس موقعه…');if(hasSelection())void loadWeather();};
 $('weatherCity').onchange=()=>{invalidate('تغيّرت المدينة المرجعية.');if(hasSelection())void loadWeather();};
 $('refreshWeather').onclick=()=>void loadWeather();
-async function loadFields(){
- try{
-  const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
-  client=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');const auth=await client.auth.getUser();if(auth.error||!auth.data?.user)throw Error('سجّل الدخول لعرض الحقول، أو اختر مدينة مرجعية.');user=auth.data.user;
-  const result=await client.from('fields').select('id,name,farms!inner(owner_id)').eq('farms.owner_id',user.id).order('name');if(result.error)throw Error('تعذّر تحميل حقول الحساب.');fields=Array.isArray(result.data)?result.data:[];$('weatherField').replaceChildren(new Option(fields.length?'اختر حقلًا':'لا توجد حقول محفوظة',''));for(const field of fields)$('weatherField').add(new Option(field.name,field.id));$('weatherField').disabled=!fields.length;$('accountStatus').textContent=fields.length?'حقول حسابك جاهزة. الموقع يؤخذ من الحدود المحفوظة لكل حقل.':'أضف حقلًا وحدوده من لوحة المزارع، أو اختر مدينة مرجعية.';
-  const chosen=hasInitialField?fields.find(field=>field.id===initialField):fields[0];if(hasInitialField&&!chosen){if($('locationMode').value==='field')setStatus('الحقل المطلوب غير متاح في حسابك. اختر أحد حقولك أو مدينة مرجعية.',true);}else if(chosen&&$('locationMode').value==='field'){$('weatherField').value=chosen.id;void loadWeather();}
-  client.auth.onAuthStateChange?.(event=>{if(event==='SIGNED_OUT'){user=null;fields=[];$('weatherField').replaceChildren(new Option('سجّل الدخول لعرض الحقول',''));$('weatherField').disabled=true;$('accountStatus').textContent='انتهت جلسة الحساب. سجّل الدخول لعرض الحقول، أو اختر مدينة مرجعية.';if($('locationMode').value==='field')invalidate('سجّل الدخول مجددًا لعرض طقس الحقل.');}});
- }catch(error){fields=[];user=null;$('weatherField').replaceChildren(new Option('سجّل الدخول لعرض الحقول',''));$('weatherField').disabled=true;$('accountStatus').replaceChildren(el('span',error.message||'تعذر تحميل حقول الحساب.'),' ',Object.assign(el('a','تسجيل الدخول'),{href:'./auth.html'}));if($('locationMode').value==='field')setStatus('يمكنك تسجيل الدخول لعرض حقولك أو اختيار مدينة مرجعية.');}
+let accountGeneration=0,accountState='loading',clientLoading=null,accountReloadTimer=null,lastAuthUserId=null;
+function clearAccountFields(message){
+ user=null;fields=[];$('weatherField').replaceChildren(new Option(message,''));$('weatherField').disabled=true;
+ if($('locationMode').value==='field')invalidate(message);
 }
+function showAccountRecovery(message,needsLogin=false){
+ $('accountStatus').textContent=message;$('retryWeatherAccount').disabled=false;$('weatherSignIn').hidden=!needsLogin;
+ if($('locationMode').value==='field'){$('weatherLocationPicker').open=true;setStatus(message,!needsLogin);}
+}
+function accountEvent(event,session){
+ if(event==='INITIAL_SESSION'){lastAuthUserId=session?.user?.id??null;return;}
+ if(event==='SIGNED_OUT'){
+  lastAuthUserId=null;
+  accountGeneration++;accountState='signedout';clearTimeout(accountReloadTimer);clearAccountFields('سجّل الدخول لعرض حقولك');
+  showAccountRecovery('لا توجد جلسة دخول على هذا الموقع. افتح تسجيل الدخول بالحساب نفسه؛ لا تحتاج إلى إنشاء حساب جديد.',true);return;
+ }
+ if(!['SIGNED_IN','TOKEN_REFRESHED','USER_UPDATED'].includes(event)||!session?.user?.id)return;
+ const changed=(user&&user.id!==session.user.id)||(lastAuthUserId&&lastAuthUserId!==session.user.id);lastAuthUserId=session.user.id;
+ if(changed){accountGeneration++;accountState='changed';clearAccountFields('تغيّر الحساب. جارٍ تحميل حقوله…');}
+ if(!changed&&(accountState==='loading'||(accountState==='ready'&&user?.id===session.user.id)))return;
+ // Supabase callbacks remain synchronous. Further SDK work runs after its auth lock is released.
+ clearTimeout(accountReloadTimer);accountReloadTimer=setTimeout(()=>void loadFields(),0);
+}
+async function weatherClient(){
+ if(client)return client;
+ if(!clientLoading)clientLoading=withDeadline(import('./supabase-client.mjs')).then(({createClient})=>{
+  client=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
+  client.auth.onAuthStateChange?.(accountEvent);return client;
+ }).catch(error=>{clientLoading=null;throw error;});
+ return clientLoading;
+}
+async function loadFields(){
+ const attempt=++accountGeneration,previous=$('weatherField').value;accountState='loading';
+ clearAccountFields('جارٍ تحميل حقول الحساب…');$('retryWeatherAccount').disabled=true;$('weatherSignIn').hidden=true;$('accountStatus').textContent='جارٍ استعادة جلسة حسابك وحقولك…';
+ try{
+  const connection=await weatherClient();if(attempt!==accountGeneration)return;
+  // This is a browser presentation hint; row-level security still authorizes every database read.
+  const auth=await withDeadline(connection.auth.getSession());if(attempt!==accountGeneration)return;
+  if(auth.error)throw Error('تعذر التحقق من جلسة الحساب.');
+  if(!auth.data?.session?.user?.id){accountState='anonymous';clearAccountFields('سجّل الدخول لعرض حقولك');showAccountRecovery('لا توجد جلسة دخول على هذا الموقع. إذا دخلت من الرابط القديم أو متصفح آخر، سجّل الدخول هنا بالحساب نفسه.',true);return;}
+  const activeUser=auth.data.session.user;user=activeUser;
+  const result=await withDeadline(connection.from('fields').select('id,name,farms!inner(owner_id)').eq('farms.owner_id',activeUser.id).order('name'));
+  if(attempt!==accountGeneration)return;
+  if(result.error)throw Error('تعذّر تحميل حقول الحساب من السحابة.');
+  fields=Array.isArray(result.data)?result.data:[];accountState='ready';$('weatherField').replaceChildren(new Option(fields.length?'اختر حقلًا':'لا توجد حقول محفوظة',''));
+  for(const field of fields)$('weatherField').add(new Option(field.name,field.id));$('weatherField').disabled=!fields.length;
+  $('accountStatus').textContent=fields.length?'تم الاتصال بحسابك. حقولك جاهزة؛ الموقع من حدود كل حقل.':'تم الاتصال بحسابك. لا توجد حقول محفوظة؛ أضف حقلًا من لوحة المزارع أو اختر مدينة مرجعية.';
+  const chosen=hasInitialField?fields.find(field=>field.id===initialField):fields.find(field=>field.id===previous)||fields[0];
+  if(hasInitialField&&!chosen){if($('locationMode').value==='field')setStatus('الحقل المطلوب غير متاح في حسابك. اختر أحد حقولك أو مدينة مرجعية.',true);}
+  else if(chosen&&$('locationMode').value==='field'){$('weatherField').value=chosen.id;void loadWeather();}
+ }catch(error){
+  if(attempt!==accountGeneration)return;accountState='error';clearAccountFields('تعذر تحميل الحقول؛ أعد الاتصال');
+  showAccountRecovery(error?.name==='RequestDeadlineError'?'تأخر الاتصال بالحساب. أعد المحاولة؛ لم نمسح جلسة الدخول أو حقولك.':'تعذر الاتصال بالحساب أو تحميل حقوله. أعد المحاولة؛ هذا لا يعني حذف الحساب أو الحاجة إلى حساب جديد.');
+ }finally{if(attempt===accountGeneration)$('retryWeatherAccount').disabled=false;}
+}
+$('retryWeatherAccount').onclick=()=>{if(client)void loadFields();else location.reload();};
+window.addEventListener('pageshow',event=>{if(event.persisted)void loadFields();});
 void loadFields();

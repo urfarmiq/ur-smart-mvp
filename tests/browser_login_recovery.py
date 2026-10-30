@@ -95,6 +95,7 @@ def scenario(browser, mobile, mode):
         assert 'سجّل الدخول' in page.locator('#cloudFields').inner_text()
         assert not page.evaluate("window.__recovery.calls.includes('farms')")
     else:
+        page.wait_for_function("document.querySelector('#welcome').textContent!=='جارٍ التحقق من تسجيل الدخول...'")
         page.locator('#connectionRecovery').wait_for(state='visible')
         assert page.locator('#saveButton').is_disabled()
         assert page.locator('#retryConnection').is_enabled()

@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>لوحة المزارع | UR Smart</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body,button,input,select,textarea{font-family:"IBM Plex Sans Arabic",Inter,Tahoma,Arial,sans-serif}
 body{font-family:'IBM Plex Sans Arabic',Inter,Tahoma,Arial,sans-serif;background:#f1f7f2;color:#23412e;margin:0}
 header{background:#176b45;color:white;padding:18px}
@@ -36,7 +35,7 @@ a{color:#176b45}
 <p id="welcome">جارٍ التحقق من تسجيل الدخول...</p>
 <p id="fieldSummary" aria-live="polite"></p><div id="status" role="status">جارٍ الاتصال...</div>
 <button id="logout">تسجيل الخروج</button>
-<div id="connectionRecovery" hidden><p>يمكنك إعادة المحاولة دون مسح بياناتك، أو فتح صفحة الحساب.</p><button id="retryConnection" type="button">إعادة المحاولة</button><a href="./auth.html">الانتقال إلى تسجيل الدخول</a></div>
+<div id="connectionRecovery"><p>إذا طال انتظار الاتصال، أعد المحاولة دون مسح بياناتك، أو افتح صفحة الحساب.</p><form action="./dashboard.html" method="get"><button id="retryConnection" type="submit">إعادة المحاولة</button></form><a href="./auth.html">الانتقال إلى تسجيل الدخول</a></div>
 <p><a id="adminLink" href="./admin.html" hidden>🔐 لوحة الإدارة وإشعارات التسجيل</a></p>
 </section>
 
