@@ -14,7 +14,7 @@ let serviceAvailable=false,availabilityGeneration=0,cooldownUntil=0,cooldownTime
 function say(message,state='ready'){$('plantHealthStatus').textContent=message;$('plantHealthStatus').dataset.state=state;}
 function invalidate(message){
  generation++;controller?.abort();controller=null;busy=false;report=null;$('resultPanel').hidden=true;
- $('resultSummary').textContent='';$('resultDetails').replaceChildren();$('resultMeta').textContent='';$('resultNote').textContent='';
+ $('resultSummary').textContent='';$('primaryMatch').hidden=true;$('primaryMatchName').textContent='';$('primaryMatchEvidence').replaceChildren();$('primaryMatchChecks').replaceChildren();$('resultDetails').replaceChildren();$('resultMeta').textContent='';$('resultNote').textContent='';
  if(message)say(message);updateControls();
 }
 function updateControls(){
@@ -151,8 +151,9 @@ function text(value,max=3000){if(typeof value!=='string'||value.length>max||!val
 function strings(value){if(!Array.isArray(value)||value.length>12)throw Error('invalid output');return value.map(item=>text(item,1600));}
 function validResult(value){
  const source=value?.assessment;if(!source||typeof source!=='object'||Array.isArray(source)||!['usable','limited','unusable'].includes(source.image_quality)||typeof source.plant_visible!=='boolean'||!Array.isArray(source.possible_causes)||source.possible_causes.length>6)throw Error('invalid output');
- const assessment={image_quality:source.image_quality,plant_visible:source.plant_visible,summary:text(source.summary),observations:strings(source.observations),possible_causes:source.possible_causes.map(cause=>{if(!cause||!['disease','pest','abiotic','uncertain'].includes(cause.category))throw Error('invalid output');return {name:text(cause.name,250),category:cause.category,supporting_signs:strings(cause.supporting_signs),distinguishing_checks:strings(cause.distinguishing_checks)};}),missing_information:strings(source.missing_information),initial_steps:strings(source.initial_steps),expert_review:strings(source.expert_review),limitations:strings(source.limitations)};
+ const assessment={image_quality:source.image_quality,plant_visible:source.plant_visible,summary:text(source.summary),observations:strings(source.observations),possible_causes:source.possible_causes.map(cause=>{if(!cause||!['disease','pest','abiotic','uncertain'].includes(cause.category))throw Error('invalid output');return {name:text(cause.name,250),category:cause.category,supporting_signs:strings(cause.supporting_signs),distinguishing_checks:strings(cause.distinguishing_checks)};}),missing_information:strings(source.missing_information),initial_steps:strings(source.initial_steps),management:strings(source.management),prevention:strings(source.prevention),expert_review:strings(source.expert_review),limitations:strings(source.limitations)};
  if((!assessment.plant_visible||assessment.image_quality==='unusable')&&assessment.possible_causes.length)throw Error('invalid output');
+ if(!assessment.plant_visible||assessment.image_quality==='unusable'){assessment.management=[];assessment.prevention=[];}else if(!assessment.possible_causes.length)assessment.management=[];
  const stamp=new Date(value.generated_at);if(!Number.isFinite(stamp.getTime()))throw Error('invalid output');
  return {provider:text(value.provider,100),model:text(value.model,120),generated_at:stamp.toISOString(),assessment,note:text(value.note,1600)};
 }
@@ -161,18 +162,26 @@ function listSection(heading,items){
 }
 function renderResult(result,context){
  const assessment=result.assessment,box=$('resultDetails');box.replaceChildren();$('resultSummary').textContent=assessment.summary;
- const quality={usable:'صور مناسبة للفحص الأولي',limited:'الصور محدودة الوضوح',unusable:'يلزم صور أوضح'};$('qualityBadge').textContent=!assessment.plant_visible?'لم يتضح نبات قابل للفحص':quality[assessment.image_quality];$('qualityBadge').dataset.quality=assessment.image_quality;
- $('resultMeta').textContent=context.crop+' · عدد الصور: '+format(context.image_count)+' · '+new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Baghdad'}).format(new Date(result.generated_at))+' بتوقيت بغداد · '+result.provider+' / '+result.model;
- const observed=listSection('ما لوحظ في الصور',assessment.observations);if(observed)box.append(observed);
- if(assessment.possible_causes.length){
-  const section=node('section',undefined,'result-section causes-section'),grid=node('div',undefined,'causes-grid');section.append(node('h3','أسباب محتملة تحتاج تمييزًا ميدانيًا'));
-  const categories={disease:'مرض محتمل',pest:'ضرر آفة محتمل',abiotic:'سبب غير مرضي محتمل',uncertain:'سبب غير محسوم'};
-  for(const cause of assessment.possible_causes){const card=node('article',undefined,'cause-card'),heading=node('div',undefined,'cause-heading');heading.append(node('h4',cause.name),node('span',categories[cause.category],'cause-category'));card.append(heading);
-   for(const [title,items] of [['علامات قد تدعمه',cause.supporting_signs],['ما يساعد على التمييز',cause.distinguishing_checks]])if(items.length){card.append(node('h5',title));const list=node('ul');for(const item of items)list.append(node('li',item));card.append(list);}grid.append(card);
+ const quality={usable:'مطابقة علامات الصورة',limited:'تحتاج لقطة أقرب',unusable:'أضف صورًا أوضح'};$('qualityBadge').textContent=!assessment.plant_visible?'أضف صورة للنبات':quality[assessment.image_quality];$('qualityBadge').dataset.quality=assessment.image_quality;
+ $('resultMeta').textContent='مساعد أور الزراعي · '+context.crop+' · عدد الصور: '+format(context.image_count)+' · '+new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Baghdad'}).format(new Date(result.generated_at))+' بتوقيت بغداد';
+ const matches=assessment.plant_visible&&assessment.image_quality!=='unusable'&&assessment.observations.length?assessment.possible_causes:[],[primary,...similar]=matches;
+ const categories={disease:'مرض',pest:'آفة',abiotic:'إجهاد أو ظروف زراعة',uncertain:'نمط أعراض'};
+ $('primaryMatch').hidden=!primary;$('primaryMatchName').textContent=primary?.name||'';$('primaryMatchLabel').textContent=primary?.category==='uncertain'?'نمط الأعراض الأقرب':'الأقرب للأعراض';$('primaryMatchCategory').textContent=primary?categories[primary.category]:'';
+ for(const [id,items] of [['primaryMatchEvidence',primary?.supporting_signs||[]],['primaryMatchChecks',primary?.distinguishing_checks||[]]]){const list=$(id);list.replaceChildren();for(const item of items)list.append(node('li',item));}
+ const observed=listSection('العلامات الظاهرة في الصور',assessment.observations);if(observed)box.append(observed);
+ if(similar.length){
+  const section=node('section',undefined,'result-section causes-section'),grid=node('div',undefined,'causes-grid');section.id='similarMatches';section.append(node('h3','حالات مشابهة وكيف تفرّق بينها'));
+  for(const cause of similar){const card=node('article',undefined,'cause-card'),heading=node('div',undefined,'cause-heading');heading.append(node('h4',cause.name),node('span',categories[cause.category],'cause-category'));card.append(heading);
+   for(const [title,items] of [['علامات التشابه',cause.supporting_signs],['علامات التمييز',cause.distinguishing_checks]])if(items.length){card.append(node('h5',title));const list=node('ul');for(const item of items)list.append(node('li',item));card.append(list);}grid.append(card);
   }section.append(grid);box.append(section);
  }
- for(const [heading,items] of [['معلومات أو صور إضافية مطلوبة',assessment.missing_information],['خطوات أولية للفحص والمتابعة',assessment.initial_steps],['متى تحتاج إلى مختص؟',assessment.expert_review],['حدود هذه النتيجة',assessment.limitations]]){const section=listSection(heading,items);if(section)box.append(section);}
- $('resultNote').textContent='نتيجة أولية وليست تأكيدًا للإصابة أو سلامة النبات. '+result.note;report={...result,input:context};$('resultPanel').hidden=false;
+ for(const [heading,items] of [['ما يكمل الفحص',assessment.missing_information],['افحص أولًا',assessment.initial_steps]]){const section=listSection(heading,items);if(section)box.append(section);}
+ const care=primary?assessment.management:[],prevention=assessment.plant_visible&&assessment.image_quality!=='unusable'?assessment.prevention:[];
+ for(const [id,heading,items] of [['treatmentPlan','العلاج والتعامل مع الإصابة',care],['preventionPlan','الوقاية ومنع تكرار المشكلة',prevention]]){const section=listSection(heading,items);if(section){section.id=id;section.classList.add('care-plan');if(primary)section.insertBefore(node('p','للحالة الأقرب: '+primary.name,'plan-context'),section.querySelector('ul'));box.append(section);}}
+ const expert=listSection('متى تحتاج إلى مختص؟',assessment.expert_review);if(expert)box.append(expert);
+ if(assessment.limitations.length){const details=node('details',undefined,'report-details'),content=listSection('حدود قراءة الصورة',assessment.limitations);details.append(node('summary','عن دقة الفحص البصري'),content);box.append(details);}
+ $('resultNote').textContent='مطابقة بصرية للأعراض؛ عند تشابه المسببات، تؤكد العينة أو الفحص الحقلي السبب قبل اختيار العلاج.';
+ report={service:'مساعد أور الزراعي',generated_at:result.generated_at,assessment,input:context,note:$('resultNote').textContent};$('resultPanel').hidden=false;
 }
 async function analyze(event){
  event.preventDefault();if(busy||processing||$('analyzePlant').disabled||!$('plantHealthForm').reportValidity())return;
@@ -193,7 +202,7 @@ async function analyze(event){
    throw Error(typeof data?.message==='string'&&data.message.length<=1200?data.message:response.status===429?'بلغت الخدمة حد الاستخدام المجاني. أعد المحاولة لاحقًا.':'تعذر إكمال الفحص الآن. أعد المحاولة لاحقًا.');
   }
   let normalized;try{normalized=validResult(data);}catch{throw Error('لم تصل نتيجة مكتملة وصالحة للعرض. لم نعرض تشخيصًا بديلًا أو نصًا ناقصًا.');}
-  renderResult(normalized,context);say(normalized.assessment.image_quality==='unusable'||!normalized.assessment.plant_visible?'اكتمل الفحص؛ لم تتوفر صورة كافية لاستنتاج سبب. راجع المطلوب في النتيجة.':'اكتمل الفحص الأولي. راجع الأسباب المحتملة وخطوات التحقق أدناه.');
+  renderResult(normalized,context);say(normalized.assessment.image_quality==='unusable'||!normalized.assessment.plant_visible?'اكتمل الفحص؛ لم تتوفر صورة كافية لاستنتاج سبب. راجع المطلوب في النتيجة.':'اكتمل فحص أور. راجع أقرب تطابق وعلامات التمييز أدناه.');
  }catch(error){if(attempt===generation)say(error?.name==='AbortError'?'انتهت مهلة الفحص. يمكنك المحاولة لاحقًا؛ لم نعرض نتيجة غير مكتملة.':error?.message||'تعذر الفحص الآن. أعد المحاولة.','error');}
  finally{clearTimeout(timeout);if(attempt===generation){busy=false;controller=null;updateControls();}}
 }

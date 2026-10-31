@@ -4,7 +4,7 @@ import {handlePlantHealth,plantHealthStatus,validatePlantHealthInput,sanitizePla
 const PNG="iVBORw0KGgoAAAANSUhEUgAAAIAAAABgCAIAAABaGO0eAAAAI3RFWHRwcml2YXRlAEdQUy1QRVJTT05BTC1ETy1OT1QtRk9SV0FSRJq/chgAAADsSURBVHic7dExDQAgAMAwwA4a8IV8ZPRgVbBkc98z4iwd8LsGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYA7AERKQGgzQXIQgAAAABJRU5ErkJggg==";
 const JPEG="/9j/4AAQSkZJRgABAQAAAQABAAD/4QA+RXhpZgAATU0AKgAAAAgAAQEOAAIAAAAcAAAAGgAAAABHUFMtUEVSU09OQUwtRE8tTk9ULUZPUldBUkQA/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8AAEQgAYACAAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/aAAwDAQACEQMRAD8A5miiiuA8EKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD/9k=";
 const ENV={SUPABASE_URL:'https://supabase.test',SUPABASE_PUBLISHABLE_KEY:'public',GEMINI_API_KEY:'private-provider-key-not-forwarded',GEMINI_FREE_TIER_CONFIRMED:'true'};
-const assessment={image_quality:'usable',plant_visible:true,summary:'بقع ظاهرة تحتاج إلى فحص ميداني للتمييز بين الأسباب.',observations:['بقع بنية على نصل الورقة'],possible_causes:[{name:'تبقع ورقي محتمل',category:'disease',supporting_signs:['حواف بقع ظاهرة'],distinguishing_checks:['قارن بين سطحي الورقة وافحص انتشار البقع']}],missing_information:['مدة ظهور الأعراض'],initial_steps:['افحص رطوبة منطقة الجذور وتصريف الماء قبل تغيير الري'],expert_review:['راجع مهندساً إذا انتشرت الأعراض سريعاً'],limitations:['الصورة وحدها لا تؤكد المرض']};
+const assessment={image_quality:'usable',plant_visible:true,summary:'بقع ظاهرة تحتاج إلى فحص ميداني للتمييز بين الأسباب.',observations:['بقع بنية على نصل الورقة'],possible_causes:[{name:'تبقع ورقي محتمل',category:'disease',supporting_signs:['حواف بقع ظاهرة'],distinguishing_checks:['قارن بين سطحي الورقة وافحص انتشار البقع']}],missing_information:['مدة ظهور الأعراض'],initial_steps:['افحص رطوبة منطقة الجذور وتصريف الماء قبل تغيير الري'],management:['تجنب تبليل الأوراق إذا كانت علامات التبقع متوافقة، وراجع رطوبة الجذور قبل تعديل الري'],prevention:['نظّف أدوات العمل ولا تنقل بقايا النباتات المصابة بين الحقول'],expert_review:['راجع مهندساً إذا انتشرت الأعراض سريعاً'],limitations:['الصورة وحدها لا تؤكد المرض']};
 const input=(overrides={})=>({crop:'حنطة',symptoms:'بقع واصفرار',duration:'منذ عدة أيام',region:'بغداد',recent_care:'ري اعتيادي',consent:true,images:[{mime_type:'image/jpeg',data:JPEG,width:128,height:96}],...overrides});
 const request=(body=input(),headers={},method='POST')=>new Request('https://worker.test/plant-health',{method,headers:{Authorization:'Bearer fixture-session-token','Content-Type':'application/json',...headers},...(method==='POST'?{body:typeof body==='string'?body:JSON.stringify(body)}:{})});
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
@@ -72,7 +72,7 @@ test('authenticated multimodal request forwards only sanitized images and bounde
 });
 test('model quality/nonplant/absent evidence abstains without a fabricated diagnosis',()=>{
  for(const overrides of [{plant_visible:false},{image_quality:'unusable'},{observations:[]}]){
-  const result=sanitizePlantHealthAssessment({...assessment,...overrides});assert.equal(result.image_quality,'unusable');assert.deepEqual(result.possible_causes,[]);assert.match(result.summary,/غير كافية/);assert.match(result.initial_steps[0],/صورة/);
+  const result=sanitizePlantHealthAssessment({...assessment,...overrides});assert.equal(result.image_quality,'unusable');assert.deepEqual(result.possible_causes,[]);assert.deepEqual(result.management,[]);assert.deepEqual(result.prevention,[]);assert.match(result.summary,/غير كافية/);assert.match(result.initial_steps[0],/صورة/);
  }
  const healthy=sanitizePlantHealthAssessment({...assessment,summary:'لا تظهر علامات مرض واضحة في الصور المتاحة.',possible_causes:[]});assert.deepEqual(healthy.possible_causes,[]);
 });
@@ -94,4 +94,18 @@ test('warm-instance cooldown avoids duplicate model requests for the same accoun
 test('warm user-day quota remains bounded after cooldowns and resets on the next UTC day',async()=>{
  const original=Date.now;let now=Date.parse('2030-01-01T01:00:00Z');Date.now=()=>now;
  try{await mocked(async calls=>{for(let index=0;index<5;index++){assert.equal((await handlePlantHealth(request(),ENV)).status,200);now+=61000;}assert.equal((await handlePlantHealth(request(),ENV)).status,429);assert.equal(calls.filter(row=>row.url.includes('googleapis')).length,5);now+=86400000;assert.equal((await handlePlantHealth(request(),ENV)).status,200);});}finally{Date.now=original;}
+});
+
+
+test('management and prevention stay conditional and reject chemical recipes across both plans',()=>{
+ const result=sanitizePlantHealthAssessment(assessment);assert.deepEqual(result.management,assessment.management);assert.deepEqual(result.prevention,assessment.prevention);
+ for(const key of ['management','prevention']){
+  assert.throws(()=>sanitizePlantHealthAssessment({...assessment,[key]:['رش مادة جديدة الآن']}));
+  assert.throws(()=>sanitizePlantHealthAssessment({...assessment,[key]:['استخدم بجرعة 2 mg/L']}));
+  assert.throws(()=>sanitizePlantHealthAssessment({...assessment,[key]:'not an array'}));
+ }
+ const healthy=sanitizePlantHealthAssessment({...assessment,possible_causes:[]});assert.deepEqual(healthy.management,[]);assert.deepEqual(healthy.prevention,assessment.prevention);
+ const second={name:'إجهاد الري',category:'abiotic',supporting_signs:['اصفرار'],distinguishing_checks:['افحص رطوبة الجذور']};
+ const ranked=sanitizePlantHealthAssessment({...assessment,possible_causes:[second,assessment.possible_causes[0]]});
+ assert.deepEqual(ranked.possible_causes.map(row=>row.name),[second.name,assessment.possible_causes[0].name]);
 });

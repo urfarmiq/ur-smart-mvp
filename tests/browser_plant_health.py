@@ -22,6 +22,9 @@ STORAGE_KEY = 'sb-ynsmhtsktbubxfhsekjq-auth-token'
 USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 PUBLIC_KEY = 'sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc'
 EXIF_MARKER = 'PRIVATE_PHOTO_EXIF_MARKER'
+PRIMARY_MATCH='اللفحة المبكرة في الطماطم'
+SIMILAR_MATCH='التبقع البكتيري في الطماطم'
+ABIOTIC_MATCH='إجهاد الري أو التغذية'
 
 
 def encode(value):
@@ -201,20 +204,55 @@ def result_fixture(abstain=False, injection=False):
             'assessment': {
                 'image_quality': 'unusable' if abstain else 'usable',
                 'plant_visible': not abstain,
-                'summary': 'لا يمكن تمييز نبات أو أعراض صالحة للتقييم.' if abstain else ('<img src=x onerror="window.__plantPwned=1"> ' if injection else '')+'بقع قد ترتبط بأكثر من سبب، ولا تكفي الصورة لتأكيد مرض.',
+                'summary': 'لا يمكن تمييز نبات أو أعراض صالحة للتقييم.' if abstain else ('<img src=x onerror="window.__plantPwned=1"> ' if injection else '')+'الأعراض أقرب إلى اللفحة المبكرة في الطماطم. قارن شكل البقع بالحالات المشابهة والعلامات الفارقة.',
                 'observations': [] if abstain else ['بقع بنية محدودة على الورقة الظاهرة.'],
                 'possible_causes': [] if abstain else [
-                    {'name': ('<script>window.__plantPwned=1</script> ' if injection else '')+'احتمال مرض ورقي', 'category': 'disease',
-                     'supporting_signs': ['البقع الظاهرة قد تتوافق مع أكثر من مرض.'],
-                     'distinguishing_checks': ['افحص أسفل الورقة ونمط انتشار البقع.']},
-                    {'name': 'إجهاد غير حيوي محتمل', 'category': 'abiotic',
+                    {'name': ('<script>window.__plantPwned=1</script> ' if injection else '')+PRIMARY_MATCH, 'category': 'disease',
+                     'supporting_signs': ['بقع بنية ذات حلقات ظاهرة على الورقة.'],
+                     'distinguishing_checks': ['افحص الحلقات داخل البقعة ونمط الانتشار على الأوراق السفلية.']},
+                    {'name': SIMILAR_MATCH, 'category': 'disease',
+                     'supporting_signs': ['البقع الداكنة قد تتشابه بصريًا.'],
+                     'distinguishing_checks': ['قارن صغر البقع والهالات الصفراء حولها.']},
+                    {'name': ABIOTIC_MATCH, 'category': 'abiotic',
                      'supporting_signs': ['الاصفرار قد يرتبط بالري أو التغذية.'],
                      'distinguishing_checks': ['راجع رطوبة الجذور وتاريخ الإضافات.']}],
                 'missing_information': ['صورة أقرب للسطح السفلي للورقة.'],
                 'initial_steps': ['أعد التصوير بإضاءة طبيعية.' if abstain else 'راقب الأوراق الجديدة وقارن نباتًا سليمًا مجاورًا.'],
+                'management': [] if abstain else ['إذا تأكدت علامات التبقع، تجنب تبليل الأوراق أثناء الري وراجع التصريف قبل تغيير كمية الماء.'],
+                'prevention': [] if abstain else ['نظّف أدوات العمل وراقب الأوراق الجديدة لتقليل انتقال المشكلة.'],
                 'expert_review': ['راجع مهندسًا زراعيًا إذا اتسع الضرر.'],
                 'limitations': ['تقييم أولي للصورة، وليس تشخيصًا مختبريًا أو وصفة مبيد.']},
             'note': 'فحص أولي يحتاج تحققًا ميدانيًا؛ لم تُحفظ الصور تلقائيًا.'}
+
+
+def verify_branded_result(page, expected_primary=None, expected_similars=()):
+    panel=page.locator('#resultPanel')
+    visible=panel.inner_text()
+    assert 'مساعد أور الزراعي' in visible, visible
+    assert not re.search(r'google|gemini|gemini-3\.5',visible,re.I),visible
+    assert not re.search(r'\d+\s*[%٪]',visible),visible
+    # Privacy disclosure remains explicit even when the report uses product branding.
+    sharing=page.locator('.consent-panel').text_content()
+    assert 'Google Gemini' in sharing
+    assert page.locator('.consent-panel a[href="https://ai.google.dev/gemini-api/terms"]').count()==1
+    if expected_primary is None:
+        assert page.locator('#primaryMatch').count()==0 or page.locator('#primaryMatch').is_hidden()
+        assert page.locator('#similarMatches').count()==0 or page.locator('#similarMatches').is_hidden()
+    else:
+        expect(page.locator('#primaryMatch')).to_be_visible()
+        assert expected_primary in page.locator('#primaryMatchName').inner_text()
+        primary_text=page.locator('#primaryMatch').inner_text()
+        assert 'الأقرب للأعراض' in primary_text,primary_text
+        for similar in expected_similars:
+            assert similar not in primary_text,primary_text
+        if expected_similars:
+            expect(page.locator('#similarMatches')).to_be_visible()
+            similar_text=page.locator('#similarMatches').inner_text()
+            assert 'حالات مشابهة' in similar_text,similar_text
+            assert expected_primary not in similar_text,similar_text
+            for similar in expected_similars:assert similar in similar_text,similar_text
+        else:
+            assert page.locator('#similarMatches').count()==0 or page.locator('#similarMatches').is_hidden()
 
 
 def authenticated_scenario(browser, mobile):
@@ -247,7 +285,13 @@ def authenticated_scenario(browser, mobile):
     assert page.locator('#resultPanel img, #resultPanel script').count() == 0
     assert page.evaluate('()=>window.__plantPwned') is None
     assert '<img src=x' in page.locator('#resultSummary').inner_text()
-    assert 'إجهاد غير حيوي' in page.locator('#resultPanel').inner_text()
+    verify_branded_result(page,PRIMARY_MATCH,[SIMILAR_MATCH,ABIOTIC_MATCH])
+    expect(page.locator('#treatmentPlan')).to_be_visible()
+    expect(page.locator('#preventionPlan')).to_be_visible()
+    assert 'تجنب تبليل الأوراق' in page.locator('#treatmentPlan').inner_text()
+    assert 'نظّف أدوات العمل' in page.locator('#preventionPlan').inner_text()
+    assert '<script>' in page.locator('#primaryMatchName').inner_text()
+    assert 'حلقات' in page.locator('#primaryMatch').inner_text()
     assert not re.search(r'\d+\s*[%٪]', page.locator('#resultPanel').inner_text())
     assert page.evaluate('()=>document.documentElement.scrollWidth<=innerWidth+1')
     state['response'] = result_fixture()
@@ -264,6 +308,18 @@ def authenticated_scenario(browser, mobile):
     exported = json.loads(Path(download.value.path()).read_text())
     assert EXIF_MARKER not in json.dumps(exported) and ACCESS_TOKEN not in json.dumps(exported)
     assert 'data:image/' not in json.dumps(exported)
+    exported_text=json.dumps(exported,ensure_ascii=False)
+    assert 'مساعد أور الزراعي' in exported_text
+    assert 'Google Gemini' not in exported_text and 'gemini-3.5-flash-lite' not in exported_text
+    assert 'provider' not in exported and 'model' not in exported
+    assert exported['service']=='مساعد أور الزراعي'
+    assert exported['assessment']['possible_causes'][0]['name']==PRIMARY_MATCH
+    assert exported['assessment']['management'] and exported['assessment']['prevention']
+    page.emulate_media(media='print')
+    assert page.locator('#resultPanel').is_visible()
+    assert 'مساعد أور الزراعي' in page.locator('#resultMeta').inner_text()
+    assert not re.search(r'google|gemini',page.locator('#resultMeta').inner_text(),re.I)
+    page.emulate_media(media='screen')
     page.evaluate('()=>{window.__plantPrintCalls=0;window.print=()=>window.__plantPrintCalls++;}')
     page.click('#printPlantReport')
     assert page.evaluate('()=>window.__plantPrintCalls') == 1
@@ -323,7 +379,31 @@ def authenticated_scenario(browser, mobile):
     submit(page)
     expect(page.locator('#resultPanel')).to_be_visible()
     assert 'لا يمكن تمييز نبات' in page.locator('#resultSummary').inner_text()
-    assert 'احتمال مرض ورقي' not in page.locator('#resultPanel').inner_text()
+    assert PRIMARY_MATCH not in page.locator('#resultPanel').inner_text()
+    verify_branded_result(page)
+    assert page.locator('#treatmentPlan').count()==0 and page.locator('#preventionPlan').count()==0
+
+    # A visually healthy report must not invent a disease just to fill the lead card.
+    healthy=result_fixture()
+    healthy['assessment']['summary']='لا تظهر علامات مرض واضحة في الصور المرفقة.'
+    healthy['assessment']['possible_causes']=[]
+    healthy['assessment']['management']=[]
+    state['response']=healthy
+    submit(page)
+    expect(page.locator('#resultSummary')).to_contain_text('لا تظهر علامات مرض')
+    verify_branded_result(page)
+    assert page.locator('#treatmentPlan').count()==0
+    expect(page.locator('#preventionPlan')).to_be_visible()
+
+    # The nearest cause can be abiotic; product wording must not force an infection.
+    abiotic=result_fixture()
+    abiotic['assessment']['possible_causes']=[abiotic['assessment']['possible_causes'][-1]]
+    abiotic['assessment']['summary']='الأعراض أقرب إلى إجهاد الري أو التغذية.'
+    state['response']=abiotic
+    submit(page)
+    expect(page.locator('#primaryMatchName')).to_contain_text(ABIOTIC_MATCH)
+    verify_branded_result(page,ABIOTIC_MATCH)
+    assert PRIMARY_MATCH not in page.locator('#resultPanel').inner_text()
 
     # Editing during an outstanding request must reject its late result.
     state['mode'] = 'hold'
@@ -411,5 +491,5 @@ if __name__ == '__main__':
         for mobile in (False, True):
             authenticated_scenario(browser, mobile)
             anonymous_scenario(browser, mobile)
-            print(('Mobile' if mobile else 'Desktop') + ': actual local SDK, camera/upload/EXIF cleanup, consent/auth, precise payload, safe results, quota/invalid/abstention, stale input and exports pass; intercepted fixtures only.')
+            print(('Mobile' if mobile else 'Desktop') + ': actual local SDK, camera/upload/EXIF cleanup, consent/auth, precise payload, UR-branded ranked named results and similar conditions, healthy/abstention/abiotic cases, quota/invalid, stale input and branded exports pass; intercepted fixtures only.')
         browser.close()
