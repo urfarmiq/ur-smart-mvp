@@ -18,7 +18,7 @@
     <nav aria-label="التنقل الرئيسي"><a href="./dashboard.html">لوحة المزارع</a><a href="./research.html">الدعم البحثي</a><a href="./auth.html" id="loginLink">دخول / تسجيل</a><button type="button" id="signOut" class="text-button" hidden>تسجيل الخروج</button></nav>
   </div></header>
   <main id="main">
-    <section class="hero"><div class="wrap hero-inner"><div><p class="eyebrow">مختبر البحث الزراعي</p><h1>من بياناتك إلى<br><span>نتائج قابلة للمراجعة</span></h1><p>إحصاء محسوب من ملفك، وقراءة فضائية لحدود حقلك المحفوظة، مع مسودة تفسير ومراجع بحثية.</p></div><aside class="price-card"><span>سعر الطلب الواحد</span><strong>٢٥٬٠٠٠ <small>دينار عراقي</small></strong><p>يشمل خيار البيانات والخرائط معاً. تبدأ المعالجة بعد تأكيد الإدارة للدفع يدوياً.</p></aside></div></section>
+    <section class="hero"><div class="wrap hero-inner"><div><p class="eyebrow">مختبر البحث الزراعي</p><h1>من بياناتك إلى<br><span>نتائج قابلة للمراجعة</span></h1><p>إحصاء محسوب من ملفك، وقراءة فضائية لحدود حقلك المحفوظة، مع مسودة تفسير ومراجع بحثية.</p></div><aside class="price-card"><span>خدمات الباحثين</span><strong>مدفوعة</strong><p>يشمل خيار البيانات والخرائط معاً. تبدأ المعالجة بعد تأكيد الإدارة للدفع يدوياً.</p></aside></div></section>
     <div class="wrap workspace">
       <ol class="steps" aria-label="خطوات الخدمة"><li><strong>١. أنشئ الطلب</strong><span>حدد الموضوع ونوع العمل</span></li><li><strong>٢. أكّد الدفع مع الإدارة</strong><span>تراجع الإدارة الدفع وتوافق يدوياً</span></li><li><strong>٣. نفّذ وراجع</strong><span>ارفع CSV واختر الحقل بعد الموافقة</span></li></ol>
       <section class="panel account-panel" aria-labelledby="accountTitle"><div><h2 id="accountTitle">حساب الباحث</h2><p id="accountStatus" role="status">جارٍ التحقق من جلسة الدخول…</p></div><button id="retryAccount" type="button" class="button secondary">إعادة التحقق</button></section>
@@ -32,7 +32,7 @@
               <label for="taskType">نوع العمل</label><select id="taskType"><option value="combined">تحليل بيانات + خرائط</option><option value="data">تحليل بيانات CSV</option><option value="maps">تحليل وخرائط حقل</option><option value="study">مسودة منهجية ومراجع</option></select>
               <label for="paymentReference">مرجع الدفع <span class="muted">(اختياري)</span></label><input id="paymentReference" maxlength="120" placeholder="رقم العملية أو الوصف المتفق عليه مع الإدارة">
               <p class="hint">إضافة مرجع لا تؤكد الدفع. تراجع الإدارة العملية بنفسها قبل السماح بالتنفيذ.</p>
-              <button class="button primary" id="createOrder" type="submit">إنشاء الطلب · ٢٥٬٠٠٠ د.ع</button>
+              <button class="button primary" id="createOrder" type="submit">إنشاء الطلب · خدمة مدفوعة</button>
             </fieldset></form>
             <p id="createStatus" class="status" role="status" hidden></p>
             <div class="payment-help"><strong>تنسيق الدفع</strong><p>تواصل مع حساب أور الرسمي، واذكر رقم طلبك. لا توجد عملية تحصيل إلكترونية هنا.</p><a href="https://www.instagram.com/ur.farm.iq/" target="_blank" rel="noopener noreferrer">فتح حساب أور على إنستغرام ↗</a></div>
