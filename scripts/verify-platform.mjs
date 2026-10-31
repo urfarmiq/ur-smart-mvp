@@ -9,7 +9,7 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
   await wait(4000);
  }
  if(!published)throw Error('The new Pages hostname has not served the expected deployment. The GitHub redirect must stay unpublished.');
- for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs','services.html','farm-budget.html','farm-budget.mjs','season-economics.mjs','weather.html','weather.mjs','weather-core.mjs','dashboard-weather.mjs']){
+ for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs','services.html','farm-budget.html','farm-budget.mjs','season-economics.mjs','weather.html','weather.mjs','weather-core.mjs','dashboard-weather.mjs','plant-health.html','plant-health.css','plant-health.mjs']){
   const response=await fetchImpl(origin+'/'+file,{signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error('A required public page is unavailable: '+file);
  }
@@ -19,6 +19,10 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
  if(!research.ok||research.headers.get('access-control-allow-origin')!==origin)throw Error('Research backend is unavailable or did not allow the platform origin.');
  const status=await research.json();
  if(status.fee_iqd!==25000||status.manual_admin_approval_required!==true)throw Error('Research backend did not confirm the expected payment gate.');
- return {app_url:origin,release,frontend:true,backend_cors:true,research:true};
+ const plant=await fetchImpl('https://ur-smart-satellite.alialbatekh111.workers.dev/plant-health/status',{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
+ if(!plant.ok||plant.headers.get('access-control-allow-origin')!==origin)throw Error('Plant health backend is unavailable or did not allow the platform origin.');
+ const plantStatus=await plant.json();
+ if(plantStatus.available!==true||plantStatus.free_tier_confirmed!==true)throw Error('Plant health service did not confirm its existing free-tier configuration.');
+ return {app_url:origin,release,frontend:true,backend_cors:true,research:true,plant_health:true};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{console.log(JSON.stringify(await verifyPlatform()));}catch(error){console.error(error.message);process.exitCode=1;}}

@@ -2,6 +2,7 @@ import {handleGeminiAdvice,geminiStatus} from './gemini-advisor.mjs';
 import {readSatelliteRequest,validateSatellitePolygon,satelliteFetch,SatelliteRequestError} from './satellite-security.mjs';
 import {handleWeather} from './met-weather.mjs';
 import {handleResearch,researchStatus} from './research-service.mjs';
+import {handlePlantHealth,plantHealthStatus} from './plant-health.mjs';
 // UR Smart Sentinel-2 analytics gateway (Cloudflare Worker).
 // Required secrets: SENTINEL_CLIENT_ID, SENTINEL_CLIENT_SECRET.
 // Required variable: SUPABASE_URL. Optional: SUPABASE_PUBLISHABLE_KEY, ALLOWED_ORIGIN.
@@ -45,6 +46,8 @@ const platformWorker={async fetch(req,env){
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':allowed,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','access-control-max-age':'86400','vary':'Origin','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
  const path=new URL(req.url).pathname;
  if(path==='/weather')return handleWeather(req,env,allowed);
+ if(path==='/plant-health/status'&&req.method==='GET')return reply(plantHealthStatus(env),200,allowed);
+ if(path==='/plant-health')return handlePlantHealth(req,env,{reply,origin:allowed});
  if(path==='/advice/status'&&req.method==='GET')return reply(geminiStatus(env),200,allowed);
  if(path==='/advice')return handleGeminiAdvice(req,env,{reply,origin:allowed});
  if(path==='/research/status'&&req.method==='GET')return reply(researchStatus(env),200,allowed);

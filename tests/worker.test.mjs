@@ -205,3 +205,17 @@ test('imagery preserves native bounded grids and reports actual display encoding
   assert.deepEqual(Array.from(context.evaluatePixel({B08:.7,B04:.3,dataMask:1,SCL:9})),[0,0,0,0]);
  }
 });
+
+
+test('plant health routes keep existing origin and authentication gates without requiring Sentinel',async()=>{
+ const origin='https://ur-smart-urfarmiq.pages.dev';
+ let response=await worker.fetch(new Request('https://worker.test/plant-health/status',{headers:{Origin:origin}}),{});
+ assert.equal(response.status,200);assert.equal((await response.json()).available,false);
+ assert.equal(response.headers.get('access-control-allow-origin'),origin);
+ response=await worker.fetch(new Request('https://worker.test/plant-health/status',{headers:{Origin:'https://untrusted.test'}}),{});assert.equal(response.status,403);
+ const configured={GEMINI_API_KEY:'synthetic-private-key',GEMINI_FREE_TIER_CONFIRMED:'true',SUPABASE_URL:'https://supabase.test',SUPABASE_PUBLISHABLE_KEY:'public'};
+ response=await worker.fetch(new Request('https://worker.test/plant-health/status',{headers:{Origin:origin}}),configured);
+ const status=await response.json();assert.equal(status.available,true);assert.equal(status.free_tier_confirmed,true);assert.ok(!JSON.stringify(status).includes('synthetic-private-key'));
+ response=await worker.fetch(new Request('https://worker.test/plant-health',{method:'POST',headers:{Origin:origin,'content-type':'application/json'},body:'{}'}),configured);
+ assert.equal(response.status,401);assert.equal(response.headers.get('access-control-allow-origin'),origin);assert.equal(response.headers.get('cache-control'),'no-store');
+});
