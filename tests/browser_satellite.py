@@ -25,6 +25,7 @@ stats['series'].append({**stats['series'][0],'date':'2026-10-22T00:00:00Z'})
 
 ADVICE_MODE={'value':'ready','requests':[]}
 DEFER_NEXT_IMAGE={'value':False,'pending':[]}
+SATELLITE_PAYMENT={'required':False}
 RECOMMENDATION={'summary':'توصية اختبار <img src=x onerror=alert(1)>','evidence':['مؤشرات مؤرخة'],'missing_data':['تحليل التربة والماء'],'irrigation':['افحص رطوبة الجذور'],'fertilization':['راجع تحليل التربة'],'follow_up':['سجل الفحص'],'limitations':['إرشادي'] }
 def route_request(route):
     u=urlparse(route.request.url)
@@ -46,6 +47,8 @@ def route_request(route):
             ADVICE_MODE['requests'].append(payload)
             if ADVICE_MODE['value']=='quota':route.fulfill(status=429,json={'code':'FREE_QUOTA_EXHAUSTED'});return
             route.fulfill(json={'provider':'Google Gemini','model':'gemini-3.5-flash-lite','generated_at':'2026-10-25T12:00:00Z','recommendation':RECOMMENDATION});return
+        if SATELLITE_PAYMENT['required']:
+            route.fulfill(status=403,json={'code':'SATELLITE_PAYMENT_REQUIRED','message':'Satellite payment required'});return
         if payload.get('action')=='imagery':
             if payload.get('map_index')=='NDRE':route.fulfill(status=502,json={'error':'Fixture unavailable NDRE'});return
             image_response={'image':IMAGE,'bounds':[[33,44],[33.01,44.01]],'index':payload.get('map_index'),'date':payload.get('map_date'),'resolution_m':20}
@@ -58,6 +61,8 @@ def route_request(route):
 def probe_point(page,map_selector,mobile,fx=.5,fy=.5,outside=False):
     raster=page.locator(map_selector+' img.leaflet-image-layer').last
     raster.scroll_into_view_if_needed()
+    # Wait for Leaflet's fitBounds/size animation before a physical phone tap.
+    raster.evaluate("node=>new Promise(resolve=>{let last=null,stable=performance.now(),start=stable;const tick=()=>{const b=node.getBoundingClientRect(),value=[b.x,b.y,b.width,b.height];if(!last||value.some((v,i)=>Math.abs(v-last[i])>.1)){stable=performance.now();last=value}if(performance.now()-stable>220||performance.now()-start>2000)resolve();else requestAnimationFrame(tick)};tick()})")
     box=raster.bounding_box()
     assert box and box['width']>0 and box['height']>0
     x=box['x']+(box['width']*fx if not outside else -12)
@@ -68,9 +73,9 @@ def probe_point(page,map_selector,mobile,fx=.5,fy=.5,outside=False):
 
 def check_probe(page,map_selector,mobile,index='NDVI',value='0.192'):
     readout=probe_point(page,map_selector,mobile)
-    page.wait_for_function("([selector,index,value])=>{const node=document.querySelector(selector+' .ur-pixel-probe-value');return node&&node.textContent.includes(index)&&node.textContent.includes(value)&&node.textContent.includes('39.2');}",arg=[map_selector,index,value])
+    observed=page.wait_for_function("([selector,index,value])=>{const node=document.querySelector(selector+' .ur-pixel-probe-value'),text=node?.textContent||'';return text.includes(index)&&text.includes(value)&&text.includes('39.2')&&text.includes('مقياس')?text:false;}",arg=[map_selector,index,value]).json_value()
     assert page.locator(map_selector+' .ur-pixel-probe').count()==1
-    assert 'مقياس' in readout.inner_text()
+    assert 'مقياس' in observed
     # PNG alpha is zero in the northwestern 2x2 pixels: no pixel value is allowed.
     readout=probe_point(page,map_selector,mobile,.125,.125)
     page.wait_for_function("selector=>{const n=document.querySelector(selector+' .ur-pixel-probe-value');return n&&!n.textContent.includes('39.2')&&!n.textContent.includes('0.192');}",arg=map_selector)
@@ -230,5 +235,38 @@ with sync_playwright() as p:
         assert not gemini.locator('input[type="checkbox"]').is_checked()
         assert not errors,errors
         print(('Mobile' if mobile else 'Desktop')+': free ChatGPT report preview, missing-data preservation, private-ID exclusion, clipboard fallback and field-form defaults pass.')
+        # A denied paid activation offers the correct field link on every fresh
+        # satellite entry point; boundary tools and ordinary field forms remain.
+        SATELLITE_PAYMENT['required']=True
+        page.goto('https://ur-smart.test/field-map.html')
+        page.wait_for_function("document.querySelector('#cloudField').options.length>1")
+        page.select_option('#cloudField',FIELD)
+        assert page.locator('#satelliteAccessLink').get_attribute('href').endswith('?field='+FIELD)
+        page.click('#loadIndicatorMap')
+        page.wait_for_selector('#indicatorStatus .satellite-payment-link')
+        assert 'مدفوعة' in page.locator('#indicatorStatus').inner_text()
+        assert 'تاريخًا آخر' not in page.locator('#indicatorStatus').inner_text()
+        assert page.locator('#indicatorStatus .satellite-payment-link').get_attribute('href').endswith('?field='+FIELD)
+        assert page.locator('img.leaflet-image-layer').count()==0
+        page.click('#loadCloud')
+        page.wait_for_function("document.querySelector('#cloudStatus').textContent.includes('✓')")
+        assert page.locator('#draw').is_enabled()
+        page.goto('https://ur-smart.test/satellite-analysis.html')
+        page.wait_for_function("document.querySelector('#field').options.length>1")
+        page.select_option('#field',FIELD);page.click('#autoAnalyze')
+        page.wait_for_selector('#autoResult .satellite-payment-link')
+        assert page.locator('#autoResult .satellite-payment-link').get_attribute('href').endswith('?field='+FIELD)
+        assert 'Cloudflare' not in page.locator('#autoResult').inner_text()
+        assert page.locator('#autoAnalyze').is_enabled()
+        page.goto('https://ur-smart.test/field-analysis.html')
+        page.wait_for_function("document.querySelector('#savedField').options.length>1")
+        page.select_option('#savedField',FIELD);page.click('#refreshFieldContext')
+        page.wait_for_selector('#satelliteContext .satellite-payment-link')
+        assert page.locator('#satelliteContext .satellite-payment-link').get_attribute('href').endswith('?field='+FIELD)
+        assert page.locator('#growthStage').is_enabled()
+        assert page.locator('#createButton').is_enabled()
+        assert not errors,errors
+        SATELLITE_PAYMENT['required']=False
+        print(('Mobile' if mobile else 'Desktop')+': paid satellite denials show field-specific activation links on maps, satellite analysis and basic field context; free boundary/form controls remain usable.')
         context.close()
     browser.close()

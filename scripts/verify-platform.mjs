@@ -9,7 +9,7 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
   await wait(4000);
  }
  if(!published)throw Error('The new Pages hostname has not served the expected deployment. The GitHub redirect must stay unpublished.');
- for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs','services.html','farm-budget.html','farm-budget.mjs','season-economics.mjs','weather.html','weather.mjs','weather-core.mjs','dashboard-weather.mjs','plant-health.html','plant-health.css','plant-health.mjs','field-services.html','field-services.css','field-services.mjs','admin-field-services.mjs']){
+ for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs','services.html','farm-budget.html','farm-budget.mjs','season-economics.mjs','weather.html','weather.mjs','weather-core.mjs','dashboard-weather.mjs','plant-health.html','plant-health.css','plant-health.mjs','field-services.html','field-services.css','field-services.mjs','admin-field-services.mjs','satellite-access.html','satellite-access.css','satellite-access.mjs','admin-satellite-access.mjs','satellite-payment.mjs']){
   const response=await fetchImpl(origin+'/'+file,{signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error('A required public page is unavailable: '+file);
  }
@@ -27,6 +27,10 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
  if(!paid.ok||paid.headers.get('access-control-allow-origin')!==origin)throw Error('Paid field service is unavailable or did not allow the platform origin.');
  const paidStatus=await paid.json();
  if(paidStatus.available!==true||paidStatus.manual_admin_approval_required!==true||paidStatus.quote_required!==true||paidStatus.customer_acceptance_required!==true||paidStatus.scheduled_automatically!==false)throw Error('Paid field service did not confirm the quote and payment gate.');
- return {app_url:origin,release,frontend:true,backend_cors:true,research:true,plant_health:true,paid_field_services:true};
+ const satellite=await fetchImpl('https://ur-smart-satellite.alialbatekh111.workers.dev/satellite/status',{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
+ if(!satellite.ok||satellite.headers.get('access-control-allow-origin')!==origin)throw Error('Satellite access service is unavailable or did not allow the platform origin.');
+ const satelliteStatus=await satellite.json();
+ if(satelliteStatus.available!==true||satelliteStatus.paid_service!==true||satelliteStatus.manual_admin_approval_required!==true||satelliteStatus.quote_required!==true||satelliteStatus.customer_acceptance_required!==true||satelliteStatus.field_specific!==true||satelliteStatus.automatic_renewal!==false)throw Error('Satellite service did not confirm the field-specific quote and payment gate.');
+ return {app_url:origin,release,frontend:true,backend_cors:true,research:true,plant_health:true,paid_field_services:true,paid_satellite:true};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{console.log(JSON.stringify(await verifyPlatform()));}catch(error){console.error(error.message);process.exitCode=1;}}

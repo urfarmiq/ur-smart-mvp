@@ -48,9 +48,9 @@ OVERRIDE = r'''
 const fixtureFetch=window.fetch;
 window.fetch=async(resource,options={})=>{
  const url=new URL(typeof resource==='string'?resource:resource.url);
- if(url.hostname!=='ur-smart-satellite.alialbatekh111.workers.dev'||url.pathname!=='/')return fixtureFetch(resource,options);
- const s=window.__fixture,body=JSON.parse(options.body||'{}');s.calls.push({api:'/',body,headers:options.headers});
- if(body.action!=='imagery'||body.field_id!=='22222222-2222-4222-8222-222222222222'||body.map_index!=='NDVI')throw Error('Unexpected imagery request');
+ if(url.hostname!=='ur-smart-satellite.alialbatekh111.workers.dev'||url.pathname!=='/research/imagery')return fixtureFetch(resource,options);
+ const s=window.__fixture,body=JSON.parse(options.body||'{}');s.calls.push({api:'/research/imagery',body,headers:options.headers});
+ if(Object.keys(body).join(',')!=='order_id'||body.order_id!==s.orders.find(row=>row.result)?.id)throw Error('Unexpected paid report imagery request');
  if(s.holdImage)await new Promise(resolve=>s.releaseImage=resolve);
  if(s.imageMode==='http-error')return new Response(JSON.stringify({message:'Fixture image temporarily unavailable'}),{status:503});
  const result=IMAGE_PAYLOAD;

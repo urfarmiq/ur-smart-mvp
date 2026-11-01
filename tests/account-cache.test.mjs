@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {accountCacheKey,readAccountCache,writeAccountCache} from '../account-cache.mjs';
+import {updateSatelliteAccessLink} from '../satellite-payment.mjs';
 
 function memory(initial=[]){
  const values=new Map(initial),reads=[],writes=[];
@@ -56,7 +57,7 @@ function privateViewHarness(kind){
  const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,{value:'previous-private-value',textContent:'previous-private-text',disabled:false,children:[],replaceChildren(...children){this.children=children;this.textContent='';}});return nodes.get(id);};
  let renders=0,mapDisposals=0,cropClears=0,viewResets=0,handler;
  const auth={onAuthStateChange(callback){handler=callback;},getUser(){throw Error('auth callbacks must not issue Supabase calls');}};
- const context=vm.createContext({$:node,Option:function(label,value){return {label,value};},map:{setView(center,zoom){assert.equal(center.join(','),'32.75,45.3');assert.equal(zoom,12);viewResets++;}},render:()=>renders++,setCropValue:value=>{assert.equal(value,'');cropClears++;},indicatorError:message=>{node('indicatorStatus').textContent=message;},disposeIndicatorMaps:()=>mapDisposals++,cloudClient:{auth},client:{auth}});
+ const context=vm.createContext({$:node,updateSatelliteAccessLink,Option:function(label,value){return {label,value};},map:{setView(center,zoom){assert.equal(center.join(','),'32.75,45.3');assert.equal(zoom,12);viewResets++;}},render:()=>renders++,setCropValue:value=>{assert.equal(value,'');cropClears++;},indicatorError:message=>{node('indicatorStatus').textContent=message;},disposeIndicatorMaps:()=>mapDisposals++,cloudClient:{auth},client:{auth}});
  const variables=kind==='map'?"let cloudAuthGeneration=0,cloudUser={id:'account-a'},cloudFields=[{name:'private'}],points=[1,2,3],observedAuthUserId='account-a';":"let authRefreshGeneration=0,analysisRequestGeneration=0,user={id:'account-a'},observedAuthUserId='account-a';";
  vm.runInContext(variables,context);
  const html=kind==='map'?mapHtml:satelliteHtml;
@@ -75,7 +76,7 @@ test('map auth callback synchronously clears the former account drawing and priv
  assert.equal(vm.runInContext('cloudFields.length',p.context),0);assert.equal(vm.runInContext('cloudAuthGeneration',p.context),1);
  for(const id of ['fieldName','notes'])assert.equal(p.node(id).value,'');
  assert.equal(p.counts().renders,1);assert.equal(p.counts().cropClears,1);
- assert.equal(p.counts().viewResets,1);
+ assert.equal(p.counts().viewResets,1);assert.equal(p.node('satelliteAccessLink').href,'./satellite-access.html');
  p.callback('TOKEN_REFRESHED',{user:{id:'account-b'}});assert.equal(p.counts().renders,1);
  p.callback('SIGNED_OUT',null);assert.equal(p.counts().renders,2);
 });
@@ -84,5 +85,5 @@ test('satellite auth callback clears protected results and invalidates in-flight
  const p=privateViewHarness('satellite');p.callback('SIGNED_OUT',null);
  assert.equal(vm.runInContext('user',p.context),null);assert.equal(vm.runInContext('analysisRequestGeneration',p.context),1);
  assert.equal(vm.runInContext('authRefreshGeneration',p.context),1);assert.equal(p.counts().mapDisposals,1);
- assert.match(p.node('autoResult').textContent,/انتهت الجلسة/);assert.equal(p.node('autoAnalyze').disabled,true);assert.equal(p.node('connectionResult').textContent,'');
+ assert.equal(p.node('satelliteAccessLink').href,'./satellite-access.html');assert.match(p.node('autoResult').textContent,/انتهت الجلسة/);assert.equal(p.node('autoAnalyze').disabled,true);assert.equal(p.node('connectionResult').textContent,'');
 });

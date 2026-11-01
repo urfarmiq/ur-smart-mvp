@@ -112,7 +112,7 @@ body{background:white}main{width:100%;margin:0}
 <div id="fieldContextStatus" class="result" aria-live="polite">اختر حقلًا محفوظًا ثم حدّد رطوبة التربة في الموقع.</div>
 <div class="grid">
 <div class="result"><strong>الطقس حول الحقل</strong><div id="weatherContext">لم تُحمّل البيانات بعد.</div></div>
-<div class="result"><strong>آخر تحليل فضائي</strong><div id="satelliteContext">لم تُحمّل البيانات بعد.</div></div>
+<div class="result"><strong>آخر تحليل فضائي</strong><p class="muted">التحليل الفضائي الجديد خدمة مدفوعة حسب مدة التفعيل. <a id="satelliteAccessLink" href="./satellite-access.html">طلب أو تجديد التفعيل</a></p><div id="satelliteContext">لم تُحمّل البيانات بعد.</div></div>
 </div>
 <h3>إضافة سجل ري</h3>
 <div class="grid">
@@ -175,6 +175,7 @@ body{background:white}main{width:100%;margin:0}
 <footer class="muted" style="text-align:center;padding:20px">© 2026 UR Smart — أور الزراعية الذكية<p><small>نحصي مشاهدات الصفحات إجمالياً دون حفظ بيانات تعريف الزائر. هذه المشاهدات ليست عدد الأشخاص.</small></p></footer>
 
 <script type="module">
+import {satelliteResponseError,isSatellitePaymentRequired,showSatellitePayment,updateSatelliteAccessLink} from './satellite-payment.mjs';
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
 import {buildWeatherUrl,WEATHER_SOURCE,WEATHER_SOURCE_URL,WEATHER_SOURCE_LICENSE,WEATHER_SOURCE_LICENSE_URL,WEATHER_TIMEZONE} from './weather-core.mjs';
@@ -457,7 +458,7 @@ async function loadSatelliteContext(fieldId,token=contextLoadToken){
  const {data:{session:activeSession}}=await supabase.auth.getSession();if(!activeSession)throw Error('سجّل الدخول لتحميل تحليل القمر.');
  if(!contextIsCurrent(fieldId,token))return null;
  const response=await fetch(SATELLITE_API_URL,{method:'POST',signal:AbortSignal.timeout(90000),headers:{'Content-Type':'application/json','Authorization':'Bearer '+activeSession.access_token},body:JSON.stringify({field_id:fieldId})});
- const data=await response.json();if(!contextIsCurrent(fieldId,token))return null;if(!response.ok)throw Error(data.message||data.error||'تعذر تحميل التحليل الفضائي.');
+ const data=await response.json();if(!contextIsCurrent(fieldId,token))return null;if(!response.ok)throw satelliteResponseError(response,data);
  if(data.field_id&&data.field_id!==fieldId)throw Error('رد المؤشرات لا يخص الحقل المختار.');
  fieldContext.satellite=data;fieldContext.updatedAt=new Date().toISOString();
  const box=$('satelliteContext');box.replaceChildren();
@@ -489,7 +490,7 @@ async function refreshFieldContext(){
  if(!contextIsCurrent(fieldId,token))return;
  const weatherResult=results[0],logsResult=results[1];
  let satelliteResult;
- try{satelliteResult=await loadSatelliteContext(fieldId,token);if(!contextIsCurrent(fieldId,token))return;try{await loadSatelliteHistory(fieldId,token)}catch(historyError){if(!contextIsCurrent(fieldId,token))return;fieldContext.series=[];console.warn('تعذر تحميل سجل المؤشرات السابق:',historyError)}}catch(e){if(!contextIsCurrent(fieldId,token))return;$('satelliteContext').textContent='غير متاح الآن: '+e.message}
+ try{satelliteResult=await loadSatelliteContext(fieldId,token);if(!contextIsCurrent(fieldId,token))return;try{await loadSatelliteHistory(fieldId,token)}catch(historyError){if(!contextIsCurrent(fieldId,token))return;fieldContext.series=[];console.warn('تعذر تحميل سجل المؤشرات السابق:',historyError)}}catch(e){if(!contextIsCurrent(fieldId,token))return;if(isSatellitePaymentRequired(e))showSatellitePayment($('satelliteContext'),fieldId);else $('satelliteContext').textContent='غير متاح الآن: '+e.message}
  if(!contextIsCurrent(fieldId,token))return;
  const messages=[];
  messages.push(weatherResult.status==='fulfilled'?'تم تحديث الطقس':'تعذر الطقس: '+weatherResult.reason.message);
@@ -498,7 +499,7 @@ async function refreshFieldContext(){
  statusBox.textContent=messages.join(' — ');
 }
 $('refreshFieldContext').addEventListener('click',refreshFieldContext);
-$('savedField').addEventListener('change',()=>{contextLoadToken++;fieldContext={fieldId:$('savedField').value||null,requestToken:contextLoadToken,updatedAt:null,weather:null,satellite:null,series:[],logs:[]};$('weatherContext').textContent='اختر الحقل ثم حدّث البيانات.';$('satelliteContext').textContent='اختر الحقل ثم حدّث البيانات.';$('irrigationHistory').textContent='اختر حقلًا لعرض سجلات الري.';});
+$('savedField').addEventListener('change',()=>{updateSatelliteAccessLink($('satelliteAccessLink'),$('savedField').value);contextLoadToken++;fieldContext={fieldId:$('savedField').value||null,requestToken:contextLoadToken,updatedAt:null,weather:null,satellite:null,series:[],logs:[]};$('weatherContext').textContent='اختر الحقل ثم حدّث البيانات.';$('satelliteContext').textContent='اختر الحقل ثم حدّث البيانات.';$('irrigationHistory').textContent='اختر حقلًا لعرض سجلات الري.';});
 $('saveIrrigationLog').addEventListener('click',async()=>{
  const fieldId=$('savedField').value;if(!fieldId||!session){$('fieldContextStatus').textContent='اختر حقلًا محفوظًا وسجّل الدخول أولًا.';return}
  const when=$('irrigatedAt').value?new Date($('irrigatedAt').value):new Date();

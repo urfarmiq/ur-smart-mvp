@@ -49,6 +49,13 @@
 <p id="fieldServiceAdminStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الطلبات بعد.</p><div id="fieldServiceOrderList" class="research-orders"></div><button id="olderFieldServiceOrders" type="button" class="secondary" hidden>عرض طلبات حقول أقدم</button>
 <p class="muted">لا تُحمّل هذه القائمة التقارير أو حدود الحقول أو ملفات العميل. المبلغ ونطاق العمل محميان من تعديل العميل وتُفرَض صلاحية المدير والتحقق الثنائي أيضًا في قاعدة البيانات.</p>
 </section>
+<section class="panel" id="satelliteAccessAdminPanel" aria-labelledby="satelliteAccessOrdersHeading" hidden>
+<div class="heading-row"><div><p class="eyebrow">وصول مدفوع لحقل محدد</p><h2 id="satelliteAccessOrdersHeading">طلبات التحليل الفضائي</h2><p class="muted">الطلبات المعروضة: <strong id="satelliteAccessAdminCount">—</strong></p></div><button id="refreshSatelliteAccessOrders" type="button" class="secondary">تحديث طلبات التحليل الفضائي</button></div>
+<p class="note">حدّد السعر والنطاق ومدة الوصول لكل حقل، ثم انتظر قبول العميل قبل تأكيد استلام المبلغ. تبدأ المدة من الموافقة الفعلية؛ لا توجد فوترة أو إعادة تفعيل تلقائية. تحقق مع العميل من حفظ حدود الحقل ومن حدود البيانات المتاحة قبل الدفع.</p>
+<label for="satelliteAccessOrderFilter">حالة طلبات التحليل الفضائي</label><select id="satelliteAccessOrderFilter"><option value="open">طلبات العرض والدفع المفتوحة</option><option value="waiting_quote">بانتظار عرض السعر</option><option value="quoted">بانتظار قبول العميل</option><option value="awaiting_payment">بانتظار مراجعة الدفع</option><option value="approved">الوصول المفعّل أو المنتهي</option><option value="rejected">مرفوض</option><option value="all">كل الحالات</option></select>
+<p id="satelliteAccessAdminStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الطلبات بعد.</p><div id="satelliteAccessOrderList" class="research-orders"></div><button id="olderSatelliteAccessOrders" type="button" class="secondary" hidden>عرض طلبات تحليل فضائي أقدم</button>
+<p class="muted">لا تُقرأ رموز الجلسة أو بيانات الدفع السرية أو كلمات المرور من هذه القائمة. يشترط الخادم تأكيد الدفع والوصول الساري للحقل قبل جلب التحليل أو صورة المؤشر.</p>
+</section>
 <section class="panel" aria-labelledby="visitsHeading">
 <div class="heading-row"><div><p class="eyebrow">حركة الموقع</p><h2 id="visitsHeading">مشاهدات صفحات المنصة</h2></div><button id="refreshVisits" type="button" class="secondary">تحديث الإحصاءات</button></div>
 <p id="visitsStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الإحصاءات بعد.</p>

@@ -132,7 +132,7 @@ async function fetchMapImage(){
  const isCurrent=()=>token===generation&&reportOrderId===context.orderId&&ownerId;
  try{
   const session=await sessionFor(token);if(!session)return;
-  const data=await api('',{body:{action:'imagery',field_id:context.fieldId,map_date:context.date,map_index:'NDVI'},accessToken:session.access_token,timeout:100000,token});
+  const data=await api('/research/imagery',{body:{order_id:context.orderId},accessToken:session.access_token,timeout:100000,token});
   if(!isCurrent()||!data)return;
   if(data.field_id!==context.fieldId||String(data.date||'').slice(0,10)!==context.date||data.index!=='NDVI')throw Error('بيانات صورة المؤشر لا تطابق الحقل والمشهد المطلوبين.');
   if(typeof data.image!=='string'||!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(data.image)||data.image.length>12*1024*1024)throw Error('لم تصل صورة PNG صالحة.');

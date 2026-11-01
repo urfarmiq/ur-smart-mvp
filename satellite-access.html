@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#164a36">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+<meta name="description" content="اطلب تفعيل التحليل الفضائي المدفوع لحقل محدد، بعرض واضح للسعر والمدة، ثم تأكيد الدفع يدويًا من إدارة أور.">
+<title>التحليل الفضائي المدفوع | أور الزراعية</title><link rel="stylesheet" href="./satellite-access.css"><script type="module" src="./satellite-access.mjs"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">انتقل إلى الخدمة</a>
+<header><div class="wrap header-inner"><a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true">أور</span><span>أور الزراعية<small lang="en" dir="ltr">UR SMART AGRICULTURE</small></span></a><nav aria-label="التنقل الرئيسي"><a href="./services.html">الخدمات</a><a href="./dashboard.html">حقولي</a><a href="./auth.html" id="loginLink">تسجيل الدخول</a></nav></div></header>
+<main id="main">
+<section class="hero"><div class="wrap hero-inner"><div><p class="eyebrow">المؤشرات والصور الفضائية</p><h1>راقب حقلك<br><span>من المشاهد المتاحة</span></h1><p>تفعيل التحليل الفضائي لحقل واحد خلال مدة متفق عليها، لعرض المؤشرات والصور الفعلية وقراءة قيم البكسلات.</p></div><aside class="paid-card"><span>التحليل بالأقمار الصناعية</span><strong>مدفوعة</strong><p>راجع السعر والمدة ونطاق الخدمة أولًا. يبدأ التفعيل عندما تؤكد الإدارة استلام الدفع.</p></aside></div></section>
+<div class="wrap workspace">
+<ol class="steps" aria-label="خطوات التفعيل"><li><strong>١. اختر الحقل</strong><span>حقل تملكه وحدود محفوظة</span></li><li><strong>٢. وافق على العرض</strong><span>السعر والمدة ونطاق التحليل</span></li><li><strong>٣. افتح التحليل</strong><span>بعد تأكيد الإدارة للدفع</span></li></ol>
+<section class="panel account-panel" aria-labelledby="accountTitle"><div><h2 id="accountTitle">حسابك وحقولك</h2><p id="accountStatus" role="status" aria-live="polite">جارٍ استعادة جلسة حسابك…</p></div><button id="retryAccount" class="button secondary" type="button">إعادة الاتصال</button></section>
+<noscript><p class="notice error">فعّل JavaScript لاستخدام جلسة حسابك ومراجعة الطلبات.</p></noscript>
+<div id="paidContent" hidden><div class="request-grid">
+<section class="panel" aria-labelledby="newOrderTitle"><p class="kicker">طلب تفعيل لحقل واحد</p><h2 id="newOrderTitle">التحليل الفضائي — مدفوعة</h2>
+<form id="orderForm" autocomplete="off"><fieldset id="orderFields" disabled>
+<label for="orderField">الحقل المحفوظ في حسابك</label><div class="field-row"><select id="orderField" required disabled><option value="">جارٍ تحميل حقولك…</option></select><button id="refreshFields" class="text-button" type="button">تحديث</button></div><p id="fieldsStatus" class="hint" role="status"></p><a class="quiet-link" href="./field-map.html">إضافة حقل وحفظ حدوده ←</a>
+<label for="durationDays">المدة المقترحة بالأيام</label><input id="durationDays" type="number" min="1" max="365" step="1" value="30" required><p class="hint">تُثبت الإدارة المدة النهائية في عرض السعر. راجعها قبل الموافقة؛ يبدأ احتسابها عند تأكيد الدفع.</p>
+<label for="orderNotes">نطاق التحليل المطلوب <span class="optional">اختياري</span></label><textarea id="orderNotes" maxlength="1500" rows="4" placeholder="مثال: متابعة مؤشرات حقل الحنطة والمشاهد المتاحة"></textarea><p class="hint">لا تُدرج كلمات مرور أو بيانات حساسة. إنشاء الطلب لا يؤكد الدفع.</p><button id="createOrder" class="button primary full" type="submit">إرسال طلب تفعيل مدفوع</button>
+</fieldset></form><p id="createStatus" class="status" role="status" hidden></p></section>
+<section class="panel" aria-labelledby="ordersTitle"><div class="section-heading"><div><p class="kicker">طلبات حسابك فقط</p><h2 id="ordersTitle">طلباتي</h2></div><button id="refreshOrders" class="button secondary" type="button" disabled>تحديث</button></div><p class="hint">اختر طلبًا لمراجعة العرض أو حالة الدفع ووقت انتهاء التفعيل.</p><p id="ordersStatus" class="hint" role="status"></p><div id="ordersList" class="orders-list"></div></section>
+</div>
+<section id="selectedPanel" class="panel selected-panel" aria-labelledby="selectedTitle" hidden><div class="section-heading"><div><p class="kicker">تفاصيل الطلب</p><h2 id="selectedTitle">تفعيل التحليل الفضائي</h2></div><span id="selectedOrderStatus" class="badge"></span></div><p id="selectedOrderMeta" class="hint"></p><p id="selectedRequestNote" class="request-note" hidden></p>
+<div id="quoteDetails" class="quote-details" hidden><div class="quote-heading"><h3>عرض الإدارة</h3><strong id="quoteAmount"></strong></div><p id="quoteScope"></p><p id="quoteMeta" class="hint"></p><div id="quoteAcceptance" hidden><p class="notice">راجع المدة والسعر والنطاق. التفعيل يخص هذا الحقل، وتوفر المشاهد وجودتها يعتمدان على المصدر والغيوم؛ لا يُضمن مشهد جديد لكل يوم.</p><label for="quotePaymentReference">مرجع الدفع أو الملاحظة <span class="optional">اختياري</span></label><input id="quotePaymentReference" maxlength="120" placeholder="المرجع المتفق عليه دون بيانات مالية حساسة"><label class="consent" for="acceptQuoteConsent"><input id="acceptQuoteConsent" type="checkbox"><span>راجعت السعر والمدة ونطاق هذا العرض وأوافق عليها قبل تنسيق الدفع.</span></label><button id="acceptQuote" class="button primary" type="button" disabled>الموافقة على العرض</button></div></div>
+<p class="hint boundary-policy">قبل الموافقة والدفع: تأكد من حفظ حدود الحقل في <a href="./field-map.html">خريطة الحقول</a>. تنفيذ التحليل يحتاج حقلًا تملكه وحدودًا محفوظة له.</p><p id="paymentStatus" class="notice" role="status"></p><p id="quoteStatus" class="status" role="status" hidden></p><p id="expiryStatus" class="hint" role="status"></p>
+<div id="analysisLinks" class="report-actions" hidden><a id="analysisLink" class="button primary" href="./satellite-analysis.html">افتح التحليل الفضائي</a><a id="fieldMapLink" class="button secondary" href="./field-map.html">افتح مؤشرات الحقل على الخريطة</a></div>
+<p id="adminNote" class="request-note" hidden></p><div class="contact-note"><strong>تأكيد الدفع مع الإدارة</strong><p>اذكر رقم الطلب عند التواصل. الموافقة على العرض وإدخال مرجع الدفع لا يؤكدان استلامه؛ تراجع الإدارة الدفع أولًا.</p><a href="https://www.instagram.com/ur.farm.iq/" target="_blank" rel="noopener noreferrer">حساب أور الرسمي ↗</a></div></section>
+</div>
+<aside class="scope-note"><strong>السعر والمدة حسب العرض المقبول</strong><p>لا تُحصّل المنصة دفعات أو تجديدًا تلقائيًا. عند انتهاء التفعيل يمكنك طلب عرض جديد. الخادم يتحقق من ملكية الحقل والدفع ووقت الانتهاء عند كل تحليل أو طلب صورة.</p><p>تظهر تواريخ المشاهد ودقة المؤشرات عند توفر البيانات؛ المؤشرات لا تعادل تحليل تربة أو تشخيصًا حقليًا. يمكنك حفظ حدود الحقل من <a href="./field-map.html">الخريطة</a> قبل طلب التفعيل.</p></aside>
+<footer><a href="./services.html">جميع خدمات أور</a><span>أور الزراعية الذكية · UR SMART</span></footer>
+</div></main>
+</body></html>

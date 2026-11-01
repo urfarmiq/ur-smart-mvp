@@ -4,6 +4,7 @@ import {handleWeather} from './met-weather.mjs';
 import {handleResearch,researchStatus} from './research-service.mjs';
 import {handlePlantHealth,plantHealthStatus} from './plant-health.mjs';
 import {handleFieldService,fieldServiceStatus} from './field-service.mjs';
+import {checkSatelliteAccess,handleResearchImagery,satellitePaidStatus} from './satellite-access.mjs';
 // UR Smart Sentinel-2 analytics gateway (Cloudflare Worker).
 // Required secrets: SENTINEL_CLIENT_ID, SENTINEL_CLIENT_SECRET.
 // Required variable: SUPABASE_URL. Optional: SUPABASE_PUBLISHABLE_KEY, ALLOWED_ORIGIN.
@@ -51,11 +52,18 @@ const platformWorker={async fetch(req,env){
  if(path==='/plant-health')return handlePlantHealth(req,env,{reply,origin:allowed});
  if(path==='/advice/status'&&req.method==='GET')return reply(geminiStatus(env),200,allowed);
  if(path==='/advice')return handleGeminiAdvice(req,env,{reply,origin:allowed});
+ if(path==='/satellite/status'&&req.method==='GET')return reply(satellitePaidStatus(env),200,allowed);
+ if(path==='/research/imagery')return handleResearchImagery(req,env,{reply,origin:allowed,satellite:request=>handleSatellite(request,env,allowed,true)});
  if(path==='/research/status'&&req.method==='GET')return reply(researchStatus(env),200,allowed);
- if(path==='/research')return handleResearch(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>platformWorker.fetch(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env)});
+ if(path==='/research')return handleResearch(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>handleSatellite(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env,allowed,true)});
  if(path==='/field-service/status'&&req.method==='GET')return reply(fieldServiceStatus(env),200,allowed);
- if(path==='/field-service')return handleFieldService(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>platformWorker.fetch(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env)});
+ if(path==='/field-service')return handleFieldService(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>handleSatellite(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env,allowed,true)});
  if(req.method!=='POST')return reply({error:'POST only'},405,allowed);
+ return handleSatellite(req,env,allowed,false);
+}};
+// The inclusion capability is a lexical argument, never a request header, body
+// property or hostname. It is passed only after a paid service claims its run.
+async function handleSatellite(req,env,allowed,includedInPaidReport=false){
  try{
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
  const bearer=req.headers.get('Authorization')||'';
@@ -70,6 +78,11 @@ const platformWorker={async fetch(req,env){
  if(!br.ok)return reply({error:'Could not read field boundary'},502,allowed);
  const rows=await br.json();const record=rows[0];
  if(!record||record.owner_id!==u.id)return reply({error:'Field boundary unavailable for this account'},404,allowed);
+ if(!includedInPaidReport){
+  const access=await checkSatelliteAccess(env,headers,field_id);
+  if(!access.available)return reply({error:'Satellite access verification unavailable',code:'SATELLITE_ACCESS_UNAVAILABLE',message:'تعذر التحقق من تفعيل التحليل الفضائي الآن. أعد المحاولة لاحقًا.'},502,allowed);
+  if(!access.active)return reply({error:'Paid satellite access required',code:'SATELLITE_PAYMENT_REQUIRED',message:'التحليل الفضائي خدمة مدفوعة لهذا الحقل. اطلب التفعيل وانتظر تأكيد الدفع من الإدارة.',access_url:'https://ur-smart-urfarmiq.pages.dev/satellite-access.html?field='+encodeURIComponent(field_id)},403,allowed);
+ }
  const geometry=validateSatellitePolygon(record.geometry,toUtm);
  const areaM2=Number(record.area_m2);if(!Number.isFinite(areaM2)||areaM2<=0)return reply({error:'Invalid field area'},400,allowed);if(areaM2>2e7)return reply({error:'Field too large for this analysis tier'},413,allowed);
  const oauth=await satelliteFetch(TOKEN_URL,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'client_credentials',client_id:env.SENTINEL_CLIENT_ID,client_secret:env.SENTINEL_CLIENT_SECRET})},15000);
@@ -131,5 +144,5 @@ function evaluatePixel(s){
  if(!items.length)return reply({error:'No valid cloud-free pixels found in the last 180 days',searched_days:180,message:'لم نجد بكسلات صالحة خالية من الغيوم خلال 180 يومًا. تحقق من حدود الحقل أو أعد المحاولة عند مرور مشهد أقمار أوضح.'},404,allowed);
  const newest=items.filter(x=>x.validPixels>=3).sort((a,b)=>b.date.localeCompare(a.date))[0];const best=newest||items[0];const totalPixels=Number(result.geometryPixelCount);const coveragePercent=Number.isFinite(totalPixels)&&totalPixels>0?Math.round(best.validPixels/totalPixels*1000)/10:null;const series=items.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>({date:x.date,indices:x.indices,ndvi:x.ndvi,ndmi:x.ndmi,valid_pixels:x.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:Number.isFinite(totalPixels)&&totalPixels>0?Math.round(x.validPixels/totalPixels*1000)/10:null}));return reply({field_id,geometry,series,ndvi:best.ndvi,ndmi:best.ndmi,indices:best.indices,date:best.date,valid_pixels:best.validPixels,geometry_pixels:Number.isFinite(totalPixels)?totalPixels:null,coverage_percent:coveragePercent,source:'Sentinel-2 L2A via Sentinel Hub Statistical API',resolution_m:20,search_window_days:searchedDays,note:searchedDays>65?'لم يتوفر مشهد صالح في آخر 65 يومًا؛ عُرض أحدث مشهد صالح من نافذة بحث موسعة حتى 180 يومًا.':'مشهد صالح ضمن آخر 65 يومًا. القيم متوسطات بكسلات صالحة بعد قناع السحب.'},200,allowed);
  }catch(e){if(e instanceof SatelliteRequestError)return reply({error:e.message},e.status,allowed);if(e?.name==='AbortError'||e?.name==='TimeoutError')return reply({error:'Satellite upstream timed out'},504,allowed);return reply({error:'Analysis temporarily unavailable'},500,allowed)}
-}};
+}
 export default platformWorker;

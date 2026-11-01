@@ -1,3 +1,4 @@
+import {createAdminSatelliteAccess} from './admin-satellite-access.mjs';
 import {createAdminFieldServices} from './admin-field-services.mjs';
 const $=id=>document.getElementById(id);
 const el=(tag,text,className)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;};
@@ -9,6 +10,7 @@ let client=null,userId=null,allowed=false,mfaReady=false,generation=0,busy=false
 let researchRows=[],researchLoading=false,researchReviewBusy=false,researchPageOffset=0,researchHasMore=false,researchOlderOpen=false,researchFilter='waiting_payment';
 const researchDrafts=new Map();
 const fieldServiceAdmin=createAdminFieldServices({getClient:()=>client,authorize:currentAccess,currentGeneration:()=>generation,isActive:()=>allowed&&mfaReady&&!busy});
+const satelliteAccessAdmin=createAdminSatelliteAccess({getClient:()=>client,authorize:currentAccess,currentGeneration:()=>generation,isActive:()=>allowed&&mfaReady&&!busy});
 
 function status(message,error=false){$('adminStatus').textContent=message;$('adminStatus').className='status'+(error?' error':'');}
 function dateText(value){const d=new Date(value);return value&&Number.isFinite(d.getTime())?new Intl.DateTimeFormat('ar-IQ',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Baghdad'}).format(d)+' — بغداد':'غير متاح';}
@@ -18,13 +20,13 @@ function researchStatus(message,error=false){$('researchOrdersStatus').textConte
 function clearResearchOrders(){researchRows=[];researchPageOffset=0;researchHasMore=false;researchOlderOpen=false;researchFilter='waiting_payment';researchDrafts.clear();$('researchOrderList').replaceChildren();$('researchPendingCount').textContent='—';$('researchOrderFilter').value=researchFilter;$('researchOrderPaginationStatus').textContent='';$('loadOlderResearchOrders').hidden=true;researchStatus('لم تُحمّل الطلبات بعد.');}
 function clearSetup(){pendingFactor=null;$('mfaSecret').value='';$('mfaQr').removeAttribute('src');$('mfaSetup').hidden=true;$('mfaCode').value='';}
 function lock(message){
- generation++;allowed=false;mfaReady=false;userId=null;rows=[];pageOffset=0;hasMore=false;olderOpen=false;clearSetup();clearVisits();clearResearchOrders();fieldServiceAdmin.lock();
+ generation++;allowed=false;mfaReady=false;userId=null;rows=[];pageOffset=0;hasMore=false;olderOpen=false;clearSetup();clearVisits();clearResearchOrders();fieldServiceAdmin.lock();satelliteAccessAdmin.lock();
  $('adminContent').hidden=true;$('mfaPanel').hidden=true;$('adminGate').hidden=false;
  $('notificationList').replaceChildren();$('unreadCount').textContent='—';$('markAllSeen').disabled=true;
  $('paginationStatus').textContent='';$('loadOlderNotifications').hidden=true;
  $('gateMessage').textContent=message;status(message,true);
 }
-function sync(){for(const id of ['enrollMfa','verifyMfaButton','mfaFactor'])$(id).disabled=busy;$('refreshNotifications').disabled=loading||busy;$('refreshVisits').disabled=visitsLoading||busy;$('markAllSeen').disabled=loading||busy||!rows.some(row=>!row.seen_at);$('loadOlderNotifications').disabled=loading||busy||!hasMore;for(const id of ['refreshResearchOrders','researchOrderFilter'])$(id).disabled=researchLoading||researchReviewBusy||busy;$('loadOlderResearchOrders').disabled=researchLoading||researchReviewBusy||busy||!researchHasMore;for(const control of $('researchOrderList').querySelectorAll('input,textarea,button'))control.disabled=researchLoading||researchReviewBusy||busy;fieldServiceAdmin.sync();}
+function sync(){for(const id of ['enrollMfa','verifyMfaButton','mfaFactor'])$(id).disabled=busy;$('refreshNotifications').disabled=loading||busy;$('refreshVisits').disabled=visitsLoading||busy;$('markAllSeen').disabled=loading||busy||!rows.some(row=>!row.seen_at);$('loadOlderNotifications').disabled=loading||busy||!hasMore;for(const id of ['refreshResearchOrders','researchOrderFilter'])$(id).disabled=researchLoading||researchReviewBusy||busy;$('loadOlderResearchOrders').disabled=researchLoading||researchReviewBusy||busy||!researchHasMore;for(const control of $('researchOrderList').querySelectorAll('input,textarea,button'))control.disabled=researchLoading||researchReviewBusy||busy;fieldServiceAdmin.sync();satelliteAccessAdmin.sync();}
 async function currentAccess({mfa=false}={}){
  const token=generation;
  const auth=await client.auth.getUser();if(token!==generation)return null;
@@ -36,7 +38,7 @@ async function currentAccess({mfa=false}={}){
  const assurance=await client.auth.mfa.getAuthenticatorAssuranceLevel();if(token!==generation)return null;
  if(assurance.error)throw Error('تعذر التحقق من حماية الجلسة. أعد تسجيل الدخول.');
  mfaReady=assurance.data?.currentLevel==='aal2';
- if(mfa&&!mfaReady){generation++;clearVisits();clearResearchOrders();fieldServiceAdmin.lock();$('adminContent').hidden=true;$('notificationList').replaceChildren();rows=[];$('unreadCount').textContent='—';$('mfaPanel').hidden=false;status('يلزم التحقق من تطبيق المصادقة قبل قراءة الإشعارات والطلبات.');return null;}
+ if(mfa&&!mfaReady){generation++;clearVisits();clearResearchOrders();fieldServiceAdmin.lock();satelliteAccessAdmin.lock();$('adminContent').hidden=true;$('notificationList').replaceChildren();rows=[];$('unreadCount').textContent='—';$('mfaPanel').hidden=false;status('يلزم التحقق من تطبيق المصادقة قبل قراءة الإشعارات والطلبات.');return null;}
  return {token,ready:mfaReady};
 }
 function saveResearchDrafts(){for(const form of $('researchOrderList').querySelectorAll('form'))researchDrafts.set(form.dataset.orderId,{note:form.elements.admin_note.value,verified:form.elements.payment_verified.checked});}
@@ -188,7 +190,7 @@ async function markSeen(ids){
  finally{busy=false;sync();}
 }
 async function showMfa(){
- const token=generation;clearVisits();clearResearchOrders();fieldServiceAdmin.lock();$('adminGate').hidden=true;$('mfaPanel').hidden=false;$('adminContent').hidden=true;
+ const token=generation;clearVisits();clearResearchOrders();fieldServiceAdmin.lock();satelliteAccessAdmin.lock();$('adminGate').hidden=true;$('mfaPanel').hidden=false;$('adminContent').hidden=true;
  const result=await client.auth.mfa.listFactors();if(token!==generation)return;
  if(result.error)throw Error('تعذر تحميل وسائل التحقق. راجع إعداد المصادقة في الحساب وأعد المحاولة.');
  const factors=(Array.isArray(result.data?.totp)?result.data.totp:[]).filter(factor=>factor.status==='verified');
@@ -227,7 +229,7 @@ $('verifyMfa').onsubmit=async event=>{
   clearSetup();$('mfaPanel').hidden=true;verified=true;status('نجح التحقق الثنائي. جارٍ فتح الإشعارات…');
  }catch(error){if(token===generation)$('mfaStatus').textContent=error.message||'تعذر إكمال التحقق.';}
  finally{$('mfaCode').value='';busy=false;sync();}
- if(verified&&token===generation)await Promise.all([loadNotifications(),loadVisits(),loadResearchOrders(),fieldServiceAdmin.load()]);
+ if(verified&&token===generation)await Promise.all([loadNotifications(),loadVisits(),loadResearchOrders(),fieldServiceAdmin.load(),satelliteAccessAdmin.load()]);
 };
 $('refreshResearchOrders').onclick=()=>void loadResearchOrders();
 $('loadOlderResearchOrders').onclick=()=>void loadResearchOrders({append:true});
@@ -251,10 +253,10 @@ async function initialize(){
   const session=await client.auth.getSession();if(token!==generation)return;
   if(session.error||!session.data?.session){lock('سجّل الدخول بحساب المدير للوصول إلى هذه الصفحة.');return;}
   const access=await currentAccess();if(!access||token!==generation)return;
-  if(access.ready){$('adminGate').hidden=true;$('mfaPanel').hidden=true;$('adminContent').hidden=false;await Promise.all([loadNotifications(),loadVisits(),loadResearchOrders(),fieldServiceAdmin.load()]);}else await showMfa();
+  if(access.ready){$('adminGate').hidden=true;$('mfaPanel').hidden=true;$('adminContent').hidden=false;await Promise.all([loadNotifications(),loadVisits(),loadResearchOrders(),fieldServiceAdmin.load(),satelliteAccessAdmin.load()]);}else await showMfa();
  }catch{if(token===generation){lock('تعذر تهيئة لوحة الإدارة. تحقق من الاتصال وإعدادات صلاحية الإدارة، ثم أعد تحميل الصفحة.');}}
 }
-function refreshVisible(){if(!document.hidden&&allowed&&mfaReady){void loadVisits();void loadResearchOrders({quiet:true});void fieldServiceAdmin.load({quiet:true});if(!olderOpen)void loadNotifications({quiet:true});}}
+function refreshVisible(){if(!document.hidden&&allowed&&mfaReady){void loadVisits();void loadResearchOrders({quiet:true});void fieldServiceAdmin.load({quiet:true});void satelliteAccessAdmin.load({quiet:true});if(!olderOpen)void loadNotifications({quiet:true});}}
 setInterval(refreshVisible,60000);
 document.addEventListener('visibilitychange',refreshVisible);
 window.addEventListener('pagehide',()=>lock('أعد التحقق من الجلسة عند العودة إلى لوحة الإدارة.'));

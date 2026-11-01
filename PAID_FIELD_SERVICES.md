@@ -1,6 +1,6 @@
 # Paid field services
 
-The three paid offerings are researcher support, comprehensive field reports and periodic field reports. The existing researcher workflow and its stored payment amounts remain unchanged. Public cards say **مدفوعة**; new field services have no fixed advertised price.
+Paid offerings include researcher support, comprehensive field reports, periodic field reports and [direct satellite access](./SATELLITE_ACCESS.md). The existing researcher workflow and its stored payment amounts remain unchanged. Public cards say **مدفوعة**; new field services have no fixed advertised price. Satellite processing included in an already paid report does not require another direct-access order.
 
 ## Customer and administrator flow
 

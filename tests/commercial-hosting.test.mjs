@@ -55,15 +55,16 @@ test('old links preserve app routes and existing callbacks on the fixed new host
 
 test('release verification requires the new researcher files and actual payment-gated backend',async()=>{
  const origin='https://ur-smart-urfarmiq.pages.dev',release='c'.repeat(40),calls=[];
- const fetchImpl=async url=>{calls.push(String(url));if(String(url).endsWith('/release.txt'))return new Response(release);if(String(url).includes('workers.dev'))return new Response(JSON.stringify({fee_iqd:25000,manual_admin_approval_required:true,available:true,free_tier_confirmed:true,quote_required:true,customer_acceptance_required:true,scheduled_automatically:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});return new Response('fixture');};
+ const fetchImpl=async url=>{calls.push(String(url));if(String(url).endsWith('/release.txt'))return new Response(release);if(String(url).includes('workers.dev'))return new Response(JSON.stringify({fee_iqd:25000,manual_admin_approval_required:true,available:true,free_tier_confirmed:true,quote_required:true,customer_acceptance_required:true,scheduled_automatically:false,paid_service:true,field_specific:true,automatic_renewal:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});return new Response('fixture');};
  assert.equal((await verifyPlatform({release,fetchImpl,wait:async()=>{}})).research,true);
  assert.ok(calls.some(url=>url.endsWith('/plant-health.html')));assert.ok(calls.some(url=>url.endsWith('/plant-health/status')));assert.ok(calls.some(url=>url.endsWith('/research-lab.html')));assert.ok(calls.some(url=>url.endsWith('/research/status')));
- assert.ok(calls.some(url=>url.endsWith('/field-services.html')));assert.ok(calls.some(url=>url.endsWith('/field-service/status')));
- for(const bad of ['missing_page','wrong_gate','plant_unavailable','field_gate']){
+ assert.ok(calls.some(url=>url.endsWith('/satellite-access.html')));assert.ok(calls.some(url=>url.endsWith('/satellite/status')));assert.ok(calls.some(url=>url.endsWith('/field-services.html')));assert.ok(calls.some(url=>url.endsWith('/field-service/status')));
+ for(const bad of ['missing_page','wrong_gate','plant_unavailable','field_gate','satellite_gate']){
   await assert.rejects(verifyPlatform({release,wait:async()=>{},fetchImpl:async(url,options)=>{
    if(bad==='missing_page'&&String(url).endsWith('/research-lab.html'))return new Response('',{status:404});
    if(bad==='wrong_gate'&&String(url).endsWith('/research/status'))return new Response(JSON.stringify({fee_iqd:1,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    if(bad==='plant_unavailable'&&String(url).endsWith('/plant-health/status'))return new Response(JSON.stringify({available:false,free_tier_confirmed:true}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
+   if(bad==='satellite_gate'&&String(url).endsWith('/satellite/status'))return new Response(JSON.stringify({paid_service:false,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    if(bad==='field_gate'&&String(url).endsWith('/field-service/status'))return new Response(JSON.stringify({available:true,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    return fetchImpl(url,options);
   }}),/required public page|payment gate|free-tier/);
