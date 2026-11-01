@@ -3,6 +3,7 @@ import {readSatelliteRequest,validateSatellitePolygon,satelliteFetch,SatelliteRe
 import {handleWeather} from './met-weather.mjs';
 import {handleResearch,researchStatus} from './research-service.mjs';
 import {handlePlantHealth,plantHealthStatus} from './plant-health.mjs';
+import {handleFieldService,fieldServiceStatus} from './field-service.mjs';
 // UR Smart Sentinel-2 analytics gateway (Cloudflare Worker).
 // Required secrets: SENTINEL_CLIENT_ID, SENTINEL_CLIENT_SECRET.
 // Required variable: SUPABASE_URL. Optional: SUPABASE_PUBLISHABLE_KEY, ALLOWED_ORIGIN.
@@ -52,6 +53,8 @@ const platformWorker={async fetch(req,env){
  if(path==='/advice')return handleGeminiAdvice(req,env,{reply,origin:allowed});
  if(path==='/research/status'&&req.method==='GET')return reply(researchStatus(env),200,allowed);
  if(path==='/research')return handleResearch(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>platformWorker.fetch(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env)});
+ if(path==='/field-service/status'&&req.method==='GET')return reply(fieldServiceStatus(env),200,allowed);
+ if(path==='/field-service')return handleFieldService(req,env,{reply,origin:allowed,satellite:({fieldId,sessionToken})=>platformWorker.fetch(new Request('https://internal-satellite/',{method:'POST',headers:{Origin:allowed,Authorization:'Bearer '+sessionToken,'Content-Type':'application/json'},body:JSON.stringify({field_id:fieldId})}),env)});
  if(req.method!=='POST')return reply({error:'POST only'},405,allowed);
  try{
  if(!env.SENTINEL_CLIENT_ID||!env.SENTINEL_CLIENT_SECRET||!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)return reply({error:'Satellite service is not configured'},503,allowed);
