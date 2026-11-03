@@ -49,6 +49,13 @@
 <p id="fieldServiceAdminStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الطلبات بعد.</p><div id="fieldServiceOrderList" class="research-orders"></div><button id="olderFieldServiceOrders" type="button" class="secondary" hidden>عرض طلبات حقول أقدم</button>
 <p class="muted">لا تُحمّل هذه القائمة التقارير أو حدود الحقول أو ملفات العميل. المبلغ ونطاق العمل محميان من تعديل العميل وتُفرَض صلاحية المدير والتحقق الثنائي أيضًا في قاعدة البيانات.</p>
 </section>
+<section class="panel" id="productAdminPanel" aria-labelledby="productAdminHeading" hidden>
+<div class="heading-row"><div><p class="eyebrow">طلبات عرض السعر</p><h2 id="productAdminHeading">المنتجات وتنفيذ الري</h2><p class="muted">الطلبات المعروضة: <strong id="productAdminCount">—</strong></p></div><button id="refreshProductInquiries" type="button" class="secondary">تحديث طلبات المنتجات</button></div>
+<p class="note">تنفيذ الري بالتنقيط داخل محافظة واسط فقط. المواصفات والأسعار والتوفر والتسليم تُحدّد في العرض؛ لا يترتب دفع أو تنفيذ تلقائي. تُضاف تفاصيل محطة الطقس ومحطة مكافحة الحشرات عند اعتماد الموديل.</p>
+<label for="productInquiryFilter">حالة طلبات المنتجات</label><select id="productInquiryFilter"><option value="open">الطلبات المفتوحة</option><option value="new">طلب جديد</option><option value="reviewing">قيد المراجعة</option><option value="quoted">أُرسل عرض السعر</option><option value="closed">مغلق</option><option value="cancelled">ألغاه العميل</option><option value="all">كل الحالات</option></select>
+<p id="productAdminStatus" class="muted" role="status" aria-live="polite">لم تُحمّل الطلبات بعد.</p><div id="productInquiryList" class="research-orders"></div><button id="olderProductInquiries" type="button" class="secondary" hidden>عرض طلبات منتجات أقدم</button>
+<p class="muted">بيانات الطلب والاتصال التي قدّمها العميل اختيارًا متاحة للمدير بعد التحقق الثنائي فقط، ولا تُعرض كلمات مرور أو رموز جلسات.</p>
+</section>
 <section class="panel" id="satelliteAccessAdminPanel" aria-labelledby="satelliteAccessOrdersHeading" hidden>
 <div class="heading-row"><div><p class="eyebrow">وصول مدفوع لحقل محدد</p><h2 id="satelliteAccessOrdersHeading">طلبات التحليل الفضائي</h2><p class="muted">الطلبات المعروضة: <strong id="satelliteAccessAdminCount">—</strong></p></div><button id="refreshSatelliteAccessOrders" type="button" class="secondary">تحديث طلبات التحليل الفضائي</button></div>
 <p class="note">حدّد السعر والنطاق ومدة الوصول لكل حقل، ثم انتظر قبول العميل قبل تأكيد استلام المبلغ. تبدأ المدة من الموافقة الفعلية؛ لا توجد فوترة أو إعادة تفعيل تلقائية. تحقق مع العميل من حفظ حدود الحقل ومن حدود البيانات المتاحة قبل الدفع.</p>
