@@ -8,7 +8,10 @@ for page in root.glob('*.html'):
     for ref in re.findall(r'(?:href|src)="([^"#]+)"',text):
         if ref.startswith(('https:','http:','data:','mailto:')): continue
         target=ref.split('#')[0].split('?')[0]
-        if target: assert (root/target).exists(),f'{page.name}: missing {ref}'
+        if target:
+            local=(root/target.lstrip('/')).resolve()
+            assert local.is_relative_to(root),f'{page.name}: link escapes public source: {ref}'
+            assert local.exists(),f'{page.name}: missing {ref}'
     for script in re.findall(r'<script[^>]*>(.*?)</script>',text,re.S):
         if not script.strip(): continue
         with tempfile.NamedTemporaryFile(suffix='.mjs',mode='w') as file:

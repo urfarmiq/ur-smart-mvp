@@ -4,17 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
   <meta name="description" content="خدمات أور الزراعية: خرائط ومراقبة الحقول، إرشاد أولي، طقس، تكاليف الموسم، فحص أعراض النباتات بالصور، تقارير ودعم البحوث الزراعية.">
   <meta name="theme-color" content="#123d2d">
   <title>خدمات أور الزراعية</title>
   <link rel="stylesheet" href="./services.css">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="أور الزراعية">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="./pwa.css">
+<script type="module" src="./pwa-client.mjs"></script>
 </head>
 <body>
   <a class="skip" href="#main">انتقل إلى المحتوى</a>
   <header><div class="wrap header-inner">
     <a class="brand" href="./index.html"><span aria-hidden="true">🌱</span><span>أور الزراعية<small lang="en" dir="ltr">UR SMART AGRICULTURE</small></span></a>
-    <nav aria-label="التنقل الرئيسي"><a href="./index.html">الرئيسية</a><a href="./products.html">المنتجات</a><a href="./dashboard.html">حقولي</a><a href="./auth.html">دخول / تسجيل</a></nav>
+    <nav aria-label="التنقل الرئيسي"><a href="./install.html" data-pwa-install>تثبيت التطبيق</a><a href="./index.html">الرئيسية</a><a href="./products.html">المنتجات</a><a href="./dashboard.html">حقولي</a><a href="./auth.html">دخول / تسجيل</a></nav>
   </div></header>
   <main id="main">
     <section class="hero"><div class="wrap">

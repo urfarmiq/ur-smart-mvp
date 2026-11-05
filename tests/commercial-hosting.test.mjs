@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readdir,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,copyFile,writeFile,readdir,readFile,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {ensurePagesProject} from '../scripts/ensure-pages-project.mjs';
@@ -45,6 +45,28 @@ test('static upload excludes backend, functions, credentials and repository file
  }finally{await rm(temp,{recursive:true,force:true});}
 });
 
+test('PWA build publishes only explicit icons and compiles a release-bound worker',async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'ur-pwa-build-'));
+ try{
+  const source=path.join(temp,'source'),out=path.join(temp,'public'),release='d'.repeat(40);
+  await mkdir(path.join(source,'vendor'),{recursive:true});await mkdir(path.join(source,'icons'));
+  const fixtures={'index.html':'<h1>fixture</h1>','manifest.webmanifest':'{"name":"fixture"}','sw.js':"const release='__UR_PWA_RELEASE__';",'pwa-client.mjs':'export const fixture=true;','pwa.css':'body{}','install.html':'<main data-ur-install></main>','offline.html':'<main data-ur-offline></main>'};
+  for(const [name,content] of Object.entries(fixtures))await writeFile(path.join(source,name),content);
+  const icons=['app-icon.svg','icon-192.png','icon-512.png','maskable-512.png','apple-touch-icon.png'];
+  for(const icon of icons)await copyFile(new URL('../icons/'+icon,import.meta.url),path.join(source,'icons',icon));
+  await writeFile(path.join(source,'icons','private-image.png'),'private-upload');await writeFile(path.join(source,'icons','secret.key'),'private-key');
+  await buildPublicSite({sourceDir:source,outDir:out,release});
+  assert.deepEqual((await readdir(path.join(out,'icons'))).sort(),icons.sort());
+  assert.equal(await readFile(path.join(out,'sw.js'),'utf8'),"const release='"+release+"';");
+  assert.deepEqual(await readFile(path.join(out,'icons','icon-192.png')),await readFile(new URL('../icons/icon-192.png',import.meta.url)));
+  const headers=await readFile(path.join(out,'_headers'),'utf8');
+  assert.match(headers,/\/sw\.js\n  Cache-Control: no-cache, max-age=0, must-revalidate\n  Service-Worker-Allowed: \//);
+  assert.match(headers,/Content-Type: application\/manifest\+json/);assert.match(headers,/\/auth\.html\n  Cache-Control: no-store/);
+  await rm(path.join(source,'icons','maskable-512.png'));
+  await assert.rejects(buildPublicSite({sourceDir:source,outDir:out,release}),/explicit application icons/);
+ }finally{await rm(temp,{recursive:true,force:true});}
+});
+
 test('old links preserve app routes and existing callbacks on the fixed new hostname',async()=>{
  const target=getRedirectUrl({pathname:'/ur-smart-mvp/field-map.html',search:'?field=abc',hash:'#view'});
  assert.equal(target,'https://ur-smart-urfarmiq.pages.dev/field-map.html?field=abc#view');
@@ -55,18 +77,21 @@ test('old links preserve app routes and existing callbacks on the fixed new host
 
 test('release verification requires the new researcher files and actual payment-gated backend',async()=>{
  const origin='https://ur-smart-urfarmiq.pages.dev',release='c'.repeat(40),calls=[];
- const fetchImpl=async url=>{calls.push(String(url));if(String(url).endsWith('/release.txt'))return new Response(release);if(String(url).includes('workers.dev'))return new Response(JSON.stringify({fee_iqd:25000,manual_admin_approval_required:true,available:true,free_tier_confirmed:true,quote_required:true,customer_acceptance_required:true,scheduled_automatically:false,paid_service:true,field_specific:true,automatic_renewal:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});return new Response('fixture');};
+ const fetchImpl=async url=>{calls.push(String(url));if(String(url).endsWith('/release.txt'))return new Response(release);if(String(url).endsWith('/manifest.webmanifest'))return new Response(JSON.stringify({name:'UR Smart',short_name:'أور',lang:'ar-IQ',dir:'rtl',display:'standalone',id:'./',scope:'./',start_url:'./',icons:[{src:'./icons/icon-192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'./icons/icon-512.png',sizes:'512x512',type:'image/png',purpose:'any'},{src:'./icons/maskable-512.png',sizes:'512x512',type:'image/png',purpose:'maskable'}]}),{headers:{'content-type':'application/manifest+json'}});if(String(url).endsWith('/sw.js'))return new Response("const BUILD_RELEASE='"+release+"';",{headers:{'content-type':'application/javascript','cache-control':'no-cache','service-worker-allowed':'/'}});if(String(url).includes('/icons/')&&String(url).endsWith('.png'))return new Response(await readFile(new URL('../icons/'+String(url).split('/').at(-1),import.meta.url)),{headers:{'content-type':'image/png'}});if(String(url).includes('workers.dev'))return new Response(JSON.stringify({fee_iqd:25000,manual_admin_approval_required:true,available:true,free_tier_confirmed:true,quote_required:true,customer_acceptance_required:true,scheduled_automatically:false,paid_service:true,field_specific:true,automatic_renewal:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});return new Response('fixture');};
  assert.equal((await verifyPlatform({release,fetchImpl,wait:async()=>{}})).research,true);
  assert.ok(calls.some(url=>url.endsWith('/plant-health.html')));assert.ok(calls.some(url=>url.endsWith('/plant-health/status')));assert.ok(calls.some(url=>url.endsWith('/research-lab.html')));assert.ok(calls.some(url=>url.endsWith('/research/status')));
  assert.ok(calls.some(url=>url.endsWith('/products.html')));assert.ok(calls.some(url=>url.endsWith('/admin-products.mjs')));assert.ok(calls.some(url=>url.endsWith('/satellite-access.html')));assert.ok(calls.some(url=>url.endsWith('/satellite/status')));assert.ok(calls.some(url=>url.endsWith('/field-services.html')));assert.ok(calls.some(url=>url.endsWith('/field-service/status')));
- for(const bad of ['missing_page','wrong_gate','plant_unavailable','field_gate','satellite_gate']){
+ for(const bad of ['missing_page','wrong_gate','plant_unavailable','field_gate','satellite_gate','pwa_manifest','pwa_worker','pwa_icon']){
   await assert.rejects(verifyPlatform({release,wait:async()=>{},fetchImpl:async(url,options)=>{
+   if(bad==='pwa_manifest'&&String(url).endsWith('/manifest.webmanifest'))return new Response('{}',{headers:{'content-type':'application/manifest+json'}});
+   if(bad==='pwa_worker'&&String(url).endsWith('/sw.js'))return new Response('const release=\"__UR_PWA_RELEASE__\";',{headers:{'content-type':'application/javascript','cache-control':'no-cache','service-worker-allowed':'/'}});
+   if(bad==='pwa_icon'&&String(url).endsWith('/icons/icon-192.png'))return new Response('invalid',{headers:{'content-type':'image/png'}});
    if(bad==='missing_page'&&String(url).endsWith('/research-lab.html'))return new Response('',{status:404});
    if(bad==='wrong_gate'&&String(url).endsWith('/research/status'))return new Response(JSON.stringify({fee_iqd:1,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    if(bad==='plant_unavailable'&&String(url).endsWith('/plant-health/status'))return new Response(JSON.stringify({available:false,free_tier_confirmed:true}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    if(bad==='satellite_gate'&&String(url).endsWith('/satellite/status'))return new Response(JSON.stringify({paid_service:false,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    if(bad==='field_gate'&&String(url).endsWith('/field-service/status'))return new Response(JSON.stringify({available:true,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    return fetchImpl(url,options);
-  }}),/required public page|payment gate|free-tier/);
+  }}),/required public page|payment gate|free-tier|PWA/);
  }
 });

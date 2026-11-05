@@ -6,6 +6,15 @@
 @media(max-width:900px){.ag-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.ag-map-layout{grid-template-columns:1.5fr 1fr}}
 @media(max-width:640px){main{padding:0 10px}.ag-map-layout{grid-template-columns:1fr}.ag-preview-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.ag-preview-card{padding:6px}.ag-preview-card strong{font-size:11px;min-height:34px}.ag-preview{aspect-ratio:1/1}.ag-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ag-summary-grid{grid-template-columns:1fr}.field-map{height:380px}}
 </style>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="أور الزراعية">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="./pwa.css">
+<script type="module" src="./pwa-client.mjs"></script>
 </head><body><header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية الذكية</a></header><main><h1>🛰️ التحليل الفضائي — مدفوعة</h1><p class="muted">تحليل 16 مؤشرًا طيفيًا من Sentinel‑2، ومقارنة تاريخية، وطبقات مؤشرات تفاعلية على خريطة الحقل.</p>
 <div class="notice" id="satellitePaymentNotice"><strong>تفعيل مدفوع لكل حقل</strong><p>تُحدد مدة التفعيل والسعر في عرض توافق عليه، ثم تؤكد الإدارة استلام الدفع. لا يوجد تجديد أو خصم تلقائي، وتوفر مشهد حديث يعتمد على المصدر والغيوم.</p><a id="satelliteAccessLink" href="./satellite-access.html">طلب أو تجديد تفعيل التحليل الفضائي ←</a></div>
 <div class="notice"><strong>تنبيه علمي:</strong> خدمة Sentinel-2 متصلة بالفعل. تعرض المنصة نتائج الرصد عند نجاح الطلب، مع تاريخ المشهد وجودة العينة وحدود التفسير العلمي.</div>

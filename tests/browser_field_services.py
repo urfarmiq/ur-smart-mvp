@@ -304,12 +304,15 @@ def paid_report_scenario(browser,mobile):
     assert page.locator('#runReport').is_disabled()
     page.check('#runConsent');expect(page.locator('#runReport')).to_be_enabled()
     page.click('#runReport');expect(page.locator('#reportPanel')).to_be_visible()
+    # The saved report is reloaded after the first render; wait for its content
+    # before checking that the deliberately hostile fixture remains plain text.
+    expect(page.locator('#reportContent')).to_contain_text('<img src=x')
     assert state['runs']==[{'order_id':ORDER,'consent':True}]
     assert page.locator('#reportContent img,#reportContent script').count()==0
     assert page.evaluate('()=>window.__paidPwned') is None
-    assert '<img src=x' in page.locator('#reportContent').inner_text()
-    assert 'Sentinel' in page.locator('#reportContent').inner_text()
-    assert 'MET Norway' in page.locator('#reportContent').inner_text()
+    expect(page.locator('#reportContent')).to_contain_text('<img src=x')
+    expect(page.locator('#reportContent')).to_contain_text('Sentinel')
+    expect(page.locator('#reportContent')).to_contain_text('MET Norway')
     assert page.locator('#runReport').is_disabled(), 'A paid single report cannot be rerun after delivery'
     with page.expect_download() as downloaded:page.click('#downloadReport')
     exported=json.loads(Path(downloaded.value.path()).read_text())

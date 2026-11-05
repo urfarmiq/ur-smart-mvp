@@ -13,6 +13,8 @@ on:
       - "*.mjs"
       - "*.js"
       - "vendor/**"
+      - "icons/**"
+      - "manifest.webmanifest"
       - "scripts/**"
       - ".github/workflows/deploy-satellite-worker.yml"
 

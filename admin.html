@@ -4,11 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self'; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self'; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#174d36">
 <title>لوحة الإدارة الخاصة | أور الزراعية</title>
 <link rel="stylesheet" href="./admin.css">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="أور الزراعية">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="./pwa.css">
+<script type="module" src="./pwa-client.mjs"></script>
 </head>
 <body>
 <header><a class="brand" href="./index.html">🌱 أور الزراعية</a><nav aria-label="التنقل"><a href="./dashboard.html">لوحة المزارع</a><a href="./weather.html">الطقس</a><button id="logoutAdmin" type="button" hidden>تسجيل الخروج</button></nav></header>

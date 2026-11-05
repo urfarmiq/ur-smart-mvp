@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
 <title>حساب المزارع | UR Smart</title>
 <style>body,button,input,select,textarea{font-family:"IBM Plex Sans Arabic",Inter,Tahoma,Arial,sans-serif}
 body{font-family:'IBM Plex Sans Arabic',Inter,Tahoma,Arial,sans-serif;background:#f1f7f2;margin:0;padding:20px;color:#173b2b}
@@ -16,6 +16,16 @@ button{background:#187044;color:white;border:0;cursor:pointer}
 .secondary{background:#e6efe8;color:#187044}
 #msg{line-height:1.8;overflow-wrap:anywhere}
 </style>
+<meta name="theme-color" content="#123d2d">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="أور الزراعية">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="./pwa.css">
+<script type="module" src="./pwa-client.mjs"></script>
 </head>
 <body>
 <main>
