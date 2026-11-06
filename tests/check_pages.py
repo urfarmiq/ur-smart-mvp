@@ -6,7 +6,7 @@ for page in root.glob('*.html'):
     ids=re.findall(r'\bid="([^"]+)"',text)
     assert len(ids)==len(set(ids)),f'duplicate IDs: {page.name}'
     for ref in re.findall(r'(?:href|src)="([^"#]+)"',text):
-        if ref.startswith(('https:','http:','data:','mailto:')): continue
+        if ref.startswith(('https:','http:','data:','mailto:','tel:')): continue
         target=ref.split('#')[0].split('?')[0]
         if target:
             local=(root/target.lstrip('/')).resolve()

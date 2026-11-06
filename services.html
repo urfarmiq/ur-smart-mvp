@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
   <meta name="description" content="خدمات أور الزراعية: خرائط ومراقبة الحقول، إرشاد أولي، طقس، تكاليف الموسم، فحص أعراض النباتات بالصور، تقارير ودعم البحوث الزراعية.">
   <meta name="theme-color" content="#123d2d">
   <title>خدمات أور الزراعية</title>
@@ -18,6 +18,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="./pwa.css">
 <script type="module" src="./pwa-client.mjs"></script>
+<link rel="stylesheet" href="./ads.css">
+<script type="module" src="./sponsor-ads.mjs"></script>
 </head>
 <body>
   <a class="skip" href="#main">انتقل إلى المحتوى</a>
@@ -52,8 +54,9 @@
         <article class="card research"><span class="icon" aria-hidden="true">🎓</span><p class="tag">خدمة مدفوعة للطلب المتفق عليه</p><h3>خدمات الباحثين</h3><p>تحليل CSV وخرائط الحقل مع مسودة تفسير ومراجع وصفية، وفق نطاق الطلب والبيانات المتاحة.</p><p class="price">مدفوعة</p><p class="hint">مراجعة النطاق وتأكيد الدفع يدويًا قبل التنفيذ. النتائج تحتاج مراجعة علمية.</p><a class="button" href="./research.html">اطّلع على خدمة الباحثين</a></article>
       </div>
     </section>
+    <section class="wrap section ur-advertising-section" aria-labelledby="serviceSponsorsTitle"><div class="ur-advertising-heading"><div><p class="eyebrow">رعاية وإعلانات مدفوعة</p><h2 id="serviceSponsorsTitle">إعلانات الشركات الزراعية</h2><p>اعرض شركتك أو منتجك بإعلان واضح، بمدة ونطاق وسعر متفق عليها.</p></div><a class="button" href="./advertise.html">اطلب إعلانًا مع أور</a></div><div data-sponsor-placement="services" hidden></div></section>
     <section class="wrap section approach" aria-labelledby="approachTitle"><h2 id="approachTitle">قرار أوضح من بيانات معروفة</h2><div class="principles"><p><strong>اعرف مصدر البيانات</strong>تاريخ المشهد والدقة والقياسات المفقودة جزء من قراءة النتيجة.</p><p><strong>سجّل ما نفذته</strong>اربط الملاحظة بالتاريخ، واحتفظ بنسخة من تقاريرك وسجلاتك.</p><p><strong>راجع القرار</strong>المؤشرات والإرشادات تساعدك على تحديد ما يحتاج فحصًا؛ لا تغني عن التحاليل والزيارة عند الحاجة.</p></div></section>
   </main>
-  <footer><div class="wrap"><strong>أور الزراعية الذكية</strong><a href="./index.html#contact">التواصل مع إدارة أور</a></div></footer>
+  <footer><div class="wrap"><strong>أور الزراعية الذكية</strong><a href="./advertise.html">أعلن معنا</a><a href="./guides.html">أدلة زراعية</a><a href="./about.html">عن أور</a><a href="./privacy.html">الخصوصية</a><a href="./terms.html">الشروط</a><a href="./index.html#contact">التواصل مع إدارة أور</a></div></footer>
 </body>
 </html>

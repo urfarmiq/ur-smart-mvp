@@ -15,6 +15,7 @@ on:
       - "vendor/**"
       - "icons/**"
       - "manifest.webmanifest"
+      - "monetization-config.json"
       - "scripts/**"
       - ".github/workflows/deploy-satellite-worker.yml"
 

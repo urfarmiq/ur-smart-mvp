@@ -1,4 +1,5 @@
 import {pathToFileURL} from 'node:url';
+import {validateMonetizationConfig,getAdsenseSeller} from '../monetization-core.mjs';
 export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=globalThis.fetch,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  if(!/^[a-f0-9]{40}$/i.test(release||''))throw Error('A deployment commit is required.');
  const origin='https://ur-smart-urfarmiq.pages.dev';
@@ -9,10 +10,29 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
   await wait(4000);
  }
  if(!published)throw Error('The new Pages hostname has not served the expected deployment. The GitHub redirect must stay unpublished.');
- for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs','services.html','farm-budget.html','farm-budget.mjs','season-economics.mjs','weather.html','weather.mjs','weather-core.mjs','dashboard-weather.mjs','plant-health.html','plant-health.css','plant-health.mjs','field-services.html','field-services.css','field-services.mjs','admin-field-services.mjs','satellite-access.html','satellite-access.css','satellite-access.mjs','admin-satellite-access.mjs','satellite-payment.mjs','products.html','products.css','products.mjs','catalog.mjs','admin-products.mjs','install.html','offline.html','pwa-client.mjs','pwa.css','icons/app-icon.svg']){
+ let homeSource='';
+ for(const file of ['index.html','auth.html','dashboard.html','supabase-client.mjs','research-lab.html','research-lab.mjs','research-statistics.mjs','research-image-viewer.mjs','services.html','farm-budget.html','farm-budget.mjs','season-economics.mjs','weather.html','weather.mjs','weather-core.mjs','dashboard-weather.mjs','plant-health.html','plant-health.css','plant-health.mjs','field-services.html','field-services.css','field-services.mjs','admin-field-services.mjs','satellite-access.html','satellite-access.css','satellite-access.mjs','admin-satellite-access.mjs','satellite-payment.mjs','products.html','products.css','products.mjs','catalog.mjs','admin-products.mjs','install.html','offline.html','pwa-client.mjs','pwa.css','icons/app-icon.svg','advertise.html','advertise.css','advertise.mjs','admin-advertising.mjs','sponsor-ads.mjs','google-ads.mjs','monetization-core.mjs','ads.css','privacy.html','terms.html','about.html','guides.html','monetization-guide.html','information.css']){
   const response=await fetchImpl(origin+'/'+file,{signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error('A required public page is unavailable: '+file);
+  if(file==='index.html')homeSource=await response.text();
  }
+ let advertisingConfig;
+ try{
+  const response=await fetchImpl(origin+'/monetization-config.json',{cache:'no-store',signal:AbortSignal.timeout(15000)});
+  if(!response.ok)throw Error();advertisingConfig=validateMonetizationConfig(await response.json());
+ }catch{throw Error('Monetization configuration is unavailable or unsafe.');}
+ const seller=getAdsenseSeller(advertisingConfig),adsTxt=await fetchImpl(origin+'/ads.txt',{cache:'no-store',signal:AbortSignal.timeout(15000)});
+ const records=(await adsTxt.text()).split(/\r?\n/).map(line=>line.trim()).filter(line=>line&&!line.startsWith('#'));
+ if(!adsTxt.ok||!/^text\/plain(?:;|$)/i.test(adsTxt.headers.get('content-type')||'')||(seller?records.length!==1||records[0]!==`google.com, ${seller}, DIRECT, f08c47fec0942fa0`:records.length!==0))throw Error('Monetization ads.txt does not match the configured publisher.');
+ if(seller?!homeSource.includes(`name="google-adsense-account" content="${advertisingConfig.google.publisher_id}"`):/name\s*=\s*["']google-adsense-account["']/i.test(homeSource))throw Error('Monetization verification metadata does not match the configured publisher.');
+ if(/<script[^>]+src=["'][^"']*googlesyndication\.com/i.test(homeSource))throw Error('Monetization must not load a Google vendor script from static HTML before the visitor choice.');
+ const adProject='https://ynsmhtsktbubxfhsekjq.supabase.co',adKey='sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc';
+ const adResponse=await fetchImpl(adProject+'/rest/v1/rpc/list_public_advertisements',{method:'POST',headers:{apikey:adKey,'Content-Type':'application/json'},credentials:'omit',cache:'no-store',body:JSON.stringify({p_placement:'home'}),signal:AbortSignal.timeout(15000)});
+ if(!adResponse.ok)throw Error('Monetization public advertising reader is unavailable.');
+ const cards=await adResponse.json(),publicKeys=['id','company_name','ad_title','ad_body','target_url','placement','starts_at','ends_at'];
+ if(!Array.isArray(cards)||cards.length>3||cards.some(card=>!card||typeof card!=='object'||Object.keys(card).some(key=>!publicKeys.includes(key))))throw Error('Monetization public advertising reader returned an unsafe projection.');
+ const privateAds=await fetchImpl(adProject+'/rest/v1/advertising_orders?select=id',{headers:{apikey:adKey},credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(15000)});
+ if(![401,403].includes(privateAds.status))throw Error('Monetization advertiser orders must not be readable anonymously.');
  const manifestResponse=await fetchImpl(origin+'/manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
  if(!manifestResponse.ok||!/^application\/(?:manifest\+json|json)(?:;|$)/i.test(manifestResponse.headers.get('content-type')||''))throw Error('PWA manifest is unavailable or has an invalid content type.');
  const manifest=await manifestResponse.json();
@@ -44,6 +64,6 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
  if(!satellite.ok||satellite.headers.get('access-control-allow-origin')!==origin)throw Error('Satellite access service is unavailable or did not allow the platform origin.');
  const satelliteStatus=await satellite.json();
  if(satelliteStatus.available!==true||satelliteStatus.paid_service!==true||satelliteStatus.manual_admin_approval_required!==true||satelliteStatus.quote_required!==true||satelliteStatus.customer_acceptance_required!==true||satelliteStatus.field_specific!==true||satelliteStatus.automatic_renewal!==false)throw Error('Satellite service did not confirm the field-specific quote and payment gate.');
- return {app_url:origin,release,frontend:true,pwa:true,backend_cors:true,research:true,plant_health:true,paid_field_services:true,paid_satellite:true};
+ return {app_url:origin,release,frontend:true,pwa:true,advertising:true,google_mode:advertisingConfig.google.mode,backend_cors:true,research:true,plant_health:true,paid_field_services:true,paid_satellite:true};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{console.log(JSON.stringify(await verifyPlatform()));}catch(error){console.error(error.message);process.exitCode=1;}}
