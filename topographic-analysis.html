@@ -71,7 +71,7 @@ const SUPABASE_URL='https://ynsmhtsktbubxfhsekjq.supabase.co',SUPABASE_KEY='sb_p
 const TERRAIN_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
 const supabase=createClient(SUPABASE_URL,SUPABASE_KEY),$=id=>document.getElementById(id);
 const status=$('status'),fieldSelect=$('fieldSelect'),mapLink=$('mapLink');
-let user=null,fields=[],boundaries=new Map(),analysis=null,map=null,fieldOutline=null,profileStart=null,profileLine=null,drawingProfile=false,overlays={};
+let user=null,fields=[],boundaries=new Map(),analysis=null,map=null,fieldOutline=null,profileStart=null,profileLine=null,drawingProfile=false,overlays={},reportSaved=false;
 const streetTiles=()=>L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
 const imageryTiles=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery © Esri and contributors'});
 const setStatus=(text,kind='ok')=>{status.textContent=text;status.className='status'+(kind==='error'?' danger':'')};
@@ -104,7 +104,9 @@ async function initialize(){
   const requested=new URLSearchParams(location.search).get('field');
   if(fields.some(f=>f.id===requested))fieldSelect.value=requested;
   else if(fields.length===1)fieldSelect.value=fields[0].id;
-  fieldChanged();setStatus('تم تحميل حقول حسابك. اختر حقلًا محفوظ الحدود لبدء التحليل.');
+  fieldChanged();
+  try{const response=await fetch(TERRAIN_API_URL+'/terrain/status',{cache:'no-store',signal:AbortSignal.timeout(8000)});const ready=await response.json();setStatus(ready.available?'تم تحميل حقولك. العامل الخلفي مهيأ؛ صلاحية DEM ستتأكد عند بدء التحليل.':(ready.message||'العامل الخلفي غير مهيأ لخدمة الارتفاع.'),ready.available?'ok':'error')}
+  catch{setStatus('تم تحميل حقولك، لكن تعذر الاتصال بخدمة التحليل الخلفية. أعد المحاولة لاحقًا.','error')}
  }catch(error){fieldSelect.innerHTML='<option value="">تعذر تحميل الحقول</option>';setStatus('تعذر تحميل الحقول المحفوظة: '+(error?.message||'خطأ غير معروف'),'error')}
 }
 function initMap(){
@@ -146,7 +148,7 @@ function overlayImage(key,rows,limits,palette,kind){
 const elevations=()=>analysis?.grid?.rows?.elevation_m||[],slopes=()=>analysis?.grid?.rows?.slope_degrees||[];
 function updateLegend(key){
  const gradient=$('legendGradient'),units=$('legendUnits'),low=$('legendLow'),high=$('legendHigh');
- if(key==='slope'){$('legend').firstElementChild.textContent='الانحدار:';gradient.style.background='linear-gradient(to left,#2c7bb6,#abd9e9,#ffffbf,#fdae61,#d7191c)';units.textContent='درجة';low.textContent='٠°';high.textContent='أكبر'}
+ if(key==='slope'){$('legend').firstElementChild.textContent='الانحدار:';gradient.style.background='linear-gradient(to left,#2c7bb6,#abd9e9,#ffffbf,#fdae61,#d7191c)';units.textContent='درجة';const v=slopes().filter(Number.isFinite);low.textContent='٠°';high.textContent=fmt(Math.max(0,...v),2)+'°'}
  else if(key==='pool'){$('legend').firstElementChild.textContent='المناطق المنخفضة:';gradient.style.background='#d7191c';units.textContent='تقدير أولي';low.textContent='';high.textContent='عمق ملء ≥ ٠٫٥ م'}
  else if(key==='drain'){$('legend').firstElementChild.textContent='مسارات أولية:';gradient.style.background='#7a3e00';units.textContent='تراكم جريان';low.textContent='';high.textContent='اقتراح غير هندسي'}
  else if(key==='flow'){$('legend').firstElementChild.textContent='اتجاه الجريان:';gradient.style.background='linear-gradient(to left,#0476d9,#63b3ed)';units.textContent='اتجاه الانحدار';low.textContent='';high.textContent='D8'}
@@ -166,7 +168,11 @@ function showStats(data){
  $('warnings').replaceChildren(...(data.warnings||[]).map(t=>{const p=document.createElement('p');p.className='notice';p.textContent=t;return p}));
 }
 function displayAnalysis(data){
- analysis=data;initMap();
+ analysis=data;$('results').hidden=false;
+ if(map){for(const layer of Object.values(overlays))map.removeLayer(layer);if(profileLine)map.removeLayer(profileLine)}
+ overlays={};profileLine=null;profileStart=null;drawingProfile=false;
+ $('profileChart').replaceChildren();$('profileStatus').textContent='';
+ initMap();
  if(fieldOutline)map.removeLayer(fieldOutline);
  fieldOutline=L.geoJSON(data.geometry,{style:{color:'#fff',weight:3,fill:false,dashArray:'7 5'}}).addTo(map);
  const feature=fieldOutline.getBounds();if(feature.isValid())map.fitBounds(feature.pad(.3));
@@ -178,13 +184,13 @@ function displayAnalysis(data){
   drain:overlayImage('drain',data.grid.rows.drainage_path,null,null,'drain')
  };
  for(const key of Object.keys(overlays)){const id={elevation:'elevationLayer',slope:'slopeLayer',flow:'flowLayer',pool:'poolLayer',drain:'drainLayer'}[key];if($(id).checked)overlays[key].addTo(map)}
- $('results').hidden=false;$('saveReport').disabled=false;$('saveStatus').textContent='لم يُحفظ هذا التقرير بعد.';showStats(data);updateLegend('elevation');$('legendLow').textContent=fmt(data.stats.minimum_elevation_m,1)+' م';$('legendHigh').textContent=fmt(data.stats.maximum_elevation_m,1)+' م';
+ $('saveReport').disabled=false;reportSaved=false;$('saveStatus').textContent='لم يُحفظ هذا التقرير بعد.';showStats(data);requestAnimationFrame(()=>map.invalidateSize());updateLegend('elevation');$('legendLow').textContent=fmt(data.stats.minimum_elevation_m,1)+' م';$('legendHigh').textContent=fmt(data.stats.maximum_elevation_m,1)+' م';
  $('mapNote').textContent='مصدر الارتفاع: '+data.source+'؛ دقة المصدر '+data.resolution_m+' م. خريطة الارتفاع مشتقة من بيانات فعلية، أما المنخفضات ومسارات الجريان فتقديرات طبوغرافية أولية.';
 }
 async function analyze(){
  const field=selectedField();if(!field||!boundaries.has(field.id)){setStatus('اختر حقلًا له حدود محفوظة في حسابك.','error');return}
  const button=$('analyze');button.disabled=true;button.textContent='جارٍ جلب DEM والتحليل…';setStatus('جارٍ التحقق من الملكية وجلب Copernicus DEM. قد تستغرق المعالجة بعض الوقت.');
- $('results').hidden=true;$('saveReport').disabled=true;analysis=null;
+ $('results').hidden=true;$('saveReport').disabled=true;reportSaved=false;analysis=null;
  try{
   const {data:sessionData,error}=await withDeadline(supabase.auth.getSession());if(error||!sessionData?.session)throw Error('انتهت جلسة الدخول. سجّل الدخول مجددًا.');
   const response=await fetch(TERRAIN_API_URL+'/terrain/analyze',{method:'POST',headers:{Authorization:'Bearer '+sessionData.session.access_token,'Content-Type':'application/json'},body:JSON.stringify({field_id:field.id}),cache:'no-store',signal:AbortSignal.timeout(110000)});
@@ -201,11 +207,11 @@ function buildReport(){
  return {field_id:analysis.field_id,area_m2:analysis.area_m2,area_donum_iq:analysis.area_donum,source:analysis.source,dem_instance:analysis.dem_instance,resolution_m:analysis.resolution_m,grid_resolution_x_m:analysis.grid_resolution_x_m,grid_resolution_y_m:analysis.grid_resolution_y_m,vertical_datum:analysis.vertical_datum,minimum_elevation_m:s.minimum_elevation_m,maximum_elevation_m:s.maximum_elevation_m,mean_slope_degrees:s.mean_slope_degrees,mean_slope_percent:s.mean_slope_percent,estimated_low_area_m2:s.low_area_m2,estimated_low_area_donum:s.low_area_donum,estimated_low_cells:s.low_cells,valid_dem_cells:s.valid_cells,warnings:analysis.warnings,recommendations,method:analysis.analysis_method,generated_at:analysis.generated_at,profile:analysis.profile||null};
 }
 async function saveReport(){
- if(!analysis||!user)return;const button=$('saveReport');button.disabled=true;$('saveStatus').textContent='جارٍ حفظ التقرير…';
+ if(!analysis||!user||reportSaved)return;const button=$('saveReport');button.disabled=true;$('saveStatus').textContent='جارٍ حفظ التقرير…';
  const report=buildReport();
  const {data,error}=await supabase.from('terrain_reports').insert({owner_id:user.id,field_id:analysis.field_id,source:analysis.source,dem_instance:analysis.dem_instance,resolution_m:analysis.resolution_m,report_data:report}).select('id,created_at').single();
  if(error){$('saveStatus').textContent=error.code==='42P01'||/terrain_reports|not found|schema cache/i.test(error.message||'')?'جدول التقارير غير مهيأ بعد. طبّق ترحيل Supabase المرفق ثم أعد الحفظ.':'تعذر حفظ التقرير: '+error.message;button.disabled=false;return}
- $('saveStatus').textContent='تم حفظ التقرير في حسابك. رقم التقرير: '+data.id;$('saveReport').disabled=false;void loadHistory(analysis.field_id);
+ $('saveStatus').textContent='تم حفظ التقرير في حسابك. رقم التقرير: '+data.id;reportSaved=true;$('saveReport').disabled=true;void loadHistory(analysis.field_id);
 }
 async function loadHistory(fieldId){
  const box=$('history');if(!user||!fieldId){box.textContent='اختر حقلًا لعرض تقاريره.';return}
