@@ -68,7 +68,7 @@ function priorityFlood(width,height,elevation,valid){
 /** Calculate first-pass terrain metrics from a real, projected DEM grid. */
 export function analyzeTerrainGrid({width,height,elevation,valid,inside,cellSizeX,cellSizeY}){
   const count=width*height;
-  if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||count>262144||elevation.length!==count||valid.length!==count||inside.length!==count||!Number.isFinite(cellSizeX)||!Number.isFinite(cellSizeY)||cellSizeX<=0||cellSizeY<=0)throw new RangeError('Invalid terrain grid');
+  if(!Number.isInteger(width)||!Number.isInteger(height)||width<3||height<3||count>65536||elevation.length!==count||valid.length!==count||inside.length!==count||!Number.isFinite(cellSizeX)||!Number.isFinite(cellSizeY)||cellSizeX<=0||cellSizeY<=0)throw new RangeError('Invalid terrain grid');
   const elevations=Float64Array.from(elevation),validMask=Uint8Array.from(valid),insideMask=Uint8Array.from(inside),filled=priorityFlood(width,height,elevations,validMask);
   const slopeDeg=new Array(count).fill(null),slopePct=new Array(count).fill(null),flowDir=new Array(count).fill(255),accum=new Float64Array(count),pooling=new Array(count).fill(false),drainage=new Array(count).fill(false);
   const sourceValues=[];
@@ -94,7 +94,7 @@ export function analyzeTerrainGrid({width,height,elevation,valid,inside,cellSize
   const threshold=Math.max(3,Math.ceil(sourceValues.length*0.025));
   for(let i=0;i<count;i++)if(insideMask[i]&&accum[i]>=threshold)drainage[i]=true;
   const slopes=[],slopePercents=[];for(let i=0;i<count;i++)if(insideMask[i]&&slopeDeg[i]!==null){slopes.push(slopeDeg[i]);slopePercents.push(slopePct[i]);}
-  const minimum=Math.min(...sourceValues),maximum=Math.max(...sourceValues),meanSlope=slopes.length?slopes.reduce((a,b)=>a+b,0)/slopes.length:null,meanSlopePercent=slopePercents.length?slopePercents.reduce((a,b)=>a+b,0)/slopePercents.length:null,cellArea=cellSizeX*cellSizeY,poolCount=pooling.reduce((n,v)=>n+(v?1:0),0),insideCount=sourceValues.length;
+  let minimum=Infinity,maximum=-Infinity;for(const value of sourceValues){minimum=Math.min(minimum,value);maximum=Math.max(maximum,value)}const meanSlope=slopes.length?slopes.reduce((a,b)=>a+b,0)/slopes.length:null,meanSlopePercent=slopePercents.length?slopePercents.reduce((a,b)=>a+b,0)/slopePercents.length:null,cellArea=cellSizeX*cellSizeY,poolCount=pooling.reduce((n,v)=>n+(v?1:0),0),insideCount=sourceValues.length;
   return {
     stats:{minimum_elevation_m:minimum,maximum_elevation_m:maximum,mean_slope_degrees:meanSlope,mean_slope_percent:meanSlopePercent,low_area_m2:poolCount*cellArea,low_cells:poolCount,valid_cells:insideCount,low_area_donum:poolCount*cellArea/2500},
     grid:{elevation_m:Array.from(elevations,(v,i)=>validMask[i]&&insideMask[i]?v:null),slope_degrees:slopeDeg.map((v,i)=>insideMask[i]?v:null),slope_percent:slopePct.map((v,i)=>insideMask[i]?v:null),flow_direction:flowDir.map((v,i)=>insideMask[i]?v:255),flow_accumulation:Array.from(accum,(v,i)=>insideMask[i]?Math.round(v):0),pooling:pooling.map((v,i)=>insideMask[i]?v:false),drainage_path:drainage.map((v,i)=>insideMask[i]?v:false)},
