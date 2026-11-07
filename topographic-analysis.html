@@ -125,11 +125,11 @@ function colorFor(value,min,max,palette){
 }
 function overlayImage(key,rows,limits,palette,kind){
  const {width,height}=analysis.grid,valid=kind==='elevation'||kind==='slope'?rows.filter(Number.isFinite):[];
- const min=limits?.[0]??Math.min(...valid),max=limits?.[1]??Math.max(...valid);
+ const min=limits?.[0]??valid.reduce((a,v)=>Math.min(a,v),Infinity),max=limits?.[1]??valid.reduce((a,v)=>Math.max(a,v),-Infinity);
  let body='';
  if(kind==='flow'){
   const dirs=[[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
-  for(let i=0;i<rows.length;i++){const d=rows[i];if(d>7)continue;const x=i%width+.5,y=Math.floor(i/width)+.5,[dx,dy]=dirs[d];body+='<line x1="'+(x-dx*.24)+'" y1="'+(y-dy*.24)+'" x2="'+(x+dx*.24)+'" y2="'+(y+dy*.24)+'" stroke="#0476d9" stroke-width=".10" marker-end="url(#a)"/>'}
+  for(let i=0;i<rows.length;i++){const d=rows[i],col=i%width,row=Math.floor(i/width);if(d>7||col%2||row%2)continue;const x=col+.5,y=row+.5,[dx,dy]=dirs[d];body+='<line x1="'+(x-dx*.24)+'" y1="'+(y-dy*.24)+'" x2="'+(x+dx*.24)+'" y2="'+(y+dy*.24)+'" stroke="#0476d9" stroke-width=".10" marker-end="url(#a)"/>'}
   body='<defs><marker id="a" markerWidth=".22" markerHeight=".22" refX=".16" refY=".11" orient="auto"><path d="M0 0L.2 .11L0 .22z" fill="#0476d9"/></marker></defs>'+body;
  }else{
   for(let i=0;i<rows.length;i++){
@@ -148,11 +148,11 @@ function overlayImage(key,rows,limits,palette,kind){
 const elevations=()=>analysis?.grid?.rows?.elevation_m||[],slopes=()=>analysis?.grid?.rows?.slope_degrees||[];
 function updateLegend(key){
  const gradient=$('legendGradient'),units=$('legendUnits'),low=$('legendLow'),high=$('legendHigh');
- if(key==='slope'){$('legend').firstElementChild.textContent='الانحدار:';gradient.style.background='linear-gradient(to left,#2c7bb6,#abd9e9,#ffffbf,#fdae61,#d7191c)';units.textContent='درجة';const v=slopes().filter(Number.isFinite);low.textContent='٠°';high.textContent=fmt(Math.max(0,...v),2)+'°'}
+ if(key==='slope'){$('legend').firstElementChild.textContent='الانحدار:';gradient.style.background='linear-gradient(to left,#2c7bb6,#abd9e9,#ffffbf,#fdae61,#d7191c)';units.textContent='درجة';const v=slopes().filter(Number.isFinite);low.textContent='٠°';high.textContent=fmt(v.reduce((a,x)=>Math.max(a,x),0),2)+'°'}
  else if(key==='pool'){$('legend').firstElementChild.textContent='المناطق المنخفضة:';gradient.style.background='#d7191c';units.textContent='تقدير أولي';low.textContent='';high.textContent='عمق ملء ≥ ٠٫٥ م'}
  else if(key==='drain'){$('legend').firstElementChild.textContent='مسارات أولية:';gradient.style.background='#7a3e00';units.textContent='تراكم جريان';low.textContent='';high.textContent='اقتراح غير هندسي'}
  else if(key==='flow'){$('legend').firstElementChild.textContent='اتجاه الجريان:';gradient.style.background='linear-gradient(to left,#0476d9,#63b3ed)';units.textContent='اتجاه الانحدار';low.textContent='';high.textContent='D8'}
- else{$('legend').firstElementChild.textContent='الارتفاع:';gradient.style.background='linear-gradient(to left,#2b83ba,#abdda4,#ffffbf,#fdae61,#d7191c)';units.textContent='الارتفاع (م)';const a=elevations().filter(Number.isFinite);low.textContent=fmt(Math.min(...a),1)+' م';high.textContent=fmt(Math.max(...a),1)+' م'}
+ else{$('legend').firstElementChild.textContent='الارتفاع:';gradient.style.background='linear-gradient(to left,#2b83ba,#abdda4,#ffffbf,#fdae61,#d7191c)';units.textContent='الارتفاع (م)';const a=elevations().filter(Number.isFinite);low.textContent=fmt(a.reduce((m,x)=>Math.min(m,x),Infinity),1)+' م';high.textContent=fmt(a.reduce((m,x)=>Math.max(m,x),-Infinity),1)+' م'}
 }
 function showStats(data){
  const s=data.stats;const items=[['المساحة',fmt(data.area_donum,2)+' دونم','الدونم العراقي = ٢٥٠٠ م²'],['أقل ارتفاع',fmt(s.minimum_elevation_m,2)+' م','مرجع EGM2008'],['أعلى ارتفاع',fmt(s.maximum_elevation_m,2)+' م','مرجع EGM2008'],['متوسط الانحدار',fmt(s.mean_slope_degrees,3)+'°',fmt(s.mean_slope_percent,3)+'%'],['منخفضات محتملة',fmt(s.low_area_donum,2)+' دونم',fmt(s.low_area_m2,0)+' م² تقريبًا'],['خلايا DEM',fmt(s.valid_cells,0),data.resolution_m+' م اسميًا']];
@@ -178,7 +178,7 @@ function displayAnalysis(data){
  const feature=fieldOutline.getBounds();if(feature.isValid())map.fitBounds(feature.pad(.3));
  overlays={
   elevation:overlayImage('elevation',data.grid.rows.elevation_m,null,['#2b83ba','#abdda4','#ffffbf','#fdae61','#d7191c'],'elevation'),
-  slope:overlayImage('slope',data.grid.rows.slope_degrees,[0,Math.max(3,...data.grid.rows.slope_degrees.filter(Number.isFinite))],['#2c7bb6','#abd9e9','#ffffbf','#fdae61','#d7191c'],'slope'),
+  slope:overlayImage('slope',data.grid.rows.slope_degrees,[0,data.grid.rows.slope_degrees.filter(Number.isFinite).reduce((m,v)=>Math.max(m,v),3)],['#2c7bb6','#abd9e9','#ffffbf','#fdae61','#d7191c'],'slope'),
   flow:overlayImage('flow',data.grid.rows.flow_direction,null,null,'flow'),
   pool:overlayImage('pool',data.grid.rows.pooling,null,null,'pool'),
   drain:overlayImage('drain',data.grid.rows.drainage_path,null,null,'drain')
