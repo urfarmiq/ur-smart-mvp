@@ -235,7 +235,7 @@ function onProfileClick(event){
 $('fieldSelect').addEventListener('change',()=>{analysis=null;$('results').hidden=true;fieldChanged()});
 $('analyze').addEventListener('click',analyze);$('saveReport').addEventListener('click',saveReport);
 $('profileButton').addEventListener('click',()=>{if(!analysis){$('profileStatus').textContent='نفّذ تحليل الحقل أولًا.';return}drawingProfile=!drawingProfile;profileStart=null;$('profileButton').textContent=drawingProfile?'اضغط نقطتين على الخريطة…':'ارسم خط المقطع على الخريطة';$('profileButton').classList.toggle('secondary',!drawingProfile);$('profileStatus').textContent=drawingProfile?'اختر نقطة بداية داخل الحقل.':'أُغلق وضع رسم المقطع.'});
-fieldSelect.addEventListener('change',fieldChanged);void initialize();
+void initialize();
 </script>
 </body>
 </html>
