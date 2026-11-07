@@ -4,7 +4,7 @@ import {satelliteFetch,SatelliteRequestError,validateSatellitePolygon} from './s
 
 const DEM_URL='https://sh.dataspace.copernicus.eu/process/v1';
 const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
-const MAX_PIXELS=262144,MAX_TIFF_BYTES=12*1024*1024,MAX_BODY=4096,UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_PIXELS=65536,MAX_TIFF_BYTES=12*1024*1024,MAX_BODY=4096,UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EVALSCRIPT=`//VERSION=3
 function setup(){return {input:[{bands:["DEM","dataMask"]}],output:{id:"default",bands:2,sampleType:SampleType.FLOAT32}}}
 function evaluatePixel(s){return [s.DEM,s.dataMask]}
