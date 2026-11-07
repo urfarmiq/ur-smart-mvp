@@ -179,6 +179,16 @@ def scenario(browser, directory, origin, mobile):
     expect(guide.locator('#servicesTitle')).to_be_visible()
     guide.goto(origin + '/', wait_until='domcontentloaded')
     expect(guide.locator('#home')).to_be_visible()
+    guide.goto(origin + '/planting-calendar.html', wait_until='domcontentloaded')
+    expect(guide.locator('[data-planting-calendar]')).to_be_visible()
+    expect(guide.locator('#filterFields')).to_be_enabled()
+    guide.locator('#month').select_option('11')
+    guide.locator('#province').select_option('wasit')
+    guide.locator('#category').select_option('field')
+    expect(guide.locator('#cropResults')).to_contain_text('الحنطة')
+    guide.locator('#month').select_option('7')
+    expect(guide.locator('#cropResults')).to_contain_text('الذرة')
+    assert guide.locator('input[type=password]').count() == 0
     guide.goto(origin + '/auth', wait_until='domcontentloaded')
     expect(guide.locator('[data-ur-offline]')).to_be_visible()
     assert guide.locator('input[type=password]').count() == 0
@@ -217,7 +227,7 @@ def scenario(browser, directory, origin, mobile):
     assert not errors, errors
     evidence = {'viewport':'mobile' if mobile else 'desktop', 'registration':registration,
                 'manifest_cdp':{'url':manifest_info.get('url'), 'errors':manifest_info.get('errors')},
-                'installability_cdp':installability, 'public_offline':True, 'private_offline_generic':True,
+                'installability_cdp':installability, 'public_offline':True, 'planting_calendar_offline':True, 'private_offline_generic':True,
                 'api_failures_not_cached':True, 'query_or_private_cache_entries':False,
                 'explicit_update_preserves_other_page_and_storage':True, 'cache_names':list(after)}
     context.close()
@@ -230,7 +240,7 @@ def main():
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     scratch = Path('/workspace/scratch')
     scratch.mkdir(parents=True, exist_ok=True)
-    required = ['sw.js','manifest.webmanifest','pwa-client.mjs','pwa.css','install.html','offline.html','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png','icons/app-icon.svg']
+    required = ['sw.js','manifest.webmanifest','pwa-client.mjs','pwa.css','install.html','offline.html','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','icons/apple-touch-icon.png','icons/app-icon.svg','planting-calendar.html','planting-calendar.css','planting-calendar.mjs','planting-calendar-core.mjs','planting-calendar-data.mjs']
     assert all((ROOT / path).is_file() for path in required), 'PWA source assets are not ready'
     with tempfile.TemporaryDirectory(prefix='pwa-browser-', dir=scratch) as temporary:
         directory = Path(temporary)

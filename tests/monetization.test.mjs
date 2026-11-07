@@ -43,7 +43,10 @@ function fixture({standalone=false,href='https://ur-smart-urfarmiq.pages.dev/',o
 
 test('public configuration is disabled without a publisher and rejects secrets or premature activation',async()=>{
  const actual=JSON.parse(await readFile(new URL('../monetization-config.json',import.meta.url),'utf8'));
- assert.equal(validateMonetizationConfig(actual).google.mode,'disabled');assert.equal(getAdsenseSeller(actual),null);
+ const verified=validateMonetizationConfig(actual);
+ if(!verified.google.site_approved||!verified.google.cmp_ready)assert.notEqual(verified.google.mode,'active');
+ assert.equal(getAdsenseSeller(actual),verified.google.mode==='disabled'?null:verified.google.publisher_id.replace(/^ca-/,''));
+ assert.equal(getAdsenseSeller({google:{mode:'disabled',publisher_id:'',ad_slot:'',site_approved:false,cmp_ready:false}}),null);
  assert.equal(getAdsenseSeller(config({mode:'verification',ad_slot:'',site_approved:false,cmp_ready:false})),'pub-1234567890123456');
  for(const value of [config({publisher_id:'ca-pub-123'}),config({ad_slot:'abc'}),config({site_approved:false}),config({cmp_ready:false}),config({mode:'verification',publisher_id:''}),{...actual,secret_key:'must-not-be-public'},{google:{...actual.google,service_role:'never'}}])assert.throws(()=>validateMonetizationConfig(value));
  for(const slot of ['1','12345678901234567890'])assert.equal(validateMonetizationConfig(config({ad_slot:slot})).google.ad_slot,slot);

@@ -1,7 +1,7 @@
 {
   "google": {
-    "mode": "disabled",
-    "publisher_id": "",
+    "mode": "verification",
+    "publisher_id": "ca-pub-1889064467402128",
     "ad_slot": "",
     "site_approved": false,
     "cmp_ready": false

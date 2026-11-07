@@ -6,7 +6,7 @@ import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../sw.js',import.meta.url),'utf8');
 const origin='https://app.test';
 const mime=path=>path.endsWith('.css')?'text/css':path.endsWith('.mjs')?'application/javascript':path.endsWith('.png')?'image/png':path.endsWith('.svg')?'image/svg+xml':path.endsWith('.webmanifest')?'application/manifest+json':'text/html';
-const content=path=>path.endsWith('/index.html')?'<main id="home">public home</main>':path.endsWith('/services.html')?'<h2 id="servicesTitle">public services</h2>':path.endsWith('/install.html')?'<main data-ur-install>install instructions</main>':path.endsWith('/offline.html')?'<main data-ur-offline>generic offline notice</main>':'public asset';
+const content=path=>path.endsWith('/index.html')?'<main id="home">public home</main>':path.endsWith('/services.html')?'<h2 id="servicesTitle">public services</h2>':path.endsWith('/install.html')?'<main data-ur-install>install instructions</main>':path.endsWith('/offline.html')?'<main data-ur-offline>generic offline notice</main>':path.endsWith('/planting-calendar.html')?'<main data-planting-calendar>public planting references</main>':'public asset';
 
 function response(url,body=content(new URL(url).pathname),{status=200,type='default',headers={},redirected=false}={}){
  const value=new Response(body,{status,headers:{'content-type':mime(new URL(url).pathname),...headers}});

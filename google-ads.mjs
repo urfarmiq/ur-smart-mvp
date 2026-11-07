@@ -1,7 +1,7 @@
 import {boundedAdJSON,isGoogleBrowserSurface,validateMonetizationConfig,GOOGLE_ADS_SCRIPT} from './monetization-core.mjs';
 
-// The publisher has no AdSense account yet. Configuration is disabled by
-// default. This first-party choice is not a replacement for Google's CMP.
+// Verification never loads advertisements. Active serving still requires
+// approval and consent; this first-party choice does not replace Google's CMP.
 export function createGoogleAds({win=globalThis.window,doc=globalThis.document,nav=globalThis.navigator,fetchImpl=globalThis.fetch}={}){
  if(!win||!doc||!nav)return null;
  const container=doc.querySelector('[data-google-ads]');if(!container)return null;

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#123d2d">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests">
+<meta name="description" content="شنو تزرع هذا الشهر في العراق؟ تقويم زراعي إرشادي حسب الشهر والمحافظة والمحصول، يميز البذر والشتل والزراعة المكشوفة والمحمية مع مصادره.">
+<title>شنو تزرع هذا الشهر؟ | أور الزراعية</title>
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="أور الزراعية"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="./planting-calendar.css"><link rel="stylesheet" href="./pwa.css">
+<script type="module" src="./planting-calendar.mjs"></script><script type="module" src="./pwa-client.mjs"></script>
+</head>
+<body class="cal-page" data-planting-calendar>
+<a class="cal-skip" href="#calendar">انتقل إلى اختيار الشهر والمحصول</a>
+<header class="cal-header"><div class="cal-wrap cal-header-inner"><a class="cal-brand" href="./index.html"><img src="./icons/app-icon.svg" width="44" height="44" alt=""><span>أور الزراعية<small lang="en" dir="ltr">UR SMART AGRICULTURE</small></span></a><nav aria-label="التنقل الرئيسي"><a href="./index.html">الرئيسية</a><a href="./services.html">الخدمات</a><a href="./weather.html">الطقس</a></nav></div></header>
+<main>
+<section class="cal-hero"><div class="cal-wrap cal-hero-inner"><div><p class="cal-eyebrow">تقويم زراعي للعراق · مفتوح للجميع</p><h1>شنو تزرع<br><span>هذا الشهر؟</span></h1><p class="cal-lead">اختر الشهر والمحافظة، وتعرّف على نوافذ زراعة المحاصيل بحسب المراجع. راجع نوع الزراعة ومرحلتها قبل أن تختار.</p><a class="cal-button cal-gold" href="#calendar">شوف مواعيد الزراعة ←</a></div><aside class="cal-month-card" aria-label="الشهر المختار"><span class="cal-calendar-symbol" aria-hidden="true">✦</span><p>نوافذ الزراعة خلال</p><strong id="heroMonth">الشهر المختار</strong><span id="heroProvince">كل العراق</span><p class="cal-month-note">مواعيد مرجعية، وليست قراءة لحالة حقلك اليوم</p></aside></div></section>
+<div class="cal-wrap cal-workspace">
+<section class="cal-scope-note" aria-label="كيف تقرأ المواعيد"><strong>البذر غير الشتل، والمكشوف غير المحمي.</strong><p>قد يغطي الموعد جزءًا من الشهر فقط؛ اقرأ الفترة المكتوبة على كل نافذة. تتغير الملاءمة مع الصقيع وحرارة التربة والصنف والمياه، ولا تُنقل المواعيد شهرًا تلقائيًا بين المناطق.</p></section>
+<section id="calendar" class="cal-panel" aria-labelledby="filterTitle"><div class="cal-heading"><div><p class="cal-kicker">من شهر إلى موسم</p><h2 id="filterTitle">حدّد بحثك</h2></div><button id="resetFilters" class="cal-button cal-secondary" type="button" disabled>رجّع لشهرنا الحالي</button></div>
+<form id="calendarFilters" autocomplete="off"><fieldset id="filterFields" disabled><div class="cal-filter-grid">
+<div><label for="month">الشهر</label><select id="month"></select></div><div><label for="province">المحافظة</label><select id="province"></select></div>
+<div><label for="cropSearch">المحصول</label><input id="cropSearch" type="search" maxlength="100" placeholder="مثال: حنطة، طماطة، باميا"></div>
+<div><label for="category">نوع المحصول</label><select id="category"><option value="all">كل المحاصيل</option><option value="field">محاصيل حقلية</option><option value="vegetable">خضروات</option><option value="herb">أعشاب</option></select></div>
+<div><label for="method">طريقة الزراعة</label><select id="method"><option value="all">كل الطرق</option><option value="open">مكشوفة</option><option value="protected">محمية</option><option value="nursery">مشتل</option><option value="unspecified">التغطية غير محددة في المرجع</option></select></div>
+<div><label for="season">الموسم أو العروة</label><select id="season"><option value="all">كل المواسم</option><option value="winter">شتوي</option><option value="spring">ربيعي</option><option value="summer">صيفي</option><option value="autumn">خريفي</option></select></div>
+</div></fieldset></form><p id="provinceNote" class="cal-help">المحافظة تحدّد منطقة مرجعية واسعة؛ قد تختلف المواعيد داخلها مع الارتفاع والمناخ المحلي.</p><p id="loadStatus" class="cal-status" role="status">جارٍ تحميل التقويم الزراعي…</p>
+<noscript><p class="cal-status cal-error">فعّل JavaScript لاختيار الأشهر وعرض نوافذ المحاصيل. لا تحتاج هذه الخدمة إلى حساب أو اتصال بواجهة ذكاء اصطناعي.</p></noscript>
+</section>
+<section class="cal-panel cal-year-panel" aria-labelledby="yearTitle"><div class="cal-heading"><div><p class="cal-kicker">نظرة على السنة</p><h2 id="yearTitle">اختَر شهرًا وشوف نوافذه</h2></div><span class="cal-help">الأعداد محاصيل لها نوافذ ضمن مرشّحاتك</span></div><div id="yearMonths" class="cal-year-grid"></div></section>
+<section class="cal-results" aria-labelledby="resultsTitle"><div class="cal-heading"><div><p class="cal-kicker">نوافذ زراعة خلال الشهر</p><h2 id="resultsTitle">المحاصيل والمواعيد</h2></div><p id="resultStatus" class="cal-result-status" role="status" aria-live="polite"></p></div><p id="resultScope" class="cal-result-scope"></p><div id="cropResults" class="cal-crop-grid"></div><div id="emptyResults" class="cal-empty" hidden><span aria-hidden="true">🌱</span><h3>ماكو نافذة موثّقة تطابق هذا الاختيار</h3><p>جرّب شهرًا آخر أو أزل مرشّحًا. غياب النتيجة هنا لا يعني أن الزراعة مستحيلة؛ يعني أن هذه المراجع لا توفر موعدًا مطابقًا.</p><button id="clearSearch" class="cal-button cal-secondary" type="button">عرض كل المحاصيل لهذا الشهر</button></div></section>
+<section class="cal-panel cal-source-panel" aria-labelledby="sourceTitle"><details id="sourceDetails"><summary id="sourceTitle">المصادر وحدود التقويم</summary><p>تجمع هذه الخدمة نوافذ بذر وشتل من مراجع جامعية عراقية وتقويم FAO. المواعيد غير المحددة جغرافيًا تظهر كمرجع عام، ولا تُعرض كأنها موعد مؤكد لمحافظتك.</p><p>البيوت المحمية والمشاتل قد تحتاج إلى ضبط الحرارة والحماية من الصقيع. ولا يكفي وجود الشهر في التقويم لتأكيد توفر مياه الري أو موافقة خطة الزراعة المحلية.</p><p id="reviewedAt" class="cal-help"></p><div id="sourceList" class="cal-source-list"></div></details></section>
+<aside class="cal-next"><div><p class="cal-kicker">قبل تنفيذ الزراعة</p><h2>راجع طقس منطقتك والمياه المتاحة</h2><p>هذه مواعيد موسمية، وليست توقعًا للطقس أو وصفة ري وتسميد. أكّد اختيارك مع الإرشاد الزراعي المحلي واحتياج الصنف.</p></div><div class="cal-next-actions"><a class="cal-button cal-primary" href="./weather.html">شاهد الطقس</a><a class="cal-button cal-secondary" href="./products.html">مستلزمات الري</a></div></aside>
+</div>
+</main>
+<footer class="cal-footer"><div class="cal-wrap"><strong>أور الزراعية الذكية</strong><nav aria-label="روابط إضافية"><a href="./guides.html">الأدلة الزراعية</a><a href="./privacy.html">الخصوصية</a><a href="./contact.html">التواصل</a><a href="./install.html">تثبيت التطبيق</a></nav></div></footer>
+</body>
+</html>
