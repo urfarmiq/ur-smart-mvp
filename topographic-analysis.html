@@ -1,100 +1,241 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#123d2d">
-<title>التحليل الطبوغرافي | UR Smart</title>
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="./pwa.css">
-<script type="module" src="./pwa-client.mjs"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#174d32"><title>التحليل الطبوغرافي وتصريف المياه | UR Smart</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="./pwa.css"><script type="module" src="./pwa-client.mjs"></script>
 <style>
-:root{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;color:#213b2d;background:#f2f7f3}*{box-sizing:border-box}body{margin:0}header{background:#123d2d;color:#fff;padding:15px max(16px,calc((100vw - 980px)/2));display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap}header a{color:#e6f5e9;text-decoration:none}main{max-width:980px;margin:24px auto;padding:0 16px}.card{background:#fff;border:1px solid #dce8df;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 5px 22px #173d260b}h1,h2{color:#176b45;margin-top:0}h1{font-size:clamp(25px,5vw,36px)}.intro,.muted{color:#5b7162;line-height:1.8}.notice{border-right:4px solid #d59b29;background:#fff8e8;padding:14px;border-radius:10px;line-height:1.8}.status{padding:12px;border-radius:10px;background:#edf5ee;line-height:1.7}label{display:block;font-weight:700;margin:14px 0 7px}select,button{width:100%;min-height:48px;padding:11px 13px;border:1px solid #cbd8ce;border-radius:10px;font:inherit;font-size:16px}button{background:#176b45;color:#fff;border:0;font-weight:700;cursor:pointer}button:disabled{background:#8b9d90;cursor:not-allowed}a.button{display:inline-flex;align-items:center;justify-content:center;background:#e7f2e9;color:#155a39;text-decoration:none;padding:11px 14px;border-radius:10px;font-weight:700;margin:6px 4px 0 0}.details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}.details div{background:#f3f8f4;border-radius:10px;padding:12px;overflow-wrap:anywhere}.details span{display:block;color:#64776a;font-size:13px}.details strong{display:block;margin-top:4px}.boundary{font-weight:700}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions>*{flex:1 1 220px}@media(max-width:540px){.card{padding:16px}.details{grid-template-columns:1fr 1fr}}
+:root{font-family:"IBM Plex Sans Arabic",Tahoma,Arial,sans-serif;color:#213b2d;background:#f2f7f3}*{box-sizing:border-box}body{margin:0;font:16px/1.75 "IBM Plex Sans Arabic",Tahoma,Arial,sans-serif}header{background:#174d32;color:white;padding:15px max(16px,calc((100vw - 1380px)/2));display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}header a{color:#e8f5ea;text-decoration:none;font-weight:700}main{max-width:1380px;margin:22px auto;padding:0 16px}h1,h2,h3{color:#174d32}h1{font-size:clamp(25px,4vw,36px);margin:3px 0}.muted{color:#627568}.card{background:#fff;border:1px solid #dce8df;border-radius:16px;padding:19px;margin-bottom:16px;box-shadow:0 5px 22px #163d2610}.top{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(400px,1.2fr);gap:16px}.layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,.8fr);gap:16px}.map-card{padding:10px}.map-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 5px 12px}.map-tools label{display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 9px;background:#f1f7f2;border-radius:8px;font-size:14px}.map-tools input{width:auto;margin:0;accent-color:#176b45}.map{height:min(66vh,650px);min-height:400px;border-radius:12px;overflow:hidden;background:#e7eee9}label{display:block;font-weight:700;margin:10px 0 6px}select,button{font:inherit;font-size:16px;border-radius:10px;min-height:46px;padding:9px 12px}select{width:100%;border:1px solid #cbd8ce;background:#fff}button{background:#176b45;border:0;color:#fff;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.secondary{background:#e6f1e8;color:#155637}.status{background:#edf5ee;border-right:4px solid #3f9261;padding:12px;border-radius:8px;line-height:1.7}.notice{background:#fff8e8;border-right:4px solid #d39c28;padding:13px;border-radius:9px}.danger{background:#fff1ef;border-right-color:#bd5c4a}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.row>*{flex:1 1 180px}.help{font-size:14px;color:#63766a}.layers{display:flex;gap:7px;flex-wrap:wrap}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.metric{background:#f2f7f3;padding:12px;border-radius:10px}.metric span{display:block;color:#63766a;font-size:13px}.metric strong{font-size:20px;color:#174d32;overflow-wrap:anywhere}.metric small{font-size:12px;color:#63766a}.legend{display:flex;align-items:center;gap:7px;margin:7px 0;font-size:13px}.gradient{width:130px;height:12px;border-radius:20px}.legend-range{display:flex;justify-content:space-between;width:130px;font-size:11px;color:#617467}.profile-chart{width:100%;min-height:140px;background:#f7faf7;border-radius:9px}.profile-chart text{font:12px Tahoma,Arial;fill:#53695a}.history-item{border-top:1px solid #e4ece6;padding:10px 0;font-size:14px}.layer-control{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;background:#f1f7f2;border-radius:8px}.leaflet-container{font:14px/1.5 Tahoma,Arial,sans-serif}@media(max-width:900px){.top,.layout{grid-template-columns:1fr}.map{height:55vh;min-height:340px}}@media(max-width:520px){main{padding:0 10px}.card{padding:15px}.map-card{padding:8px}.map-tools{gap:6px}.map-tools label{font-size:12px;padding:5px 7px}.map{height:52vh;min-height:320px}.metric strong{font-size:17px}}
 </style>
 </head>
 <body>
-<header><strong>🌿 UR Smart | أور الزراعية</strong><nav><a href="./dashboard.html">لوحة المزارع</a>　<a href="./field-map.html">خريطة الحقول</a></nav></header>
+<header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية</a><nav><a href="./field-analysis.html">تحليل الحقل</a>　<a href="./field-map.html">خريطة الحقول</a></nav></header>
 <main>
-<section class="card">
-<p class="muted">خدمات الحقل · المرحلة الأولى</p>
-<h1>⛰️ التحليل الطبوغرافي وتصريف المياه</h1>
-<p class="intro">اختر حقلًا محفوظًا في حسابك لمراجعة بياناته وحدوده قبل التحليل. هذه المرحلة تجهّز الواجهة وتربطها بحقولك؛ قراءة الارتفاع والانحدار ومسارات تصريف المياه ستظهر بعد توصيل مصدر DEM وتنفيذ التحليل.</p>
-<div id="status" class="status" role="status" aria-live="polite">جارٍ التحقق من الحساب وتحميل الحقول…</div>
-</section>
-<section class="card">
-<h2>اختر الحقل</h2>
-<label for="fieldSelect">الحقول المحفوظة في حسابك</label>
-<select id="fieldSelect" disabled><option value="">جارٍ تحميل الحقول…</option></select>
-<div id="fieldDetails" hidden>
-<div class="details">
-<div><span>المساحة المسجلة</span><strong id="area"></strong></div>
-<div><span>المحصول</span><strong id="crop"></strong></div>
-<div><span>الموقع المسجل</span><strong id="location"></strong></div>
-<div><span>حدود الحقل</span><strong id="boundary" class="boundary"></strong></div>
+<section class="top">
+<div class="card">
+<p class="muted">Terrain &amp; Drainage Analysis</p>
+<h1>⛰️ التحليل الطبوغرافي وتصريف مياه الحقل</h1>
+<p>اعرض الارتفاع والانحدار ومؤشرات الجريان للحقل، مع تقرير قابل للحفظ في حسابك.</p>
+<div id="status" class="status" role="status" aria-live="polite">جارٍ التحقق من الحساب…</div>
 </div>
-<div class="actions">
-<a id="mapLink" class="button" href="./field-map.html">فتح حدود الحقل على الخريطة</a>
-<button id="startButton" type="button" disabled>التحليل الطبوغرافي غير متاح بعد</button>
-</div>
+<div class="card">
+<h2>١. اختر الحقل</h2>
+<label for="fieldSelect">حقول حسابك</label>
+<select id="fieldSelect" disabled><option>جارٍ تحميل الحقول…</option></select>
+<p id="fieldInfo" class="help">اختر حقلًا محفوظًا وحدوده السحابية. لإنشاء حقل جديد، أضفه من لوحة المزارع ثم ارسم حدوده واحفظها في خريطة الحقول.</p>
+<div class="row"><a id="mapLink" class="button secondary" href="./field-map.html" style="display:inline-flex;justify-content:center;align-items:center;padding:10px;border-radius:10px;text-decoration:none;font-weight:700">فتح خريطة الحقول</a><button id="analyze" disabled>تحليل تضاريس الحقل</button></div>
+<p class="help">يستخدم التحليل Copernicus DEM الحقيقي عبر العامل الخلفي. الدقة المصدرية المتاحة ستظهر في النتيجة.</p>
 </div>
 </section>
+<section id="results" hidden>
+<div class="layout">
+<div class="card map-card">
+<div class="map-tools" aria-label="طبقات الخريطة">
+<label><input type="checkbox" id="satelliteLayer"> صور الأقمار الصناعية (Esri)</label>
+<label><input type="checkbox" id="elevationLayer" checked> الارتفاعات</label>
+<label><input type="checkbox" id="slopeLayer"> الانحدار</label>
+<label><input type="checkbox" id="flowLayer"> اتجاه الجريان</label>
+<label><input type="checkbox" id="poolLayer"> التجمع المحتمل</label>
+<label><input type="checkbox" id="drainLayer"> مسارات تصريف أولية</label>
+</div>
+<div id="map" class="map" role="region" aria-label="خريطة تحليل تضاريس الحقل"></div>
+<div class="legend" id="legend"><span>مفتاح الألوان:</span><span id="legendGradient" class="gradient"></span><span id="legendUnits">الارتفاع (م)</span></div>
+<div class="legend-range"><span id="legendLow">—</span><span id="legendHigh">—</span></div>
+<p id="mapNote" class="help">الطبقات مشتقة من نموذج ارتفاع رقمي، وليست قياسًا مساحيًا ميدانيًا.</p>
+</div>
+<aside>
 <section class="card">
-<h2>حالة الخدمة</h2>
-<p class="notice">لا تُعرض في هذه الصفحة قيم ارتفاع أو انحدار أو اتجاه تصريف تقديرية. لم يُربط مصدر DEM بعد، ولا يُنفّذ التحليل أو تُنشأ تقارير في هذه المرحلة.</p>
-<p class="muted">المرحلة التالية ستربط بيانات ارتفاع حقيقية. بعد التحقق من المصدر ودقته، تُضاف الحسابات والخرائط والتقارير في المراحل اللاحقة.</p>
+<h2>ملخص التقرير</h2><div id="stats" class="metrics"></div><p id="sourceInfo" class="help"></p><div id="warnings"></div>
+<h3>توصيات أولية</h3><ul id="recommendations"></ul>
+<button id="saveReport" disabled>حفظ التقرير في Supabase</button><p id="saveStatus" class="help" role="status"></p>
 </section>
+<section class="card">
+<h2>المقطع الطبوغرافي</h2>
+<p class="help">اضغط زر الرسم، ثم اختر نقطتي بداية ونهاية داخل الحقل. يعرض المقطع قيم خلايا DEM الفعلية على الخط.</p>
+<button id="profileButton" class="secondary" type="button">ارسم خط المقطع على الخريطة</button>
+<div id="profileStatus" class="help" role="status"></div><svg id="profileChart" class="profile-chart" viewBox="0 0 600 180" aria-label="مخطط ارتفاع المقطع"></svg>
+</section>
+<section class="card"><h2>التقارير السابقة</h2><div id="history" class="help">اختر حقلًا لعرض تقاريره المحفوظة.</div></section>
+</aside>
+</div>
+</section>
+<section class="card notice"><strong>تنبيه الدقة والاستخدام</strong><p>Copernicus DEM نموذج سطح رقمي عالمي بدقة اسمية 30 مترًا، وقد يتضمن مناطق ببيانات 90 مترًا. في الحقول الصغيرة أو شبه المستوية، قد لا تكفي الخلايا لاقتراح اتجاه مبزل موثوق. المناطق المنخفضة والجريان المحتمل تقديرات أولية؛ لا تعتمدها كتخطيط هندسي أو كبديل لمسح مناسيب ميداني. بيانات DEM العادية ليست LiDAR.</p><p class="help">المصدر: Copernicus DEM عبر Sentinel Hub. الارتفاعات بوحدة المتر وبمرجع EGM2008. الدونم العراقي = ٢٥٠٠ م². © Copernicus Data Space Ecosystem / Sentinel Hub.</p></section>
 </main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
 import {createClient} from './supabase-client.mjs';
 import {withDeadline} from './request-deadline.mjs';
-const $=id=>document.getElementById(id);
-const status=$('status'),select=$('fieldSelect'),details=$('fieldDetails');
-const supabase=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
-let fields=[],boundaries=new Set(),boundaryReadAvailable=true;
-function say(message){status.textContent=message}
-function renderField(){
- const item=fields.find(field=>field.id===select.value);
- if(!item){details.hidden=true;return}
- details.hidden=false;
- $('area').textContent=Number.isFinite(Number(item.area_donum))?Number(item.area_donum).toLocaleString('ar-IQ')+' دونم عراقي':'غير محددة';
- $('crop').textContent=item.crop||'غير محدد';
- $('location').textContent=item.location||'غير محدد';
- const hasBoundary=boundaries.has(item.id);
- $('boundary').textContent=hasBoundary?'محفوظة في حسابك':'غير محفوظة؛ ارسمها واحفظها من الخريطة';
- $('boundary').style.color=hasBoundary?'#176b45':'#8a5b0a';
- $('mapLink').href='./field-map.html?field='+encodeURIComponent(item.id);
+import {inverseUtm,pointInProjectedPolygon,projectToUtm,utmZoneForLongitude} from './topographic-core.mjs';
+const SUPABASE_URL='https://ynsmhtsktbubxfhsekjq.supabase.co',SUPABASE_KEY='sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc';
+const TERRAIN_API_URL='https://ur-smart-satellite.alialbatekh111.workers.dev';
+const supabase=createClient(SUPABASE_URL,SUPABASE_KEY),$=id=>document.getElementById(id);
+const status=$('status'),fieldSelect=$('fieldSelect'),mapLink=$('mapLink');
+let user=null,fields=[],boundaries=new Map(),analysis=null,map=null,fieldOutline=null,profileStart=null,profileLine=null,drawingProfile=false,overlays={};
+const streetTiles=()=>L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
+const imageryTiles=()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imagery © Esri and contributors'});
+const setStatus=(text,kind='ok')=>{status.textContent=text;status.className='status'+(kind==='error'?' danger':'')};
+const fmt=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toLocaleString('ar-IQ',{maximumFractionDigits:d}):'غير متاح';
+function selectedField(){return fields.find(f=>f.id===fieldSelect.value)||null}
+function fieldChanged(){
+ const field=selectedField();if(!field){$('fieldInfo').textContent='اختر حقلًا.';$('analyze').disabled=true;return}
+ const boundary=boundaries.get(field.id);mapLink.href='./field-map.html?field='+encodeURIComponent(field.id);
+ $('fieldInfo').textContent=boundary?'الحقل: '+field.name+' — '+(field.crop||'محصول غير محدد')+' — حدوده محفوظة.':'الحقل: '+field.name+' — لا توجد حدود محفوظة. ارسم الحدود واحفظها قبل التحليل.';
+ $('analyze').disabled=!boundary;
+ void loadHistory(field.id);
 }
 async function initialize(){
  try{
-  const {data:authData,error:authError}=await withDeadline(supabase.auth.getSession());
-  if(authError)throw authError;
-  const user=authData?.session?.user;
-  if(!user){select.innerHTML='<option value="">سجّل الدخول لعرض حقولك</option>';say('يلزم تسجيل الدخول أولًا لقراءة الحقول المحفوظة.');return}
+  const {data:sessionData,error:sessionError}=await withDeadline(supabase.auth.getSession());
+  if(sessionError)throw sessionError;user=sessionData?.session?.user||null;
+  if(!user||user.is_anonymous){fieldSelect.innerHTML='<option value="">سجّل الدخول لعرض حقولك</option>';setStatus('سجّل الدخول أولًا لاختيار حقل محفوظ.','error');return}
   const {data:farms,error:farmError}=await withDeadline(supabase.from('farms').select('id').eq('owner_id',user.id));
-  if(farmError)throw farmError;
-  const farmIds=(farms||[]).map(farm=>farm.id).filter(Boolean);
-  if(!farmIds.length){fields=[];select.innerHTML='<option value="">لا توجد حقول محفوظة</option>';say('لا توجد مزرعة أو حقول محفوظة لهذا الحساب حتى الآن.');return}
-  const {data:rows,error:fieldsError}=await withDeadline(supabase.from('fields').select('id,name,crop,area_donum,location,farm_id').in('farm_id',farmIds).order('created_at',{ascending:false}));
-  if(fieldsError)throw fieldsError;
-  fields=rows||[];
-  if(!fields.length){select.innerHTML='<option value="">لا توجد حقول محفوظة</option>';say('لم تُضف حقول إلى المزرعة بعد. أضف حقلًا من لوحة المزارع ثم أعد المحاولة.');return}
-  try{
-   const {data:rows}=await withDeadline(supabase.from('field_boundaries').select('field_id').in('field_id',fields.map(field=>field.id)));
-   boundaries=new Set((rows||[]).map(row=>row.field_id));
-  }catch{boundaries=new Set();boundaryReadAvailable=false}
-  select.replaceChildren(new Option('اختر الحقل',''),...fields.map(field=>new Option(field.name+' — '+(field.area_donum??'؟')+' دونم',field.id)));
-  select.disabled=false;
-  select.value=fields[0].id;
-  renderField();
-  say('تم تحميل '+fields.length.toLocaleString('ar-IQ')+' حقلًا من حسابك. اختر الحقل لمراجعة بياناته وحدوده.');
- }catch(error){
-  select.innerHTML='<option value="">تعذر تحميل الحقول</option>';
-  say('تعذر تحميل الحقول المحفوظة: '+(error?.message||'خطأ غير معروف')+' — أعد المحاولة أو افتح لوحة المزارع.');
- }
+  if(farmError)throw farmError;const farmIds=(farms||[]).map(f=>f.id).filter(Boolean);
+  if(!farmIds.length){fieldSelect.innerHTML='<option value="">لا توجد مزارع مسجلة</option>';setStatus('لا توجد مزرعة لهذا الحساب. أضف مزرعة وحقلًا من لوحة المزارع.','error');return}
+  const {data:rows,error:fieldError}=await withDeadline(supabase.from('fields').select('id,name,crop,area_donum,farm_id').in('farm_id',farmIds).order('created_at',{ascending:false}));
+  if(fieldError)throw fieldError;fields=rows||[];
+  if(!fields.length){fieldSelect.innerHTML='<option value="">لا توجد حقول محفوظة</option>';setStatus('أضف حقلًا من لوحة المزارع، ثم ارسم حدوده واحفظها من خريطة الحقول.');return}
+  fieldSelect.replaceChildren(new Option('اختر الحقل',''),...fields.map(f=>new Option(f.name+' — '+fmt(f.area_donum,1)+' دونم',f.id)));
+  const ids=fields.map(f=>f.id);
+  const {data:boundaryRows,error:boundaryError}=await withDeadline(supabase.from('field_boundaries').select('field_id,geometry,area_m2,updated_at').in('field_id',ids));
+  if(boundaryError)throw boundaryError;
+  boundaries=new Map((boundaryRows||[]).filter(b=>b&&b.field_id&&b.geometry).map(b=>[b.field_id,b]));
+  fieldSelect.disabled=false;
+  const requested=new URLSearchParams(location.search).get('field');
+  if(fields.some(f=>f.id===requested))fieldSelect.value=requested;
+  else if(fields.length===1)fieldSelect.value=fields[0].id;
+  fieldChanged();setStatus('تم تحميل حقول حسابك. اختر حقلًا محفوظ الحدود لبدء التحليل.');
+ }catch(error){fieldSelect.innerHTML='<option value="">تعذر تحميل الحقول</option>';setStatus('تعذر تحميل الحقول المحفوظة: '+(error?.message||'خطأ غير معروف'),'error')}
 }
-select.addEventListener('change',renderField);
-void initialize();
+function initMap(){
+ if(map)return;
+ map=L.map('map',{preferCanvas:true}).setView([32.75,45.3],13);streetTiles().addTo(map);
+ const esri=imageryTiles();$('satelliteLayer').onchange=e=>e.target.checked?esri.addTo(map):map.removeLayer(esri);
+ for(const [id,key] of [['elevationLayer','elevation'],['slopeLayer','slope'],['flowLayer','flow'],['poolLayer','pool'],['drainLayer','drain']]){
+  $(id).onchange=e=>{const layer=overlays[key];if(!layer)return;e.target.checked?layer.addTo(map):map.removeLayer(layer);updateLegend(key)}
+ }
+ map.on('click',onProfileClick);
+}
+function colorFor(value,min,max,palette){
+ const t=Math.max(0,Math.min(1,(value-min)/(max-min||1))),index=t*(palette.length-1),i=Math.floor(index),f=index-i,a=palette[i],b=palette[Math.min(i+1,palette.length-1)];
+ const rgb=[0,1,2].map(k=>Math.round(parseInt(a.slice(1+2*k,3+2*k),16)*(1-f)+parseInt(b.slice(1+2*k,3+2*k),16)*f));
+ return 'rgb('+rgb.join(',')+')';
+}
+function overlayImage(key,rows,limits,palette,kind){
+ const {width,height}=analysis.grid,valid=kind==='elevation'||kind==='slope'?rows.filter(Number.isFinite):[];
+ const min=limits?.[0]??Math.min(...valid),max=limits?.[1]??Math.max(...valid);
+ let body='';
+ if(kind==='flow'){
+  const dirs=[[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+  for(let i=0;i<rows.length;i++){const d=rows[i];if(d>7)continue;const x=i%width+.5,y=Math.floor(i/width)+.5,[dx,dy]=dirs[d];body+='<line x1="'+(x-dx*.24)+'" y1="'+(y-dy*.24)+'" x2="'+(x+dx*.24)+'" y2="'+(y+dy*.24)+'" stroke="#0476d9" stroke-width=".10" marker-end="url(#a)"/>'}
+  body='<defs><marker id="a" markerWidth=".22" markerHeight=".22" refX=".16" refY=".11" orient="auto"><path d="M0 0L.2 .11L0 .22z" fill="#0476d9"/></marker></defs>'+body;
+ }else{
+  for(let i=0;i<rows.length;i++){
+   const v=rows[i];if(kind==='pool'||kind==='drain'){if(!v)continue;const fill=kind==='pool'?'#d7191c':'#7a3e00';body+='<rect x="'+(i%width)+'" y="'+Math.floor(i/width)+'" width="1.05" height="1.05" fill="'+fill+'" fill-opacity=".62"/>';continue}
+   if(!Number.isFinite(v))continue;
+   body+='<rect x="'+(i%width)+'" y="'+Math.floor(i/width)+'" width="1.03" height="1.03" fill="'+colorFor(v,min,max,palette)+'" fill-opacity=".72"/>';
+  }
+ }
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+width+'" height="'+height+'" viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none">'+body+'</svg>';
+ const corners=analysis.grid.bounds_wgs84,lats=corners.map(p=>p[1]),lons=corners.map(p=>p[0]);
+ const bounds=[[Math.min(...lats),Math.min(...lons)],[Math.max(...lats),Math.max(...lons)]];
+ const url='data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
+ const opacity=kind==='flow'?.9:.78;
+ return L.imageOverlay(url,bounds,{opacity,interactive:false,crossOrigin:false});
+}
+const elevations=()=>analysis?.grid?.rows?.elevation_m||[],slopes=()=>analysis?.grid?.rows?.slope_degrees||[];
+function updateLegend(key){
+ const gradient=$('legendGradient'),units=$('legendUnits'),low=$('legendLow'),high=$('legendHigh');
+ if(key==='slope'){$('legend').firstElementChild.textContent='الانحدار:';gradient.style.background='linear-gradient(to left,#2c7bb6,#abd9e9,#ffffbf,#fdae61,#d7191c)';units.textContent='درجة';low.textContent='٠°';high.textContent='أكبر'}
+ else if(key==='pool'){$('legend').firstElementChild.textContent='المناطق المنخفضة:';gradient.style.background='#d7191c';units.textContent='تقدير أولي';low.textContent='';high.textContent='عمق ملء ≥ ٠٫٥ م'}
+ else if(key==='drain'){$('legend').firstElementChild.textContent='مسارات أولية:';gradient.style.background='#7a3e00';units.textContent='تراكم جريان';low.textContent='';high.textContent='اقتراح غير هندسي'}
+ else if(key==='flow'){$('legend').firstElementChild.textContent='اتجاه الجريان:';gradient.style.background='linear-gradient(to left,#0476d9,#63b3ed)';units.textContent='اتجاه الانحدار';low.textContent='';high.textContent='D8'}
+ else{$('legend').firstElementChild.textContent='الارتفاع:';gradient.style.background='linear-gradient(to left,#2b83ba,#abdda4,#ffffbf,#fdae61,#d7191c)';units.textContent='الارتفاع (م)';const a=elevations().filter(Number.isFinite);low.textContent=fmt(Math.min(...a),1)+' م';high.textContent=fmt(Math.max(...a),1)+' م'}
+}
+function showStats(data){
+ const s=data.stats;const items=[['المساحة',fmt(data.area_donum,2)+' دونم','الدونم العراقي = ٢٥٠٠ م²'],['أقل ارتفاع',fmt(s.minimum_elevation_m,2)+' م','مرجع EGM2008'],['أعلى ارتفاع',fmt(s.maximum_elevation_m,2)+' م','مرجع EGM2008'],['متوسط الانحدار',fmt(s.mean_slope_degrees,3)+'°',fmt(s.mean_slope_percent,3)+'%'],['منخفضات محتملة',fmt(s.low_area_donum,2)+' دونم',fmt(s.low_area_m2,0)+' م² تقريبًا'],['خلايا DEM',fmt(s.valid_cells,0),data.resolution_m+' م اسميًا']];
+ $('stats').replaceChildren(...items.map(([label,value,note])=>{const d=document.createElement('div');d.className='metric';const span=document.createElement('span');span.textContent=label;const strong=document.createElement('strong');strong.textContent=value;const small=document.createElement('small');small.textContent=note;d.append(span,strong,small);return d}));
+ $('sourceInfo').textContent='المصدر: '+data.source+' | شبكة التحليل: '+fmt(data.grid_resolution_x_m,1)+' × '+fmt(data.grid_resolution_y_m,1)+' م | النطاق الرأسي: '+data.vertical_datum+' | خلايا داخل الحقل: '+fmt(s.valid_cells,0);
+ const recommendations=[];
+ if(s.mean_slope_percent!==null&&s.mean_slope_percent<.2)recommendations.push('يظهر الحقل شبه مستوٍ في هذا النموذج؛ راجع المناسيب بميزان أو RTK قبل تخطيط الميل أو المبازل.');
+ else recommendations.push('راجع اتجاه الانحدار على الخريطة وقارنه بمناسيب ميدانية قبل أي أعمال تسوية أو تصريف.');
+ if(s.low_cells>0)recommendations.push('افحص المناطق المنخفضة بعد الري أو المطر، وتحقق من نفاذية التربة قبل تحديد معالجة مائية.');
+ else recommendations.push('لم يُقدّر النموذج منخفضات تتجاوز عتبة التحليل؛ هذا لا ينفي تجمع الماء الفعلي بعد المطر أو الري.');
+ recommendations.push(data.resolution_m>30?'الدقة المتاحة خشنة لحقل صغير؛ لا تعتمد مسارات التصريف المقترحة كتصميم تنفيذي.':'مسارات التصريف ظاهرة كاقتراح أولي فقط؛ يلزم مسح مناسيب وتقييم التربة والمخرج قبل التنفيذ.');
+ $('recommendations').replaceChildren(...recommendations.map(t=>{const li=document.createElement('li');li.textContent=t;return li}));
+ $('warnings').replaceChildren(...(data.warnings||[]).map(t=>{const p=document.createElement('p');p.className='notice';p.textContent=t;return p}));
+}
+function displayAnalysis(data){
+ analysis=data;initMap();
+ if(fieldOutline)map.removeLayer(fieldOutline);
+ fieldOutline=L.geoJSON(data.geometry,{style:{color:'#fff',weight:3,fill:false,dashArray:'7 5'}}).addTo(map);
+ const feature=fieldOutline.getBounds();if(feature.isValid())map.fitBounds(feature.pad(.3));
+ overlays={
+  elevation:overlayImage('elevation',data.grid.rows.elevation_m,null,['#2b83ba','#abdda4','#ffffbf','#fdae61','#d7191c'],'elevation'),
+  slope:overlayImage('slope',data.grid.rows.slope_degrees,[0,Math.max(3,...data.grid.rows.slope_degrees.filter(Number.isFinite))],['#2c7bb6','#abd9e9','#ffffbf','#fdae61','#d7191c'],'slope'),
+  flow:overlayImage('flow',data.grid.rows.flow_direction,null,null,'flow'),
+  pool:overlayImage('pool',data.grid.rows.pooling,null,null,'pool'),
+  drain:overlayImage('drain',data.grid.rows.drainage_path,null,null,'drain')
+ };
+ for(const key of Object.keys(overlays)){const id={elevation:'elevationLayer',slope:'slopeLayer',flow:'flowLayer',pool:'poolLayer',drain:'drainLayer'}[key];if($(id).checked)overlays[key].addTo(map)}
+ $('results').hidden=false;$('saveReport').disabled=false;$('saveStatus').textContent='لم يُحفظ هذا التقرير بعد.';showStats(data);updateLegend('elevation');$('legendLow').textContent=fmt(data.stats.minimum_elevation_m,1)+' م';$('legendHigh').textContent=fmt(data.stats.maximum_elevation_m,1)+' م';
+ $('mapNote').textContent='مصدر الارتفاع: '+data.source+'؛ دقة المصدر '+data.resolution_m+' م. خريطة الارتفاع مشتقة من بيانات فعلية، أما المنخفضات ومسارات الجريان فتقديرات طبوغرافية أولية.';
+}
+async function analyze(){
+ const field=selectedField();if(!field||!boundaries.has(field.id)){setStatus('اختر حقلًا له حدود محفوظة في حسابك.','error');return}
+ const button=$('analyze');button.disabled=true;button.textContent='جارٍ جلب DEM والتحليل…';setStatus('جارٍ التحقق من الملكية وجلب Copernicus DEM. قد تستغرق المعالجة بعض الوقت.');
+ $('results').hidden=true;$('saveReport').disabled=true;analysis=null;
+ try{
+  const {data:sessionData,error}=await withDeadline(supabase.auth.getSession());if(error||!sessionData?.session)throw Error('انتهت جلسة الدخول. سجّل الدخول مجددًا.');
+  const response=await fetch(TERRAIN_API_URL+'/terrain/analyze',{method:'POST',headers:{Authorization:'Bearer '+sessionData.session.access_token,'Content-Type':'application/json'},body:JSON.stringify({field_id:field.id}),cache:'no-store',signal:AbortSignal.timeout(110000)});
+  let data={};try{data=await response.json()}catch{}
+  if(!response.ok)throw Error(data.message||'فشل جلب بيانات الارتفاع والتحليل.');
+  if(!data.grid||!data.stats||!data.grid.rows||data.stats.valid_cells<4)throw Error('لم يكتمل التحليل؛ لن نعرض نتيجة غير مكتملة.');
+  displayAnalysis(data);setStatus('اكتمل التحليل الفعلي من '+data.source+'؛ راجع الدقة والتحذيرات قبل استخدام التوصيات.');
+ }catch(error){setStatus(error?.message||'تعذر تحليل الحقل.','error')}
+ finally{button.disabled=!boundaries.has(field.id);button.textContent='تحليل تضاريس الحقل'}
+}
+function buildReport(){
+ if(!analysis)return null;const s=analysis.stats;
+ const recommendations=[...$('recommendations').children].map(x=>x.textContent);
+ return {field_id:analysis.field_id,area_m2:analysis.area_m2,area_donum_iq:analysis.area_donum,source:analysis.source,dem_instance:analysis.dem_instance,resolution_m:analysis.resolution_m,grid_resolution_x_m:analysis.grid_resolution_x_m,grid_resolution_y_m:analysis.grid_resolution_y_m,vertical_datum:analysis.vertical_datum,minimum_elevation_m:s.minimum_elevation_m,maximum_elevation_m:s.maximum_elevation_m,mean_slope_degrees:s.mean_slope_degrees,mean_slope_percent:s.mean_slope_percent,estimated_low_area_m2:s.low_area_m2,estimated_low_area_donum:s.low_area_donum,estimated_low_cells:s.low_cells,valid_dem_cells:s.valid_cells,warnings:analysis.warnings,recommendations,method:analysis.analysis_method,generated_at:analysis.generated_at,profile:analysis.profile||null};
+}
+async function saveReport(){
+ if(!analysis||!user)return;const button=$('saveReport');button.disabled=true;$('saveStatus').textContent='جارٍ حفظ التقرير…';
+ const report=buildReport();
+ const {data,error}=await supabase.from('terrain_reports').insert({owner_id:user.id,field_id:analysis.field_id,source:analysis.source,dem_instance:analysis.dem_instance,resolution_m:analysis.resolution_m,report_data:report}).select('id,created_at').single();
+ if(error){$('saveStatus').textContent=error.code==='42P01'||/terrain_reports|not found|schema cache/i.test(error.message||'')?'جدول التقارير غير مهيأ بعد. طبّق ترحيل Supabase المرفق ثم أعد الحفظ.':'تعذر حفظ التقرير: '+error.message;button.disabled=false;return}
+ $('saveStatus').textContent='تم حفظ التقرير في حسابك. رقم التقرير: '+data.id;$('saveReport').disabled=false;void loadHistory(analysis.field_id);
+}
+async function loadHistory(fieldId){
+ const box=$('history');if(!user||!fieldId){box.textContent='اختر حقلًا لعرض تقاريره.';return}
+ box.textContent='جارٍ تحميل التقارير…';
+ const {data,error}=await supabase.from('terrain_reports').select('id,source,resolution_m,report_data,created_at').eq('field_id',fieldId).order('created_at',{ascending:false}).limit(10);
+ if(error){box.textContent=/terrain_reports|schema cache/i.test(error.message||'')?'يظهر سجل التقارير بعد تطبيق ترحيل Supabase المرفق.':'تعذر تحميل التقارير السابقة.';return}
+ if(!data?.length){box.textContent='لا توجد تقارير محفوظة لهذا الحقل بعد.';return}
+ box.replaceChildren(...data.map(row=>{const d=document.createElement('div');d.className='history-item';const when=new Date(row.created_at).toLocaleString('ar-IQ');d.textContent=when+' — '+row.source+' — '+row.resolution_m+' م — أقل ارتفاع: '+fmt(row.report_data?.minimum_elevation_m)+' م';return d}))
+}
+function onProfileClick(event){
+ if(!drawingProfile||!analysis)return;const field=selectedField(),boundary=boundaries.get(field.id),zone=utmZoneForLongitude(boundary.geometry.coordinates[0].slice(0,-1).reduce((s,p)=>s+p[0],0)/(boundary.geometry.coordinates[0].length-1)),projected=boundary.geometry.coordinates.map(r=>r.map(([lon,lat])=>projectToUtm(lon,lat,zone)));
+ const pt=projectToUtm(event.latlng.lng,event.latlng.lat,zone);
+ if(!pointInProjectedPolygon(pt,projected)){ $('profileStatus').textContent='اختر نقطتين داخل حدود الحقل.';return}
+ if(!profileStart){profileStart=event.latlng;if(profileLine)map.removeLayer(profileLine);profileLine=L.polyline([event.latlng],{color:'#8b20aa',weight:4}).addTo(map);$('profileStatus').textContent='اختر نقطة نهاية داخل الحقل.';return}
+ const end=event.latlng;profileLine.setLatLngs([profileStart,end]);const start=projectToUtm(profileStart.lng,profileStart.lat,zone),finish=projectToUtm(end.lng,end.lat,zone),distance=Math.hypot(finish[0]-start[0],finish[1]-start[1]),steps=Math.max(2,Math.ceil(distance/Math.min(analysis.grid_resolution_x_m,analysis.grid_resolution_y_m))),samples=[];
+ for(let i=0;i<=steps;i++){
+  const t=i/steps,x=start[0]+(finish[0]-start[0])*t,y=start[1]+(finish[1]-start[1])*t,[minX,minY,maxX,maxY]=analysis.grid.bounds_utm,col=Math.floor((x-minX)/analysis.grid_resolution_x_m),row=Math.floor((maxY-y)/analysis.grid_resolution_y_m);
+  if(col<0||row<0||col>=analysis.grid.width||row>=analysis.grid.height)continue;
+  const index=row*analysis.grid.width+col,elevation=analysis.grid.rows.elevation_m[index];if(Number.isFinite(elevation))samples.push({distance_m:distance*t,elevation_m:elevation});
+ }
+ profileStart=null;drawingProfile=false;$('profileButton').textContent='ارسم خط المقطع على الخريطة';$('profileButton').classList.add('secondary');
+ if(samples.length<2){$('profileStatus').textContent='لا توجد خلايا DEM كافية على هذا المقطع.';return}
+ analysis.profile={distance_m:distance,points:samples};$('profileStatus').textContent='مقطع من '+samples.length+' عينة ارتفاع فعلية؛ الدقة على طول الخط '+fmt(analysis.resolution_m,0)+' م.';
+ const svg=$('profileChart'),w=600,h=180,pad=25,values=samples.map(s=>s.elevation_m),lo=Math.min(...values),hi=Math.max(...values),span=hi-lo||1,path=samples.map((s,i)=>{const x=pad+(w-2*pad)*i/(samples.length-1),y=h-pad-(h-2*pad)*(s.elevation_m-lo)/span;return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}).join(' ');
+ svg.innerHTML='<line x1="'+pad+'" y1="'+(h-pad)+'" x2="'+(w-pad)+'" y2="'+(h-pad)+'" stroke="#83978a"/><path d="'+path+'" fill="none" stroke="#7a2b9b" stroke-width="3"/><text x="'+pad+'" y="18">أعلى '+fmt(hi,1)+' م</text><text x="'+pad+'" y="'+(h-4)+'">أدنى '+fmt(lo,1)+' م</text><text x="'+(w-pad-100)+'" y="'+(h-4)+'">المسافة '+fmt(distance,0)+' م</text>';
+}
+$('fieldSelect').addEventListener('change',()=>{analysis=null;$('results').hidden=true;fieldChanged()});
+$('analyze').addEventListener('click',analyze);$('saveReport').addEventListener('click',saveReport);
+$('profileButton').addEventListener('click',()=>{if(!analysis){$('profileStatus').textContent='نفّذ تحليل الحقل أولًا.';return}drawingProfile=!drawingProfile;profileStart=null;$('profileButton').textContent=drawingProfile?'اضغط نقطتين على الخريطة…':'ارسم خط المقطع على الخريطة';$('profileButton').classList.toggle('secondary',!drawingProfile);$('profileStatus').textContent=drawingProfile?'اختر نقطة بداية داخل الحقل.':'أُغلق وضع رسم المقطع.'});
+fieldSelect.addEventListener('change',fieldChanged);void initialize();
 </script>
 </body>
 </html>
