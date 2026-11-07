@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+      - name: Install pinned terrain raster decoder
+        run: npm install --prefix satellite-backend --ignore-scripts --no-audit --no-fund
 
       - name: Validate core functions and pages
         run: |
