@@ -51,7 +51,7 @@ import {withDeadline} from './request-deadline.mjs';
 const $=id=>document.getElementById(id);
 const status=$('status'),select=$('fieldSelect'),details=$('fieldDetails');
 const supabase=createClient('https://ynsmhtsktbubxfhsekjq.supabase.co','sb_publishable_gvGYG-BLNBQbA8JsXy9lag_9c6QwSWc');
-let fields=[],boundaries=new Set();
+let fields=[],boundaries=new Set(),boundaryReadAvailable=true;
 function say(message){status.textContent=message}
 function renderField(){
  const item=fields.find(field=>field.id===select.value);
@@ -82,7 +82,7 @@ async function initialize(){
   try{
    const {data:rows}=await withDeadline(supabase.from('field_boundaries').select('field_id').in('field_id',fields.map(field=>field.id)));
    boundaries=new Set((rows||[]).map(row=>row.field_id));
-  }catch{boundaries=new Set()}
+  }catch{boundaries=new Set();boundaryReadAvailable=false}
   select.replaceChildren(new Option('اختر الحقل',''),...fields.map(field=>new Option(field.name+' — '+(field.area_donum??'؟')+' دونم',field.id)));
   select.disabled=false;
   select.value=fields[0].id;
