@@ -1,5 +1,5 @@
 import {fromArrayBuffer} from 'geotiff';
-import {analyzeTerrainGrid,pointInProjectedPolygon,projectToUtm,utmZoneForLongitude} from '../topographic-core.mjs';
+import {analyzeTerrainGrid,inverseUtm,pointInProjectedPolygon,projectToUtm,utmZoneForLongitude} from '../topographic-core.mjs';
 import {satelliteFetch,SatelliteRequestError,validateSatellitePolygon} from './satellite-security.mjs';
 
 const DEM_URL='https://sh.dataspace.copernicus.eu/process/v1';
@@ -17,7 +17,7 @@ const boundedJSON=async(response,max=32*1024)=>{
 };
 const boundsOf=geometry=>geometry.coordinates.flat().reduce((b,p)=>({minX:Math.min(b.minX,p[0]),minY:Math.min(b.minY,p[1]),maxX:Math.max(b.maxX,p[0]),maxY:Math.max(b.maxY,p[1])}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
 const projectGeometry=(geometry,zone)=>({type:'Polygon',coordinates:geometry.coordinates.map(ring=>ring.map(([lon,lat])=>projectToUtm(lon,lat,zone)))});
-const toLonLatCorners=(box,zone,north)=>[[box.minX,box.minY],[box.maxX,box.minY],[box.maxX,box.maxY],[box.minX,box.maxY]].map(([x,y])=>projectToUtm===null?[0,0]:(()=>{const a=6378137,e2=.00669438,k0=.9996,ep2=e2/(1-e2),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2)),xx=x-500000,yy=north?y:y-10000000,m=yy/k0,mu=m/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)),j1=3*e1/2-27*e1**3/32,j2=21*e1*e1/16-55*e1**4/32,j3=151*e1**3/96,j4=1097*e1**4/512,fp=mu+j1*Math.sin(2*mu)+j2*Math.sin(4*mu)+j3*Math.sin(6*mu)+j4*Math.sin(8*mu),sin=Math.sin(fp),cos=Math.cos(fp),tan=Math.tan(fp),c1=ep2*cos*cos,t1=tan*tan,n1=a/Math.sqrt(1-e2*sin*sin),r1=a*(1-e2)/Math.pow(1-e2*sin*sin,1.5),d=xx/(n1*k0),q1=n1*tan/r1,q2=d*d/2,q3=(5+3*t1+10*c1-4*c1*c1-9*ep2)*d**4/24,q4=(61+90*t1+298*c1+45*t1*t1-252*ep2-3*c1*c1)*d**6/720,q5=d,q6=(1+2*t1+c1)*d**3/6,q7=(5-2*c1+28*t1-3*c1*c1+8*ep2+24*t1*t1)*d**5/120,lon0=((zone-1)*6-180+3)*Math.PI/180;return [(lon0+(q5-q6+q7)/cos)*180/Math.PI,(fp-q1*(q2-q3+q4))*180/Math.PI]})());
+const toLonLatCorners=(box,zone,north)=>[[box.minX,box.minY],[box.maxX,box.minY],[box.maxX,box.maxY],[box.minX,box.maxY]].map(([x,y])=>inverseUtm(x,y,zone,north));
 
 async function authenticate(request,env){
  const bearer=request.headers.get('Authorization')||'';
@@ -77,11 +77,13 @@ export async function handleTerrainAnalysis(request,env,{reply,origin}){
   const center=geometry.coordinates[0].slice(0,-1).reduce((sum,p)=>[sum[0]+p[0],sum[1]+p[1]],[0,0]).map(v=>v/(geometry.coordinates[0].length-1));
   const zone=utmZoneForLongitude(center[0]),epsg=(center[1]<0?32700:32600)+zone,projected=projectGeometry(geometry,zone),fieldBox=boundsOf(projected),nominal=30,pad=nominal*2;
   const bbox={minX:fieldBox.minX-pad,minY:fieldBox.minY-pad,maxX:fieldBox.maxX+pad,maxY:fieldBox.maxY+pad,epsg};
-  const width=Math.max(3,Math.ceil((bbox.maxX-bbox.minX)/nominal)),height=Math.max(3,Math.ceil((bbox.maxY-bbox.minY)/nominal));
+  let instance='COPERNICUS_30',resolution=30,width,height,buffer;
+  const dimensions=cell=>({width:Math.max(3,Math.ceil((bbox.maxX-bbox.minX)/cell)),height:Math.max(3,Math.ceil((bbox.maxY-bbox.minY)/cell))});
+  ({width,height}=dimensions(resolution));
   if(width*height>MAX_PIXELS||width>1024||height>1024)return bad('FIELD_GRID_TOO_LARGE',413,'شبكة الحقل أكبر من حد المعالجة؛ قلّص حدود الحقل أو اطلب معالجة مخصصة.');
-  const token=await accessToken(env);let instance='COPERNICUS_30',buffer;
+  const token=await accessToken(env);
   try{buffer=await fetchDem(token,bbox,width,height,instance)}
-  catch(error){instance='COPERNICUS_90';buffer=await fetchDem(token,bbox,width,height,instance)}
+  catch(error){instance='COPERNICUS_90';resolution=90;({width,height}=dimensions(resolution));if(width*height>MAX_PIXELS)return bad('FIELD_GRID_TOO_LARGE',413,'شبكة الحقل أكبر من حد المعالجة حتى بدقة 90 مترًا.');buffer=await fetchDem(token,bbox,width,height,instance)}
   const raster=await readRaster(buffer,width,height),resX=(bbox.maxX-bbox.minX)/width,resY=(bbox.maxY-bbox.minY)/height,inside=new Uint8Array(width*height),valid=new Uint8Array(width*height),pixelElevation=Float64Array.from(raster.elevation);
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){
    const i=y*width+x,point=[bbox.minX+(x+.5)*resX,bbox.maxY-(y+.5)*resY];
@@ -97,7 +99,7 @@ export async function handleTerrainAnalysis(request,env,{reply,origin}){
   const flat=(result.stats.mean_slope_percent??0)<0.2;
   if(flat)warnings.push('الانحدار المحسوب شبه مستوٍ؛ تحقق بمسح مناسيب ميداني قبل اختيار اتجاه الري أو المبازل.');
   const source=instance==='COPERNICUS_30'?'Copernicus DEM GLO-30 Public عبر Sentinel Hub':'Copernicus DEM GLO-90 عبر Sentinel Hub';
-  return json(reply,{field_id:body.field_id.toLowerCase(),geometry,source,dem_instance:instance,resolution_m:instance==='COPERNICUS_30'?30:90,grid_resolution_x_m:resX,grid_resolution_y_m:resY,vertical_datum:'EGM2008 orthometric heights',area_m2:area,area_donum:area/2500,grid:{width,height,bounds_utm:[bbox.minX,bbox.minY,bbox.maxX,bbox.maxY],epsg,rows:result.grid},stats:{...result.stats,field_grid_cells_estimate:fieldCells},thresholds:result.thresholds,warnings,generated_at:new Date().toISOString(),analysis_method:'Horn 3x3 slope; D8 flow direction; priority-flood depression depth estimate; flow-accumulation threshold for preliminary drainage paths',note:'المناطق المنخفضة ومسارات التصريف مؤشرات أولية مستنتجة من DEM وليست قياسًا ميدانيًا أو تصميمًا هندسيًا.'},200,origin);
+  return json(reply,{field_id:body.field_id.toLowerCase(),geometry,source,dem_instance:instance,resolution_m:resolution,grid_resolution_x_m:resX,grid_resolution_y_m:resY,vertical_datum:'EGM2008 orthometric heights',area_m2:area,area_donum:area/2500,grid:{width,height,bounds_utm:[bbox.minX,bbox.minY,bbox.maxX,bbox.maxY],bounds_wgs84:toLonLatCorners(bbox,zone,center[1]>=0),epsg,rows:result.grid},stats:{...result.stats,field_grid_cells_estimate:fieldCells},thresholds:result.thresholds,warnings,generated_at:new Date().toISOString(),analysis_method:'Horn 3x3 slope; D8 flow direction; priority-flood depression depth estimate; flow-accumulation threshold for preliminary drainage paths',note:'المناطق المنخفضة ومسارات التصريف مؤشرات أولية مستنتجة من DEM وليست قياسًا ميدانيًا أو تصميمًا هندسيًا.'},200,origin);
  }catch(error){
   if(error?.status===401)return bad('AUTH_REQUIRED',401,'انتهت جلسة الدخول أو تعذر التحقق من الحساب.');
   if(error?.status===404)return bad('FIELD_NOT_FOUND',404,'الحقل أو حدوده المحفوظة غير متاحة لهذا الحساب.');
