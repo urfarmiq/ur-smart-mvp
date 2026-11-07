@@ -11,7 +11,7 @@ export function projectToUtm(longitude,latitude,zone=utmZoneForLongitude(longitu
   const a=6378137,e2=0.00669438,ep2=e2/(1-e2),k0=0.9996;
   const phi=latitude*Math.PI/180,lambda=longitude*Math.PI/180,lambda0=((zone-1)*6-180+3)*Math.PI/180;
   const sin=Math.sin(phi),cos=Math.cos(phi),tan=Math.tan(phi),n=a/Math.sqrt(1-e2*sin*sin),t=tan*tan,c=ep2*cos*cos,aa=cos*(lambda-lambda0);
-  const m=a*((1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)*phi-(3*e2/8+3*e2*e2/32+45*e2*e2*e2/1024)*Math.sin(2*phi)+(15*e2*e2/256+45*e2*e2*e3/1024)*Math.sin(4*phi)-(35*e2*e2*e2/3072)*Math.sin(6*phi));
+  const m=a*((1-e2/4-3*e2*e2/64-5*e2*e2*e2/256)*phi-(3*e2/8+3*e2*e2/32+45*e2*e2*e2/1024)*Math.sin(2*phi)+(15*e2*e2/256+45*e2*e2*e2/1024)*Math.sin(4*phi)-(35*e2*e2*e2/3072)*Math.sin(6*phi));
   return [500000+k0*n*(aa+(1-t+c)*aa**3/6+(5-18*t+t*t+72*c-58*ep2)*aa**5/120),k0*(m+n*tan*(aa*aa/2+(5-t+9*c+4*c*c)*aa**4/24+(61-58*t+t*t+600*c-330*ep2)*aa**6/720))+(latitude<0?10000000:0)];
 }
 
@@ -83,7 +83,7 @@ export function analyzeTerrainGrid({width,height,elevation,valid,inside,cellSize
     slopeDeg[i]=Math.atan(rise)*180/Math.PI;slopePct[i]=rise*100;
     let best=0;
     for(let d=0;d<NEIGHBORS.length;d++){
-      const [ox,oy]=NEIGHBORS[d],nx=x+ox,ny=y+oy,ni=ny*width+nx,drop=filled[i]-filled[ni],distance=Math.hypot(ox*cellSizeX,oy*cellSizeY);
+      const [ox,oy]=NEIGHBORS[d],nx=x+ox,ny=y+oy,ni=ny*width+nx;if(!validMask[ni])continue;const drop=filled[i]-filled[ni],distance=Math.hypot(ox*cellSizeX,oy*cellSizeY);
       if(drop>0.000001&&drop/distance>best){best=drop/distance;flowDir[i]=d;}
     }
     const fillDepth=filled[i]-elevations[i];if(insideMask[i]&&fillDepth>=0.5)pooling[i]=true;
@@ -93,10 +93,10 @@ export function analyzeTerrainGrid({width,height,elevation,valid,inside,cellSize
   for(const i of order){const d=flowDir[i];if(d===255)continue;const x=i%width,y=Math.floor(i/width),[dx,dy]=NEIGHBORS[d],ni=(y+dy)*width+x+dx;if(ni>=0&&ni<count&&validMask[ni])accum[ni]+=accum[i];}
   const threshold=Math.max(3,Math.ceil(sourceValues.length*0.025));
   for(let i=0;i<count;i++)if(insideMask[i]&&accum[i]>=threshold)drainage[i]=true;
-  const slopes=[];for(let i=0;i<count;i++)if(insideMask[i]&&slopeDeg[i]!==null)slopes.push(slopeDeg[i]);
-  const minimum=Math.min(...sourceValues),maximum=Math.max(...sourceValues),meanSlope=slopes.length?slopes.reduce((a,b)=>a+b,0)/slopes.length:null,cellArea=cellSizeX*cellSizeY,poolCount=pooling.reduce((n,v)=>n+(v?1:0),0),insideCount=sourceValues.length;
+  const slopes=[],slopePercents=[];for(let i=0;i<count;i++)if(insideMask[i]&&slopeDeg[i]!==null){slopes.push(slopeDeg[i]);slopePercents.push(slopePct[i]);}
+  const minimum=Math.min(...sourceValues),maximum=Math.max(...sourceValues),meanSlope=slopes.length?slopes.reduce((a,b)=>a+b,0)/slopes.length:null,meanSlopePercent=slopePercents.length?slopePercents.reduce((a,b)=>a+b,0)/slopePercents.length:null,cellArea=cellSizeX*cellSizeY,poolCount=pooling.reduce((n,v)=>n+(v?1:0),0),insideCount=sourceValues.length;
   return {
-    stats:{minimum_elevation_m:minimum,maximum_elevation_m:maximum,mean_slope_degrees:meanSlope,mean_slope_percent:meanSlope===null?null:Math.tan(meanSlope*Math.PI/180)*100,low_area_m2:poolCount*cellArea,low_cells:poolCount,valid_cells:insideCount,low_area_donum:poolCount*cellArea/2500},
+    stats:{minimum_elevation_m:minimum,maximum_elevation_m:maximum,mean_slope_degrees:meanSlope,mean_slope_percent:meanSlopePercent,low_area_m2:poolCount*cellArea,low_cells:poolCount,valid_cells:insideCount,low_area_donum:poolCount*cellArea/2500},
     grid:{elevation_m:Array.from(elevations,(v,i)=>validMask[i]&&insideMask[i]?v:null),slope_degrees:slopeDeg.map((v,i)=>insideMask[i]?v:null),slope_percent:slopePct.map((v,i)=>insideMask[i]?v:null),flow_direction:flowDir.map((v,i)=>insideMask[i]?v:255),flow_accumulation:Array.from(accum,(v,i)=>insideMask[i]?Math.round(v):0),pooling:pooling.map((v,i)=>insideMask[i]?v:false),drainage_path:drainage.map((v,i)=>insideMask[i]?v:false)},
     thresholds:{depression_depth_m:0.5,drainage_accumulation_cells:threshold},
     cell_area_m2:cellArea
