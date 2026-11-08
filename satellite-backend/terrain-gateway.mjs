@@ -18,7 +18,10 @@ export async function handleTerrainGateway(req,env,{reply,origin,fetchImpl=fetch
    const consume=(async()=>{try{for(;;){const {done,value}=await reader.read();if(done)break;total+=value.byteLength;if(total>8192){void reader.cancel().catch(()=>{});throw Error('BODY_LIMIT');}chunks.push(value);}const bytes=new Uint8Array(total);let at=0;for(const part of chunks){bytes.set(part,at);at+=part.length;}return bytes;}finally{try{reader.releaseLock();}catch{}}})();
    let timer;try{body=await Promise.race([consume,new Promise((_,reject)=>{timer=setTimeout(()=>{void reader.cancel().catch(()=>{});reject(Error('BODY_TIMEOUT'));},10000);})]);}catch(error){return reply({error:error.message==='BODY_LIMIT'?'REQUEST_TOO_LARGE':'INVALID_REQUEST',message:'تعذر قراءة طلب التحليل ضمن الحد المسموح.'},error.message==='BODY_LIMIT'?413:408,origin);}finally{clearTimeout(timer);}
   }
-  const upstream=await fetchImpl(base+'/functions/v1/terrain-analysis'+(status?'/status':''),{method:status?'GET':'POST',headers,body,signal:AbortSignal.timeout(status?15000:110000),redirect:'error'});
+  // Workers supports manual/follow redirect modes. Refuse redirects explicitly
+  // instead of using the browser-only error mode, which throws before sending.
+  const upstream=await fetchImpl(base+'/functions/v1/terrain-analysis'+(status?'/status':''),{method:status?'GET':'POST',headers,body,signal:AbortSignal.timeout(status?15000:110000),redirect:'manual'});
+  if(upstream.status>=300&&upstream.status<400){void upstream.body?.cancel().catch(()=>{});return reply({error:'TERRAIN_UNAVAILABLE',message:'رفضت خدمة التضاريس تحويل اتصال غير متوقع.'},502,origin);}
   if(!/^application\/json(?:;|$)/i.test(upstream.headers.get('content-type')||'')){void upstream.body?.cancel().catch(()=>{});return reply({error:'TERRAIN_UNAVAILABLE',message:'تعذر الاتصال بخدمة التضاريس. أعد المحاولة لاحقًا.'},502,origin);}
   // Forward the already-authenticated Edge response as a stream, without
   // parsing large rasters within the Workers CPU budget or caching reports.

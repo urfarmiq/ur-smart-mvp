@@ -23,7 +23,7 @@ test('only the fixed Edge endpoint receives the authenticated body and report st
  let called;const response=await handleTerrainGateway(post('{"field_id":"fixture","url":"https://attacker.test"}'),env,{reply,origin,fetchImpl:async(url,options)=>{called={url,options};return Response.json({report_id:'actual-edge-result',analysis:{status:'completed'}});}});
  assert.equal(called.url,env.SUPABASE_URL+'/functions/v1/terrain-analysis');
  assert.equal(called.options.headers.Authorization,'Bearer user-fixture');assert.equal(called.options.headers.apikey,'public-fixture');
- assert.equal(called.options.redirect,'error');assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('access-control-allow-origin'),origin);
+ assert.equal(called.options.redirect,'manual');assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('access-control-allow-origin'),origin);
  assert.equal((await response.json()).report_id,'actual-edge-result');
 });
 test('public status, private upstream errors and unavailable services do not claim analysis success or expose bodies',async()=>{
@@ -32,6 +32,7 @@ test('public status, private upstream errors and unavailable services do not cla
  const bad=await handleTerrainGateway(post(),env,{reply,origin,fetchImpl:async()=>new Response('private provider credentials',{status:500})});
  assert.equal(bad.status,502);assert.ok(!(await bad.text()).includes('private provider'));
  const denied=await handleTerrainGateway(post(),env,{reply,origin,fetchImpl:async()=>Response.json({error:'FIELD_UNAVAILABLE'},{status:404})});assert.equal(denied.status,404);
+ const moved=await handleTerrainGateway(post(),env,{reply,origin,fetchImpl:async()=>new Response(null,{status:302,headers:{Location:'https://other.test'}})});assert.equal(moved.status,502);
  const timeout=await handleTerrainGateway(post(),env,{reply,origin,fetchImpl:async()=>{throw Object.assign(Error('private-secret'),{name:'TimeoutError'});}});assert.equal(timeout.status,504);assert.ok(!(await timeout.text()).includes('private-secret'));
 });
 test('the existing Worker applies origin denial and preflight rules to terrain before proxying',async()=>{
