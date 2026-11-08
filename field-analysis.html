@@ -114,6 +114,14 @@ body{background:white}main{width:100%;margin:0}
 </div>
 </section>
 
+<section class="panel no-print" id="terrainAnalysisPanel">
+<h2>التحليل الطبوغرافي وتصريف مياه الحقل</h2>
+<p>افتح الحقل المختار أو ارسم حدودًا جديدة لعرض الارتفاع والانحدار واتجاه الجريان والمناطق المنخفضة، مع مقطع طبوغرافي وتقرير محفوظ في حسابك.</p>
+<p class="muted">بيانات Copernicus DEM بدقة اسمية نحو ٣٠ مترًا، وليست LiDAR. اتجاهات التصريف ومسارات المبازل تقديرية وتتطلب مسحًا ميدانيًا، خصوصًا في الأراضي شبه المستوية.</p>
+<a class="secondary" id="openTerrainAnalysis" data-terrain-field-select="savedField" href="./terrain.html" style="display:inline-block;text-decoration:none;font-weight:bold">تحليل تضاريس الحقل ←</a>
+</section>
+<script type="module" src="./terrain-entry.mjs"></script>
+
 <section class="panel" id="fieldContextPanel">
 <h2>🌦️ طقس الحقل وسجل الري</h2>
 <p class="muted">تُقرأ بيانات الطقس من إحداثيات حدود الحقل، وتُحفظ سجلات الري ومشاهد الأقمار في حسابك.</p>

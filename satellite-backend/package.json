@@ -1,0 +1,15 @@
+{
+  "name": "ur-smart-terrain-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "geotiff": "3.0.5"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "build:terrain-geotiff": "node build-terrain-geotiff.mjs"
+  }
+}

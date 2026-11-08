@@ -1,0 +1,6 @@
+# The terrain function validates every POST session via Auth and checks field
+# ownership itself. Only its safe readiness endpoint is public.
+[functions.terrain-analysis]
+verify_jwt = false
+entrypoint = "./functions/terrain-analysis/index.ts"
+import_map = "./functions/terrain-analysis/deno.json"

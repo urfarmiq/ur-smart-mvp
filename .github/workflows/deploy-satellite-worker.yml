@@ -38,11 +38,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Set up Node for pinned DEM decoder tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: satellite-backend/package-lock.json
+      - name: Install pinned DEM decoder dependencies
+        run: npm ci --prefix satellite-backend --ignore-scripts
       - name: Validate core functions and pages
         run: |
           node --test tests/*.test.mjs
           python3 tests/check_pages.py
-          python3 -m py_compile tests/browser_satellite.py tests/browser_management.py
+          python3 -m py_compile tests/browser_satellite.py tests/browser_management.py tests/browser_terrain.py
 
       - name: Check Cloudflare deployment access
         env:

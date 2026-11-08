@@ -5,6 +5,7 @@ import {handleResearch,researchStatus} from './research-service.mjs';
 import {handlePlantHealth,plantHealthStatus} from './plant-health.mjs';
 import {handleFieldService,fieldServiceStatus} from './field-service.mjs';
 import {checkSatelliteAccess,handleResearchImagery,satellitePaidStatus} from './satellite-access.mjs';
+import {handleTerrainGateway} from './terrain-gateway.mjs';
 // UR Smart Sentinel-2 analytics gateway (Cloudflare Worker).
 // Required secrets: SENTINEL_CLIENT_ID, SENTINEL_CLIENT_SECRET.
 // Required variable: SUPABASE_URL. Optional: SUPABASE_PUBLISHABLE_KEY, ALLOWED_ORIGIN.
@@ -47,6 +48,7 @@ const platformWorker={async fetch(req,env){
  if(origin&&!allowedOrigins.has(origin))return reply({error:'Origin not allowed'},403,defaultOrigin);
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{'access-control-allow-origin':allowed,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'Authorization, Content-Type','access-control-max-age':'86400','vary':'Origin','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
  const path=new URL(req.url).pathname;
+ if(path==='/terrain'||path==='/terrain/status')return handleTerrainGateway(req,env,{reply,origin:allowed});
  if(path==='/weather')return handleWeather(req,env,allowed);
  if(path==='/plant-health/status'&&req.method==='GET')return reply(plantHealthStatus(env),200,allowed);
  if(path==='/plant-health')return handlePlantHealth(req,env,{reply,origin:allowed});

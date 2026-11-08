@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="./pwa.css">
 <script type="module" src="./pwa-client.mjs"></script>
 </head><body>
-<header><div class="brand">🌿 UR Smart <small> | أور الزراعية</small></div><nav><a href="./dashboard.html">لوحة المزارع</a> · <a href="./field-analysis.html">تحليل الحقول</a></nav></header>
+<header><div class="brand">🌿 UR Smart <small> | أور الزراعية</small></div><nav><a href="./dashboard.html">لوحة المزارع</a> · <a href="./field-analysis.html">تحليل الحقول</a> · <a href="./terrain.html" data-terrain-field-select="cloudField">تضاريس الحقل وتصريف المياه</a></nav></header>
 <main><section class="intro"><h1>🗺️ خرائط الحقول الزراعية</h1><p>حدد موقع حقلك، ارسم حدوده بسهولة، واحسب مساحته بالدونم العراقي.</p></section><section class="panel" id="satellitePaymentNotice"><strong>المؤشرات الفضائية — مدفوعة</strong><p>رسم الحدود وحساب المساحة متاحان مجانًا. لتحليل المشاهد وطبقات المؤشرات، اتفق على مدة التفعيل والسعر ثم أكّد الدفع مع الإدارة.</p><a id="satelliteAccessLink" href="./satellite-access.html">طلب أو تجديد تفعيل الحقل ←</a></section>
 <div class="layout"><section class="mapcard"><div class="mapwrap"><div id="map" aria-label="خريطة تفاعلية لرسم حدود الحقل"></div>
 <div class="maptools"><button id="draw" class="active" type="button">✏️ رسم الحدود</button><button id="undo" type="button">↶ تراجع</button><button id="clear" type="button">🗑 مسح</button><button id="locate" type="button">📍 موقعي</button><button id="fit" type="button">⛶ إظهار الحقل</button><button id="indicatorJump" type="button">🌿 مؤشرات الحقل</button></div>
@@ -185,4 +185,5 @@ render();
 })();
 </script><footer aria-label="خصوصية الإحصاءات" style="max-width:1100px;margin:20px auto;padding:0 16px;text-align:center;color:#61766a"><small>نحصي مشاهدات الصفحات إجمالياً دون حفظ بيانات تعريف الزائر. هذه المشاهدات ليست عدد الأشخاص.</small></footer>
 <script type="module" src="./visit-tracker.mjs"></script>
+<script type="module" src="./terrain-entry.mjs"></script>
 </body></html>
