@@ -92,18 +92,26 @@ export async function buildPublicSite({ sourceDir = PROJECT_ROOT, outDir = path.
   if (iconFiles.length) await mkdir(path.join(outDir, 'icons'), { recursive: true });
   for (const file of iconFiles) await copyFile(path.join(sourceDir, 'icons', file), path.join(outDir, 'icons', file));
   for (const file of vendorFiles) await copyFile(path.join(vendorDir, file), path.join(outDir, 'vendor', file));
-  const productGallerySource = path.join(sourceDir, 'assets', 'product-gallery');
-  const productGalleryEntries = await readdir(productGallerySource, { withFileTypes: true });
-  if (PRODUCT_GALLERY_FILES.some(file => !productGalleryEntries.some(entry => entry.isFile() && entry.name === file))) {
-    throw new Error('The public product gallery is missing an approved image.');
+  let productGalleryFiles = [];
+  try {
+    const productGallerySource = path.join(sourceDir, 'assets', 'product-gallery');
+    const productGalleryEntries = await readdir(productGallerySource, { withFileTypes: true });
+    productGalleryFiles = PRODUCT_GALLERY_FILES.filter(file => productGalleryEntries.some(entry => entry.isFile() && entry.name === file));
+    if (productGalleryFiles.length && productGalleryFiles.length !== PRODUCT_GALLERY_FILES.length) {
+      throw new Error('The public product gallery is missing an approved image.');
+    }
+    if (productGalleryFiles.length) {
+      const productGalleryOutput = path.join(outDir, 'assets', 'product-gallery');
+      await mkdir(productGalleryOutput, { recursive: true });
+      for (const file of productGalleryFiles) await copyFile(path.join(productGallerySource, file), path.join(productGalleryOutput, file));
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
   }
-  const productGalleryOutput = path.join(outDir, 'assets', 'product-gallery');
-  await mkdir(productGalleryOutput, { recursive: true });
-  for (const file of PRODUCT_GALLERY_FILES) await copyFile(path.join(productGallerySource, file), path.join(productGalleryOutput, file));
   await writeFile(path.join(outDir, '_headers'), HEADERS);
   await writeFile(path.join(outDir, 'release.txt'), `${release}\n`);
   await writeFile(path.join(outDir,'ads.txt'),seller ? `google.com, ${seller}, DIRECT, f08c47fec0942fa0\n` : '# No Google advertising seller configured.\n# Direct sponsorship enquiries: https://ur-smart-urfarmiq.pages.dev/advertise.html\n');
-  return { directory: path.basename(outDir), files: publicFiles.length + vendorFiles.length + iconFiles.length + PRODUCT_GALLERY_FILES.length + 3, release };
+  return { directory: path.basename(outDir), files: publicFiles.length + vendorFiles.length + iconFiles.length + productGalleryFiles.length + 3, release };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
