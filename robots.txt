@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ur-smart-urfarmiq.pages.dev/sitemap.xml
