@@ -76,7 +76,7 @@ test('map auth callback synchronously clears the former account drawing and priv
  assert.equal(vm.runInContext('cloudFields.length',p.context),0);assert.equal(vm.runInContext('cloudAuthGeneration',p.context),1);
  for(const id of ['fieldName','notes'])assert.equal(p.node(id).value,'');
  assert.equal(p.counts().renders,1);assert.equal(p.counts().cropClears,1);
- assert.equal(p.counts().viewResets,1);assert.equal(p.node('satelliteAccessLink').href,'./satellite-access.html');
+ assert.equal(p.counts().viewResets,1);assert.equal(p.node('satelliteAccessLink').href,'./satellite-access-legacy.html');
  p.callback('TOKEN_REFRESHED',{user:{id:'account-b'}});assert.equal(p.counts().renders,1);
  p.callback('SIGNED_OUT',null);assert.equal(p.counts().renders,2);
 });
@@ -85,5 +85,5 @@ test('satellite auth callback clears protected results and invalidates in-flight
  const p=privateViewHarness('satellite');p.callback('SIGNED_OUT',null);
  assert.equal(vm.runInContext('user',p.context),null);assert.equal(vm.runInContext('analysisRequestGeneration',p.context),1);
  assert.equal(vm.runInContext('authRefreshGeneration',p.context),1);assert.equal(p.counts().mapDisposals,1);
- assert.equal(p.node('satelliteAccessLink').href,'./satellite-access.html');assert.match(p.node('autoResult').textContent,/انتهت الجلسة/);assert.equal(p.node('autoAnalyze').disabled,true);assert.equal(p.node('connectionResult').textContent,'');
+ assert.equal(p.node('satelliteAccessLink').href,'./satellite-access-legacy.html');assert.match(p.node('autoResult').textContent,/انتهت الجلسة/);assert.equal(p.node('autoAnalyze').disabled,true);assert.equal(p.node('connectionResult').textContent,'');
 });
