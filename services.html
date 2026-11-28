@@ -4,60 +4,116 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
-  <meta name="description" content="خدمات أور الزراعية: خرائط ومراقبة الحقول، إرشاد أولي، طقس، تكاليف الموسم، فحص أعراض النباتات بالصور، تقارير ودعم البحوث الزراعية.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://images.unsplash.com; connect-src https://ynsmhtsktbubxfhsekjq.supabase.co; base-uri 'none'; form-action 'self'; object-src 'none'; frame-src 'none'; upgrade-insecure-requests; worker-src 'self'; manifest-src 'self'">
+  <meta name="description" content="اكتشف خدمات أور الزراعية بالصور: التحليل الفضائي، إدارة الحقول، الري، الطقس، الإرشاد الزراعي ودعم البحوث.">
   <meta name="theme-color" content="#123d2d">
-  <title>خدمات أور الزراعية</title>
+  <title>خدمات أور الزراعية | اكتشف الخدمة المناسبة</title>
   <link rel="stylesheet" href="./services.css">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="أور الزراعية">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="./pwa.css">
-<script type="module" src="./pwa-client.mjs"></script>
-<link rel="stylesheet" href="./ads.css">
-<script type="module" src="./sponsor-ads.mjs"></script>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" sizes="180x180">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="أور الزراعية">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="./pwa.css">
+  <script type="module" src="./pwa-client.mjs"></script>
+  <link rel="stylesheet" href="./ads.css">
+  <script type="module" src="./sponsor-ads.mjs"></script>
 </head>
 <body>
   <a class="skip" href="#main">انتقل إلى المحتوى</a>
   <header><div class="wrap header-inner">
     <a class="brand" href="./index.html"><span aria-hidden="true">🌱</span><span>أور الزراعية<small lang="en" dir="ltr">UR SMART AGRICULTURE</small></span></a>
-    <nav aria-label="التنقل الرئيسي"><a href="./install.html" data-pwa-install>تثبيت التطبيق</a><a href="./index.html">الرئيسية</a><a href="./products.html">المنتجات</a><a href="./dashboard.html">حقولي</a><a href="./auth.html">دخول / تسجيل</a></nav>
+    <nav aria-label="التنقل الرئيسي"><a href="./index.html">الرئيسية</a><a href="./products.html">المنتجات</a><a href="./dashboard.html">حقولي</a><a href="./auth.html">دخول / تسجيل</a></nav>
   </div></header>
   <main id="main">
-    <section class="hero"><div class="wrap">
-      <p class="eyebrow">للمزارع والباحث والمستثمر الزراعي</p>
-      <h1>خدمات واضحة<br><span>لكل خطوة في أرضك</span></h1>
-      <p>ارسم حدود الحقل، تابع بياناته، واحسب مصروفات الموسم. اختر ما تحتاجه واعرف ما تحصل عليه قبل أن تبدأ.</p>
-      <a class="button gold" href="./dashboard.html">افتح ملف حقلك ←</a>
-    </div></section>
-    <section class="wrap section" aria-labelledby="servicesTitle">
-      <h2 id="servicesTitle">اختر خدمتك</h2>
-      <p class="intro">خدمات الحقول مرتبطة بحسابك. الأدوات الأساسية والتحليل الفضائي متاحة مجانًا خلال مرحلة الإطلاق. تبقى خدمات دعم الباحثين والتقرير الشامل والمتابعة الدورية خدمات مدفوعة.</p>
-      <div class="cards">
-        <article class="card featured"><span class="icon" aria-hidden="true">🗓️</span><p class="tag">تقويم مجاني للزوار</p><h3>شنو تزرع هذا الشهر؟</h3><p>نوافذ مرجعية للمحاصيل حسب الشهر والمحافظة، مع تمييز البذر والشتل والزراعة المكشوفة والمحمية وذكر المصادر.</p><p class="hint">المواعيد إرشادية؛ راجع ظروف الحقل والمياه والطقس قبل الزراعة.</p><a class="button" href="./planting-calendar.html">اختر الشهر والمحصول</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">💧</span><p class="tag">منتجات زراعية حسب الطلب</p><h3>مستلزمات الري بالتنقيط</h3><p>حدد احتياجات شبكة الري واطلب عرضًا للمكونات والكميات المطلوبة. تُراجع المواصفات والتوفر والتكلفة قبل الاتفاق.</p><a class="button" href="./products.html?item=drip_supplies#request">اطلب عرض منتجات التنقيط</a></article>
-        <article class="card featured"><span class="icon" aria-hidden="true">🔧</span><p class="tag">تنفيذ داخل واسط فقط</p><h3>تنفيذ شبكات الري بالتنقيط</h3><p>قدّم موقع الحقل ومساحته داخل محافظة واسط لتحديد نطاق التنفيذ والمكونات والتكلفة والموعد بالاتفاق.</p><a class="button" href="./products.html?item=drip_installation#request">اطلب التنفيذ في واسط</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">🌦️</span><p class="tag">منتج بطلب عرض سعر</p><h3>محطة الطقس الزراعية</h3><p>اطلب معلومات المنتج وعرض سعر للمحطة. يُحدد الموديل والمواصفات والتوفر في العرض قبل الشراء.</p><a class="button" href="./products.html?item=weather_station#request">استفسر عن محطة الطقس</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">🪲</span><p class="tag">منتج بطلب عرض سعر</p><h3>محطة مكافحة الحشرات</h3><p>اطلب تفاصيل المحطة المناسبة لاحتياجك، ويُراجع الموديل وطريقة العمل والمواصفات والسعر قبل الاتفاق.</p><a class="button" href="./products.html?item=pest_station#request">استفسر عن محطة مكافحة الحشرات</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">⛰️</span><p class="tag">تضاريس وتصريف تقديري</p><h3>التحليل الطبوغرافي وتصريف مياه الحقل</h3><p>ارتفاعات حقيقية من Copernicus DEM، خرائط الانحدار والجريان والمنخفضات، مقطع طبوغرافي وتقرير محفوظ للحقل.</p><p class="hint">نموذج سطح بدقة اسمية نحو ٣٠ مترًا؛ مسارات المبازل أولية وتحتاج مسحًا ميدانيًا وتصميمًا هندسيًا.</p><a class="button" href="./terrain.html">تحليل تضاريس الحقل</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">🗺️</span><p class="tag">الحدود والمساحة</p><h3>خريطة حقلك</h3><p>ارسم الحدود وشاهد المساحة بالدونم العراقي. الدونم العراقي يساوي ٢٥٠٠ متر مربع.</p><a class="button" href="./field-map.html">ارسم حدود الحقل</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">🛰️</span><p class="tag">مجانية خلال الإطلاق</p><h3>التحليل الفضائي والمؤشرات</h3><p>شاهد خرائط NDVI وNDMI وRed Edge ومؤشرات المحصول، واقرأ البكسلات باللمس مع تاريخ المشهد وجودة التغطية.</p><p class="price">مجانية الآن</p><p class="hint">متاحة لأصحاب الحسابات والحقول المحفوظة. توفر المشاهد يعتمد على المصدر والسحب وحصص البيانات.</p><a class="button" href="./satellite-analysis.html">ابدأ التحليل الفضائي</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">🌿</span><p class="tag">إرشاد أولي</p><h3>المساعد الزراعي</h3><p>اجمع معلومات المحصول ومرحلة نموه والأعراض والبيانات المتاحة للحصول على خطوات فحص وتوصيات أولية.</p><p class="hint">تحديد الجرعات يحتاج بيانات مناسبة ومراجعة مختص.</p><a class="button" href="./field-analysis.html#smartAdvisor">افتح المساعد الزراعي</a></article>
-        <article class="card featured"><span class="icon" aria-hidden="true">🔎</span><p class="tag">فحص أولي بالصور</p><h3>كشف أمراض النبات المحتملة</h3><p>ارفع صور النبات وصف الأعراض لتراجع الأسباب المحتملة، بما فيها الأمراض والآفات والإجهاد، مع خطوات فحص ومتابعة.</p><p class="hint">تقييم بصري أولي من أور؛ لا يؤكد المرض ولا يحدد جرعات مبيدات. يتطلب الدخول والموافقة على إرسال الصور.</p><a class="button" href="./plant-health.html">افحص صور النبات</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">🌦️</span><p class="tag">الطقس والموقع</p><h3>طقس حقلك</h3><p>تابع حالة الطقس المقدّرة وتوقعات الساعات والأيام القادمة لمساعدتك في ترتيب الأعمال الزراعية.</p><a class="button" href="./weather.html">شاهد الطقس</a></article>
-        <article class="card featured"><span class="icon" aria-hidden="true">🧮</span><p class="tag">حساب من الأرقام التي تدخلها</p><h3>ميزانية الموسم</h3><p>احسب تكلفة الدونم والموسم، والإيراد والهامش المتوقع ونقطة التعادل باستخدام كمياتك وأسعارك.</p><p class="hint">أداة حساب أولية؛ ليست دراسة جدوى معتمدة أو ضمان ربح.</p><a class="button" href="./farm-budget.html">احسب ميزانية الموسم</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">📒</span><p class="tag">توثيق العمل</p><h3>العمليات والمتابعة</h3><p>سجّل الأعمال الزراعية وملاحظات الحقل وصدّر نسخة من السجل. راجع القراءات المتاحة مع تمييز القراءات الافتراضية.</p><p class="hint">السجل العام محفوظ على هذا الجهاز؛ احتفظ بنسخة مصدّرة.</p><a class="button" href="./operations.html">افتح سجل العمليات</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">📋</span><p class="tag">خدمة مدفوعة</p><h3>تقرير شامل للحقل</h3><p>اجمع بيانات الحقل والمشهد الفضائي والطقس وسجل الري المتاح، مع إرشاد وحدود البيانات وتقرير قابل للتنزيل والطباعة.</p><p class="price">مدفوعة</p><p class="hint">عرض سعر ونطاق توافق عليهما، ثم تأكيد الدفع يدويًا قبل التنفيذ. <a href="./field-analysis.html">الملخص الأولي مجاني</a>.</p><a class="button" href="./field-services.html?service=field_report">اطلب التقرير الشامل</a></article>
-        <article class="card"><span class="icon" aria-hidden="true">📅</span><p class="tag">خدمة مدفوعة</p><h3>متابعة الحقل الدورية</h3><p>سلسلة تقارير بعدد وفاصل متفق عليهما، مع مقارنة بالمشهد السابق عند توفر بيانات قابلة للمقارنة.</p><p class="price">مدفوعة</p><p class="hint">تنشئ التقرير عند استحقاقه من حسابك؛ لا يوجد تنفيذ تلقائي أو ضمان مشهد جديد لكل موعد.</p><a class="button" href="./field-services.html?service=field_monitoring">اطلب المتابعة الدورية</a></article>
-        <article class="card research"><span class="icon" aria-hidden="true">🎓</span><p class="tag">خدمة مدفوعة للطلب المتفق عليه</p><h3>خدمات الباحثين</h3><p>تحليل CSV وخرائط الحقل مع مسودة تفسير ومراجع وصفية، وفق نطاق الطلب والبيانات المتاحة.</p><p class="price">مدفوعة</p><p class="hint">مراجعة النطاق وتأكيد الدفع يدويًا قبل التنفيذ. النتائج تحتاج مراجعة علمية.</p><a class="button" href="./research.html">اطّلع على خدمة الباحثين</a></article>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">حلول زراعية رقمية وميدانية</p>
+          <h1>كل خدمة زراعية،<br><span>بصورة أوضح وقرار أذكى</span></h1>
+          <p>تعرّف على خدمات أور بسرعة. شاهد ما تقدمه كل خدمة، وكيف تستفيد منها في أرضك، ثم انتقل مباشرة إلى الأداة أو نموذج الطلب.</p>
+          <div class="hero-actions"><a class="button gold" href="./dashboard.html">ابدأ بملف حقلك ←</a><a class="button ghost" href="#service-list">استكشف الخدمات</a></div>
+          <div class="hero-points"><span>🛰️ بيانات وخرائط</span><span>🌱 إرشاد زراعي</span><span>💧 حلول ري</span></div>
+        </div>
+        <div class="hero-photo">
+          <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=85" alt="حقول زراعية خضراء ممتدة">
+          <div class="photo-caption"><strong>من الحقل تبدأ الحكاية</strong><span>أدوات عملية للمزارع والمهندس والباحث</span></div>
+        </div>
       </div>
     </section>
-    <section class="wrap section ur-advertising-section" aria-labelledby="serviceSponsorsTitle"><div class="ur-advertising-heading"><div><p class="eyebrow">رعاية وإعلانات مدفوعة</p><h2 id="serviceSponsorsTitle">إعلانات الشركات الزراعية</h2><p>اعرض شركتك أو منتجك بإعلان واضح، بمدة ونطاق وسعر متفق عليها.</p></div><a class="button" href="./advertise.html">اطلب إعلانًا مع أور</a></div><div data-sponsor-placement="services" hidden></div></section>
-    <section class="wrap section approach" aria-labelledby="approachTitle"><h2 id="approachTitle">قرار أوضح من بيانات معروفة</h2><div class="principles"><p><strong>اعرف مصدر البيانات</strong>تاريخ المشهد والدقة والقياسات المفقودة جزء من قراءة النتيجة.</p><p><strong>سجّل ما نفذته</strong>اربط الملاحظة بالتاريخ، واحتفظ بنسخة من تقاريرك وسجلاتك.</p><p><strong>راجع القرار</strong>المؤشرات والإرشادات تساعدك على تحديد ما يحتاج فحصًا؛ لا تغني عن التحاليل والزيارة عند الحاجة.</p></div></section>
+
+    <section class="wrap section" id="service-list" aria-labelledby="servicesTitle">
+      <div class="section-heading">
+        <div><p class="eyebrow dark-eyebrow">خدمات أور</p><h2 id="servicesTitle">اختر الخدمة التي تحتاجها</h2><p class="intro">صور توضيحية، شرح مباشر، ورابط واضح للبدء. اضغط على الخدمة لمعرفة التفاصيل أو استخدامها.</p></div>
+        <div class="service-count"><strong>14</strong><span>خدمة وأداة زراعية</span></div>
+      </div>
+      <div class="cards">
+        <article class="card featured">
+          <a class="card-image" href="./satellite-analysis.html"><img loading="lazy" src="https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=900&q=82" alt="منظر علوي للأرض والغطاء النباتي"><span class="image-label">مجاني خلال الإطلاق</span></a>
+          <div class="card-body"><p class="tag">🛰️ الاستشعار عن بُعد</p><h3>التحليل الفضائي للحقول</h3><p>حلّل حالة الغطاء النباتي ورطوبة الغطاء ومؤشرات الحافة الحمراء والكلوروفيل باستخدام بيانات Sentinel‑2. تظهر النتائج كخرائط داخل حدود الحقل مع تاريخ المشهد وقراءات المؤشرات المتاحة.</p><p class="hint">يتطلب تسجيل الدخول وحفظ حدود الحقل. تتأثر النتائج بالغيوم وتوفر المشاهد وحصص مصدر البيانات.</p><a class="button" href="./satellite-analysis.html">ابدأ تحليل حقلك ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./field-map.html"><img loading="lazy" src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=82" alt="مساحات زراعية وحدود حقول"></a>
+          <div class="card-body"><p class="tag">🗺️ الخرائط والمساحة</p><h3>رسم حدود الحقل وقياس المساحة</h3><p>حدد زوايا أرضك على الخريطة واحفظ حدودها في حسابك. تعرض الأداة المساحة بالمتر المربع والدونم العراقي، وتساعدك على توثيق موقع الحقل ومقارنته لاحقًا.</p><a class="button" href="./field-map.html">ارسم حدود أرضك ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./terrain.html"><img loading="lazy" src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=900&q=82" alt="تضاريس وارتفاعات سطح الأرض"></a>
+          <div class="card-body"><p class="tag">⛰️ تحليل سطح الأرض</p><h3>التحليل الطبوغرافي وتصريف المياه</h3><p>استكشف الارتفاعات والانحدارات ومناطق تجمع المياه المحتملة واتجاهات الجريان، مع مقطع طبوغرافي وتقرير للحقل. تفيد النتائج في الفهم الأولي لطبيعة الأرض وتخطيط المعاينة.</p><p class="hint">النتائج تقديرية وليست بديلًا عن الرفع المساحي والتصميم الهندسي للمبازل.</p><a class="button" href="./terrain.html">حلّل تضاريس الحقل ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./field-analysis.html#smartAdvisor"><img loading="lazy" src="https://images.unsplash.com/photo-1523742815156-59a0d4f4f1b1?auto=format&fit=crop&w=900&q=82" alt="مهندس زراعي يتفقد النباتات"></a>
+          <div class="card-body"><p class="tag">🤖 إرشاد زراعي</p><h3>المساعد الزراعي الذكي</h3><p>أدخل نوع المحصول ومرحلة النمو وملاحظاتك عن الحقل، واستفد من الإرشادات الأولية المتعلقة بالري والتسميد ومتابعة حالة النبات. تُعرض التوصيات مع مراعاة البيانات المتوفرة وحدودها.</p><p class="hint">الجرعات والمعالجات النهائية تحتاج بيانات كافية ومراجعة مختص.</p><a class="button" href="./field-analysis.html#smartAdvisor">افتح المساعد الزراعي ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./plant-health.html"><img loading="lazy" src="https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=900&q=82" alt="أوراق نبات خضراء للفحص الزراعي"></a>
+          <div class="card-body"><p class="tag">🔎 صحة النبات</p><h3>فحص أعراض النبات بالصور</h3><p>ارفع صورة واضحة للنبات وأضف وصفًا للأعراض ومكان ظهورها. تساعدك الخدمة على مراجعة الأسباب المحتملة مثل الأمراض والآفات والإجهاد، مع اقتراح خطوات فحص ومتابعة أولية.</p><p class="hint">الفحص بصري أولي ولا يؤكد التشخيص أو يحدد جرعات المبيدات.</p><a class="button" href="./plant-health.html">افحص صورة النبات ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./weather.html"><img loading="lazy" src="https://images.unsplash.com/photo-1504608524841-42fe6f032b4b?auto=format&fit=crop&w=900&q=82" alt="سماء وغيوم فوق الحقول"></a>
+          <div class="card-body"><p class="tag">🌦️ الطقس الزراعي</p><h3>طقس موقع الحقل</h3><p>تابع حالة الطقس والتوقعات المتاحة لموقعك، واستفد منها في ترتيب مواعيد الري والرش والتسميد والحصاد. تساعدك قراءة الطقس على تجنب تنفيذ بعض العمليات في ظروف غير مناسبة.</p><a class="button" href="./weather.html">شاهد طقس حقلك ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./planting-calendar.html"><img loading="lazy" src="https://images.unsplash.com/photo-1500651230702-0e2d8a49d4ad?auto=format&fit=crop&w=900&q=82" alt="شتلات ومحاصيل في أرض زراعية"></a>
+          <div class="card-body"><p class="tag">🗓️ دليل المواسم</p><h3>تقويم الزراعة العراقي</h3><p>اختر المحافظة والشهر والمحصول لتتعرف على نوافذ الزراعة المناسبة ومراحلها، مع التمييز بين البذر والشتل والزراعة المكشوفة والمحمية. استخدمه كمرجع أولي عند التخطيط للموسم.</p><p class="hint">المواعيد إرشادية وتتغير حسب المنطقة والطقس والصنف وظروف الحقل.</p><a class="button" href="./planting-calendar.html">افتح تقويم الزراعة ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./irrigation-scheduling.html"><img loading="lazy" src="https://images.unsplash.com/photo-1560493676-04071c5f467b?auto=format&fit=crop&w=900&q=82" alt="ري المحاصيل في الحقل"></a>
+          <div class="card-body"><p class="tag">💧 إدارة المياه</p><h3>جدولة الري</h3><p>نظّم مواعيد الري وكمياته وفق بيانات المحصول والتربة والطقس والملاحظات المتاحة. تساعدك الجدولة على متابعة قرارات الري وتوثيقها بدل الاعتماد على التقدير وحده.</p><a class="button" href="./irrigation-scheduling.html">نظّم عمليات الري ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./farm-budget.html"><img loading="lazy" src="https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=900&q=82" alt="محصول زراعي جاهز للحصاد"></a>
+          <div class="card-body"><p class="tag">🧮 التخطيط المالي</p><h3>ميزانية الموسم الزراعي</h3><p>أدخل تكاليف البذور والأسمدة والوقود والعمالة والري، ثم أضف الإنتاج والسعر المتوقع. تحسب الأداة تكلفة الدونم والموسم والإيراد والهامش ونقطة التعادل وفق الأرقام التي تدخلها.</p><p class="hint">حساب تقديري وليس دراسة جدوى معتمدة أو ضمانًا للربح.</p><a class="button" href="./farm-budget.html">احسب ميزانية الموسم ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./operations.html"><img loading="lazy" src="https://images.unsplash.com/photo-1592982537447-6f2a6a0d4c35?auto=format&fit=crop&w=900&q=82" alt="متابعة الأعمال الزراعية في الحقل"></a>
+          <div class="card-body"><p class="tag">📒 إدارة المزرعة</p><h3>سجل العمليات الزراعية</h3><p>وثّق الري والتسميد والرش والزراعة والحصاد والملاحظات مع التاريخ. يساعدك السجل على تذكر ما نُفذ ومراجعة تسلسل الأعمال، ويمكنك الاحتفاظ بنسخة من بياناتك.</p><a class="button" href="./operations.html">افتح سجل العمليات ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./products.html?item=drip_supplies#request"><img loading="lazy" src="https://images.unsplash.com/photo-1599685315640-9ec7a1a8b4b5?auto=format&fit=crop&w=900&q=82" alt="أنابيب ومستلزمات ري زراعي"></a>
+          <div class="card-body"><p class="tag">🧰 تجهيزات زراعية</p><h3>مستلزمات الري ومحطات الطقس</h3><p>اطلب مستلزمات شبكات التنقيط أو معلومات عن محطات الطقس ومكافحة الحشرات. نراجع احتياجك والمواصفات والتوفر والكميات، ثم نجهز عرضًا قبل الاتفاق على الشراء.</p><a class="button" href="./products.html">تصفح المنتجات واطلب عرضًا ←</a></div>
+        </article>
+        <article class="card">
+          <a class="card-image" href="./products.html?item=drip_installation#request"><img loading="lazy" src="https://images.unsplash.com/photo-1586771107445-d3ca888129ce?auto=format&fit=crop&w=900&q=82" alt="شبكة ري بالتنقيط في مزرعة"></a>
+          <div class="card-body"><p class="tag">🔧 خدمة ميدانية</p><h3>تنفيذ شبكات الري بالتنقيط</h3><p>قدّم مساحة الحقل وموقعه ومصدر المياه والمحصول لمعرفة نطاق التنفيذ والمكونات المقترحة. تتم مراجعة التفاصيل والتكلفة والموعد قبل بدء العمل.</p><p class="hint">التنفيذ الميداني متاح داخل محافظة واسط فقط حاليًا.</p><a class="button" href="./products.html?item=drip_installation#request">اطلب تنفيذ شبكة ←</a></div>
+        </article>
+        <article class="card paid-card">
+          <a class="card-image" href="./field-services.html?service=field_report"><img loading="lazy" src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=82" alt="حقل زراعي لإعداد تقرير شامل"><span class="image-label paid-label">خدمة مدفوعة</span></a>
+          <div class="card-body"><p class="tag">📋 تقارير الحقول</p><h3>التقرير الشامل للحقل</h3><p>نجمع المعلومات المتاحة عن الحقل والمؤشرات الفضائية والطقس وسجل الري، ونرتبها في تقرير واضح يتضمن النتائج وحدود البيانات وملاحظات تساعد على اتخاذ القرار.</p><p class="hint">يُحدد نطاق التقرير وسعره معك، ويبدأ العمل بعد موافقتك وتأكيد الدفع.</p><a class="button" href="./field-services.html?service=field_report">اطلب تقريرًا شاملًا ←</a></div>
+        </article>
+        <article class="card paid-card">
+          <a class="card-image" href="./field-services.html?service=field_monitoring"><img loading="lazy" src="https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?auto=format&fit=crop&w=900&q=82" alt="متابعة نمو المحاصيل عبر الموسم"><span class="image-label paid-label">خدمة مدفوعة</span></a>
+          <div class="card-body"><p class="tag">📅 متابعة موسمية</p><h3>المتابعة الدورية للحقل</h3><p>احصل على سلسلة تقارير وفق عدد ومواعيد متفق عليها، مع مقارنة المؤشرات والمشاهد السابقة عندما تتوفر بيانات قابلة للمقارنة، وتوثيق التغيرات المهمة خلال الموسم.</p><p class="hint">لا يُضمن توفر مشهد فضائي جديد في كل موعد بسبب الغيوم ومصدر البيانات.</p><a class="button" href="./field-services.html?service=field_monitoring">اطلب متابعة دورية ←</a></div>
+        </article>
+        <article class="card paid-card">
+          <a class="card-image" href="./research.html"><img loading="lazy" src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=900&q=82" alt="عمل بحثي وتحليل بيانات علمية"><span class="image-label paid-label">خدمة مدفوعة</span></a>
+          <div class="card-body"><p class="tag">🎓 للباحثين والطلبة</p><h3>الدعم البحثي الزراعي</h3><p>دعم في تنظيم بيانات التجارب وتحليل ملفات CSV وإعداد الخرائط والجداول ومسودة تفسير علمي ومراجع وصفية، وفق موضوع البحث والبيانات المتاحة ومتطلبات الباحث.</p><p class="hint">المخرجات مساعدة بحثية وتحتاج مراجعة الباحث والإشراف العلمي.</p><a class="button" href="./research.html">اكتشف خدمة الباحثين ←</a></div>
+        </article>
+      </div>
+    </section>
+    <section class="wrap section ur-advertising-section" aria-labelledby="serviceSponsorsTitle"><div class="advertising-panel"><div><p class="eyebrow dark-eyebrow">للشركات والمجهزين</p><h2 id="serviceSponsorsTitle">اعرض منتجك الزراعي لجمهور أور</h2><p>مساحة إعلانية للشركات والمشاريع الزراعية بمدة ونطاق وسعر متفق عليها.</p></div><a class="button gold" href="./advertise.html">اطلب إعلانًا مع أور ←</a></div><div data-sponsor-placement="services" hidden></div></section>
+    <section class="wrap section approach" aria-labelledby="approachTitle"><h2 id="approachTitle">خدمات واضحة وبيانات موثوقة</h2><div class="principles"><div><strong>مصدر ووقت معروف</strong><p>نوضح مصدر البيانات وتاريخ المشهد والقراءات المفقودة عند توفرها.</p></div><div><strong>القرار بيدك</strong><p>الأدوات تساعدك على الفهم والمتابعة، ولا تستبدل المعاينة والتحليل المختبري عند الحاجة.</p></div><div><strong>ابدأ بالأساسيات</strong><p>أنشئ حسابك واحفظ حقولك حتى تستفيد من الخرائط والتحليلات وسجل العمليات.</p></div></div></section>
   </main>
   <footer><div class="wrap"><strong>أور الزراعية الذكية</strong><a href="./advertise.html">أعلن معنا</a><a href="./guides.html">أدلة زراعية</a><a href="./about.html">عن أور</a><a href="./privacy.html">الخصوصية</a><a href="./terms.html">الشروط</a><a href="./index.html#contact">التواصل مع إدارة أور</a></div></footer>
 </body>
