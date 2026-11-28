@@ -5,7 +5,7 @@ import { validateMonetizationConfig, getAdsenseSeller } from '../monetization-co
 
 const PROJECT_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PUBLIC_EXTENSIONS = new Set(['.html', '.css', '.mjs', '.js']);
-const EXCLUDED_FILES = new Set(['satellite-staging-test.html']);
+const EXCLUDED_FILES = new Set(['satellite-staging-test.html', 'satellite-access-legacy.html']);
 const PWA_ICONS = ['app-icon.svg', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'];
 const PWA_FILES = ['manifest.webmanifest', 'sw.js', 'pwa-client.mjs', 'pwa.css', 'install.html', 'offline.html'];
 const PRODUCT_GALLERY_FILES = ["disease-forecasting.webp","iscout.webp","metos-5.webp","soil-probe-single.webp","soil-probes.webp","soil-sensor-rods.webp","stremoclip.webp"];
