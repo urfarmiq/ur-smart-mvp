@@ -1,30 +1,23 @@
-# Paid satellite access
+# Satellite analysis access model
 
-New satellite statistics and real per-pixel imagery require a paid activation for the owned field. Drawing boundaries, calculating Iraqi donum area and reading previously saved owner history remain available. No historic data is removed.
+## Current public launch: free direct analysis
 
-## Offer and activation
+Direct Sentinel-2 field analysis is temporarily free during the public launch. The deployment workflow sets the server-only Cloudflare Worker variable `SATELLITE_FREE_LAUNCH=true`.
 
-The customer opens `satellite-access.html`, chooses an owned field and proposes a duration. An MFA allowlisted administrator quotes the actual IQD price, scope and duration (1–365 days). No price is advertised or charged automatically. The customer accepts the exact quote version, including its duration, before arranging payment. The administrator verifies the actual receipt and approves the order. Client-entered payment references never activate access.
+Free launch includes direct statistics and per-pixel Sentinel-2 imagery for authenticated owners of saved fields. The Worker still verifies the live Supabase session, field ownership, and saved boundary before contacting Copernicus. Browser-supplied flags, headers, hostnames, or account state cannot enable access. Copernicus coverage, cloud-free observations, provider quotas and service availability still apply.
 
-Activation begins at the actual server approval time and ends after the accepted number of 24-hour days. It is field-specific and does not renew automatically. A new order is required for another field or a later period. Overlapping approved periods do not stack automatically: each ends at its own approval time plus its accepted duration. Review existing dates before approving another order.
+The temporary flag bypasses only the per-field paid entitlement lookup for direct satellite analysis. It does not change paid research orders, comprehensive or periodic field reports, advertising orders, existing satellite access orders, or their stored payment history. No database migration or destructive data change is needed.
 
-The duration is an access window, not a promise of a new satellite acquisition, cloud-free pixels or continuous monitoring. Copernicus coverage and existing free service quotas still govern availability. No billing, paid data source or new API key is enabled.
+## Re-enable paid satellite access later
 
-## Server enforcement
+When UR is ready to monetize direct analysis:
+1. Remove `--var SATELLITE_FREE_LAUNCH:true` from `.github/workflows/deploy-satellite-worker.yml`.
+2. Deploy the Worker. Without the exact server-side value `true`, the existing owner-bound `satellite_access_status` RPC is required again.
+3. Restore the paid access request link and pricing/quote language in the public pages.
+4. Confirm the production status endpoint reports `paid_service=true` and that unpaid/expired/wrong-field access fails closed before any Copernicus request.
 
-`satellite_access_orders` uses owner/MFA-admin RLS, named SELECT grants and checked private functions behind public SECURITY INVOKER wrappers. Clients cannot approve payment, modify amounts or change accepted durations. Field deletion preserves the order with a null field reference and prevents new access. Live field ownership is checked again for each access decision.
+The existing `satellite_access_orders` table, owner/MFA-admin RLS, quote acceptance, payment verification and expiry logic remain available. Client-entered payment references never activate access. Super Qi may be considered later only after its official payment/verification workflow is confirmed; this release does not claim an automatic Super Qi integration.
 
-Every external satellite POST path, including statistics and imagery, checks the live authenticated user, field ownership and the database entitlement before contacting Copernicus. Expired, unpaid or unavailable entitlements fail closed. The browser does not control activation or expiry. A client-supplied header, hostname or body flag cannot mark a request as included in another paid service.
+## Limits and safety
 
-Existing paid research and comprehensive/periodic reports retain their agreed satellite inclusion. Only their already claimed server execution uses the private included-service callback. A saved paid research report can retrieve its NDVI image through `/research/imagery` with its order ID; the server verifies the paid owner-bound report and derives the field and acquisition date from the saved result. It does not grant general access to other fields, dates or indices.
-
-The staging source re-exports the same production handler to avoid a future authorization drift. The old deployed staging service was unconfigured (HTTP 503) at the pre-change check; the normal release pipeline deploys production only.
-
-## Verification
-
-- Unit tests cover unpaid, expired, wrong-field and failed entitlement checks before provider requests, generic route and spoofed bypass attempts, internal paid report execution and owner-bound research imagery.
-- `tests/satellite-access-rls.sql` uses synthetic data inside one transaction ending in ROLLBACK to verify owner isolation, MFA administration, immutable accepted quotes, duration/expiry, payment gates and deleted-field history.
-- Customer/admin browser fixtures use the pinned Supabase SDK where applicable, with all network intercepted. They cover desktop/mobile order creation, quoted terms, payment, expiry, late replies and account cleanup.
-- Existing satellite, field management, research images, paid field reports and administration regressions remain part of verification. Production checks confirm the published revision/files, CORS and the public paid-service status.
-
-Fixture tests do not claim that a real customer paid or that an agricultural interpretation was independently validated. The administrator still verifies real transfers.
+The free launch does not mean unlimited satellite processing. Existing Copernicus quotas and data availability still govern requests. Authentication, live field ownership and boundary checks remain mandatory. Historical reports and user data are retained. The direct-analysis free launch is not a promise of daily new imagery or a field diagnosis.
