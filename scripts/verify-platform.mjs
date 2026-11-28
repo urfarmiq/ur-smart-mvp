@@ -63,11 +63,11 @@ export async function verifyPlatform({release=process.env.GITHUB_SHA,fetchImpl=g
  const satellite=await fetchImpl('https://ur-smart-satellite.alialbatekh111.workers.dev/satellite/status',{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
  if(!satellite.ok||satellite.headers.get('access-control-allow-origin')!==origin)throw Error('Satellite access service is unavailable or did not allow the platform origin.');
  const satelliteStatus=await satellite.json();
- if(satelliteStatus.available!==true||satelliteStatus.paid_service!==true||satelliteStatus.manual_admin_approval_required!==true||satelliteStatus.quote_required!==true||satelliteStatus.customer_acceptance_required!==true||satelliteStatus.field_specific!==true||satelliteStatus.automatic_renewal!==false)throw Error('Satellite service did not confirm the field-specific quote and payment gate.');
+ if(satelliteStatus.available!==true||satelliteStatus.paid_service!==false||satelliteStatus.free_launch!==true||satelliteStatus.manual_admin_approval_required!==false||satelliteStatus.quote_required!==false||satelliteStatus.customer_acceptance_required!==false||satelliteStatus.field_specific!==true||satelliteStatus.authenticated_owner_required!==true||satelliteStatus.automatic_renewal!==false)throw Error('Satellite service did not confirm the authenticated-owner free launch.');
  const terrain=await fetchImpl('https://ur-smart-satellite.alialbatekh111.workers.dev/terrain/status',{headers:{Origin:origin},signal:AbortSignal.timeout(20000)});
  if(!terrain.ok||terrain.headers.get('access-control-allow-origin')!==origin)throw Error('Terrain backend is unavailable or did not allow the platform origin.');
  const terrainStatus=await terrain.json();
  if(terrainStatus.available!==true||terrainStatus.lidar!==false||terrainStatus.source_resolution_m!==30||terrainStatus.saved_account_required!==true||terrainStatus.engineering_design!==false)throw Error('Terrain backend did not confirm real DEM configuration and its analysis limits.');
- return {app_url:origin,release,frontend:true,pwa:true,advertising:true,google_mode:advertisingConfig.google.mode,backend_cors:true,research:true,plant_health:true,paid_field_services:true,paid_satellite:true,terrain:true};
+ return {app_url:origin,release,frontend:true,pwa:true,advertising:true,google_mode:advertisingConfig.google.mode,backend_cors:true,research:true,plant_health:true,paid_field_services:true,free_satellite_launch:true,paid_field_services:true,terrain:true};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{console.log(JSON.stringify(await verifyPlatform()));}catch(error){console.error(error.message);process.exitCode=1;}}
