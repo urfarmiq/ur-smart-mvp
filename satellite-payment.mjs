@@ -1,7 +1,7 @@
 // Public presentation helpers. Access is independently checked by the server.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const SATELLITE_PAYMENT_MESSAGE='التحليل الفضائي خدمة مدفوعة لهذا الحقل.';
-export function satelliteAccessUrl(fieldId){return './satellite-access.html'+(UUID.test(fieldId||'')?'?field='+encodeURIComponent(fieldId):'');}
+export function satelliteAccessUrl(fieldId){return './satellite-access-legacy.html'+(UUID.test(fieldId||'')?'?field='+encodeURIComponent(fieldId):'');}
 export function updateSatelliteAccessLink(link,fieldId){if(link)link.href=satelliteAccessUrl(fieldId);}
 export function isSatellitePaymentRequired(error){return error?.code==='SATELLITE_PAYMENT_REQUIRED'||String(error?.message||error||'').includes(SATELLITE_PAYMENT_MESSAGE);}
 export function satelliteResponseError(response,data,fallback='تعذر تحميل التحليل الفضائي.'){
