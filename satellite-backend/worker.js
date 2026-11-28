@@ -84,7 +84,7 @@ async function handleSatellite(req,env,allowed,includedInPaidReport=false){
  if(!br.ok)return reply({error:'Could not read field boundary'},502,allowed);
  const rows=await br.json();const record=rows[0];
  if(!record||record.owner_id!==u.id)return reply({error:'Field boundary unavailable for this account'},404,allowed);
- if(!includedInPaidReport){
+ if(!includedInPaidReport&&env.SATELLITE_FREE_LAUNCH!=='true'){
   const access=await checkSatelliteAccess(env,headers,field_id);
   if(!access.available)return reply({error:'Satellite access verification unavailable',code:'SATELLITE_ACCESS_UNAVAILABLE',message:'تعذر التحقق من تفعيل التحليل الفضائي الآن. أعد المحاولة لاحقًا.'},502,allowed);
   if(!access.active)return reply({error:'Paid satellite access required',code:'SATELLITE_PAYMENT_REQUIRED',message:'التحليل الفضائي خدمة مدفوعة لهذا الحقل. اطلب التفعيل وانتظر تأكيد الدفع من الإدارة.',access_url:'https://ur-smart-urfarmiq.pages.dev/satellite-access.html?field='+encodeURIComponent(field_id)},403,allowed);
