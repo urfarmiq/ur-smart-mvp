@@ -15,8 +15,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="./pwa.css">
 <script type="module" src="./pwa-client.mjs"></script>
-</head><body><header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية الذكية</a></header><main><h1>🛰️ التحليل الفضائي — مدفوعة</h1><p class="muted">تحليل 19 مؤشرًا طيفيًا من Sentinel‑2، بما فيها مؤشرات الحافة الحمراء والكلوروفيل، ومقارنة تاريخية وخرائط تفاعلية داخل حدود الحقل.</p>
-<div class="notice" id="satellitePaymentNotice"><strong>تفعيل مدفوع لكل حقل</strong><p>تُحدد مدة التفعيل والسعر في عرض توافق عليه، ثم تؤكد الإدارة استلام الدفع. لا يوجد تجديد أو خصم تلقائي، وتوفر مشهد حديث يعتمد على المصدر والغيوم.</p><a id="satelliteAccessLink" href="./satellite-access.html">طلب أو تجديد تفعيل التحليل الفضائي ←</a></div>
+</head><body><header><a href="./dashboard.html">🌱 UR Smart | أور الزراعية الذكية</a></header><main><h1>🛰️ التحليل الفضائي — مجاني خلال الإطلاق</h1><p class="muted">تحليل 19 مؤشرًا طيفيًا من Sentinel‑2، بما فيها مؤشرات الحافة الحمراء والكلوروفيل، ومقارنة تاريخية وخرائط تفاعلية داخل حدود الحقل.</p>
+<div class="notice" id="satellitePaymentNotice"><strong>التحليل الفضائي متاح مجانًا خلال مرحلة الإطلاق</strong><p>استخدم مؤشرات Sentinel‑2 والخرائط التفاعلية دون اشتراك. يلزم تسجيل الدخول وامتلاك الحقل وحفظ حدوده. قد تتأثر المشاهد المتاحة بالغيوم وتغطية الأقمار وحصص مزود البيانات.</p></div>
 <div class="notice"><strong>تنبيه علمي:</strong> خدمة Sentinel-2 متصلة بالفعل. تعرض المنصة نتائج الرصد عند نجاح الطلب، مع تاريخ المشهد وجودة العينة وحدود التفسير العلمي.</div>
 <section class="panel"><h2>1. اختر الحقل</h2><div id="status">جارٍ التحقق من تسجيل الدخول...</div><label for="field">الحقول المحفوظة</label><select id="field"><option value="">اختر حقلًا</option></select><button id="refresh" class="secondary">↻ تحديث حقولي</button><div id="boundary" class="result">اختر حقلًا لعرض المساحة وحدوده المحفوظة.</div><a href="./field-map.html">فتح خريطة الحدود ←</a></section>
 <section class="panel"><h2>2. تحليل تلقائي من الأقمار الصناعية</h2><p class="muted">اختر حقلًا محفوظًا لتحليل أحدث مشهد صالح من Sentinel‑2. إذا لم يظهر مشهد خالٍ من الغيوم خلال 65 يومًا، يوسّع البحث تلقائيًا حتى 180 يومًا ويعرض تاريخ المشهد بوضوح.</p><button id="autoAnalyze">🛰️ تحليل الحقل تلقائيًا</button><details><summary style="cursor:pointer;color:#176b45">🔎 أدوات تشخيص الاتصال (عند الحاجة)</summary><button id="testConnection" class="secondary">فحص الاتصال التفصيلي</button><div id="connectionResult" class="result" aria-live="polite">فحص الاتصال يفصل بين مشكلة CORS وطلبات POST.</div></details><div id="autoResult" class="result" aria-live="polite">جاهز لطلب تحليل فعلي من Sentinel-2. اختر حقلًا واضغط زر التحليل.</div></section>
@@ -24,7 +24,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
 import {loadRasterImage,colorizeRaster,collectRasters} from './satellite-raster.mjs';
-import {satelliteResponseError,isSatellitePaymentRequired,showSatellitePayment,updateSatelliteAccessLink} from './satellite-payment.mjs';
+import {satelliteResponseError,isSatellitePaymentRequired,showSatellitePayment} from './satellite-payment.mjs';
 import {attachPixelProbe} from './satellite-pixel-probe.mjs';
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
