@@ -1,4 +1,5 @@
 name: Deploy UR Smart Platform
+# Direct Sentinel-2 analysis remains free during the public launch.
 
 on:
   workflow_dispatch:
