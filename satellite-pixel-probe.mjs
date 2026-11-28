@@ -1,6 +1,6 @@
 // These ranges must match the Worker's grayscale display encoding. Values are
 // reconstructed from the original grayscale PNG, never from its colored overlay.
-export const DISPLAY_RANGES=Object.freeze({NDVI:[-.2,.8],NDMI:[-.5,.5],SAVI:[-.2,.8],OSAVI:[-.2,.8],MSAVI2:[-.2,.8],EVI:[-.2,1],GNDVI:[-.2,.8],NDRE:[-.2,.8],MNDWI:[-.8,.8],NBR:[-1,1],MSI:[0,2],CIgreen:[0,4],NDRE2:[-.2,.8],NDRE3:[-.2,.8],CIrededge:[0,4],NIRv:[0,.5]});
+export const DISPLAY_RANGES=Object.freeze({NDVI:[-.2,.8],NDMI:[-.5,.5],SAVI:[-.2,.8],OSAVI:[-.2,.8],MSAVI2:[-.2,.8],EVI:[-.2,1],GNDVI:[-.2,.8],NDRE:[-.2,.8],MNDWI:[-.8,.8],NBR:[-1,1],MSI:[0,2],CIgreen:[0,4],NDRE2:[-.2,.8],NDRE3:[-.2,.8],CIrededge:[0,4],NIRv:[0,.5],MTCI:[-1,5],IRECI:[0,.5],REIP:[700,750]});
 
 function onSegment(x,y,a,b){
  const cross=(x-a[0])*(b[1]-a[1])-(y-a[1])*(b[0]-a[0]);
