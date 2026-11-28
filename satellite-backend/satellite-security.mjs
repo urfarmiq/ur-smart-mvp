@@ -4,7 +4,7 @@ export class SatelliteRequestError extends Error{
 }
 const MAX_BODY_BYTES=4096,MAX_VERTICES=4096,MAX_RINGS=32,MAX_AREA_M2=2e7,MAX_BOUNDS_M2=4e7,MAX_SPAN_M=50000;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const INDICES=new Set(['NDVI','NDMI','SAVI','OSAVI','MSAVI2','EVI','GNDVI','NDRE','MNDWI','NBR','MSI','CIgreen','NDRE2','NDRE3','CIrededge','NIRv']);
+const INDICES=new Set(['NDVI','NDMI','SAVI','OSAVI','MSAVI2','EVI','GNDVI','NDRE','MNDWI','NBR','MSI','CIgreen','NDRE2','NDRE3','CIrededge','NIRv','MTCI','IRECI','REIP']);
 
 export async function readSatelliteRequest(req){
  const declared=Number(req.headers.get('content-length'));
