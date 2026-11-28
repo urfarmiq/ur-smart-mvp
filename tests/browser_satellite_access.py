@@ -96,7 +96,7 @@ def setup(browser,mobile,signed=True):
 
 
 def ready(page):
-    page.goto(SITE+'/satellite-access.html?field='+FIELD,wait_until='domcontentloaded')
+    page.goto(SITE+'/satellite-access-legacy.html?field='+FIELD,wait_until='domcontentloaded')
     page.wait_for_function("()=>!document.querySelector('#retryAccount').disabled")
     if page.locator('#paidContent').is_visible():page.wait_for_function("()=>!document.querySelector('#refreshOrders').disabled&&!document.querySelector('#refreshFields').disabled")
 
@@ -120,6 +120,16 @@ def close(ctx,state):
         try:route.abort('blockedbyclient')
         except Exception:pass
     ctx.close()
+
+
+def free_launch_scenario(browser,mobile):
+    ctx,page,state,errors,logs=setup(browser,mobile,False)
+    page.goto(SITE+'/satellite-access.html',wait_until='domcontentloaded')
+    expect(page.locator('.badge')).to_contain_text('متاح مجانًا')
+    expect(page.locator('h1')).to_contain_text('دون رسوم')
+    expect(page.locator('a.button')).to_have_attribute('href','./satellite-analysis.html')
+    assert not state['api'] and not state['rpc']
+    clean(page,errors,logs);close(ctx,state)
 
 
 def public_scenario(browser,mobile):
@@ -174,7 +184,7 @@ def account_switch_scenario(browser,mobile):
 
 def signout_scenario(browser,mobile):
     ctx,page,state,errors,logs=setup(browser,mobile);quote(state['orders'][0]);ready(page);choose(page,ORDER);page.fill('#quotePaymentReference','PRIVATE-DRAFT');page.check('#acceptQuoteConsent')
-    second=ctx.new_page();second.goto(SITE+'/satellite-access.html',wait_until='domcontentloaded')
+    second=ctx.new_page();second.goto(SITE+'/satellite-access-legacy.html',wait_until='domcontentloaded')
     second.evaluate("async()=>{const {createClient}=await import('./supabase-client.mjs');const c=createClient('https://"+API+"','"+KEY+"');await c.auth.signOut({scope:'local'});}")
     expect(page.locator('#paidContent')).to_be_hidden();expect(page.locator('#accountStatus')).to_contain_text('لا توجد جلسة');assert page.locator('#quotePaymentReference').input_value()=='';assert not page.is_checked('#acceptQuoteConsent');assert page.locator('#ordersList').inner_text()=='';clean(page,errors,logs);close(ctx,state)
 
@@ -183,7 +193,7 @@ def main():
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
         for mobile in [False,True]:
-            public_scenario(browser,mobile);quote_and_access_scenario(browser,mobile);deletion_scenario(browser,mobile);account_switch_scenario(browser,mobile);signout_scenario(browser,mobile)
+            free_launch_scenario(browser,mobile);public_scenario(browser,mobile);quote_and_access_scenario(browser,mobile);deletion_scenario(browser,mobile);account_switch_scenario(browser,mobile);signout_scenario(browser,mobile)
             print(('Mobile' if mobile else 'Desktop')+': actual pinned SDK, owned fields/orders, quote version and duration, manual payment, expiry, deleted field, safe text, stale reads/account switch and cross-tab signout passed; isolated fixtures only.')
         browser.close()
 
