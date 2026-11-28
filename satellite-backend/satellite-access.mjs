@@ -17,7 +17,8 @@ async function boundedJSON(response,limit,timeout=8000){
 }
 
 export function satellitePaidStatus(env={}){
- return {available:!!(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY&&env.SENTINEL_CLIENT_ID&&env.SENTINEL_CLIENT_SECRET),paid_service:true,manual_admin_approval_required:true,quote_required:true,customer_acceptance_required:true,field_specific:true,automatic_renewal:false,duration:'Quoted number of days starting at manual payment approval',included_research_image_route:'/research/imagery'};
+ const freeLaunch=env.SATELLITE_FREE_LAUNCH==='true';
+ return {available:!!(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY&&env.SENTINEL_CLIENT_ID&&env.SENTINEL_CLIENT_SECRET),paid_service:!freeLaunch,free_launch:freeLaunch,manual_admin_approval_required:!freeLaunch,quote_required:!freeLaunch,customer_acceptance_required:!freeLaunch,field_specific:true,authenticated_owner_required:true,automatic_renewal:false,access_policy:freeLaunch?'Free launch; authenticated owner and field ownership still required':'Field-specific paid activation',duration:freeLaunch?'Free during public launch; upstream quotas and data availability still apply':'Quoted number of days starting at manual payment approval',included_research_image_route:'/research/imagery'};
 }
 
 // RLS and the checked RPC determine the current owner and accepted paid terms.
