@@ -10,6 +10,7 @@ const ORIGIN='https://ur-smart-urfarmiq.pages.dev';
 const TODAY=new Date().toISOString().slice(0,10);
 const GEOMETRY={type:'Polygon',coordinates:[[[44,33],[44.001,33],[44.001,33.001],[44,33.001],[44,33]]]};
 const ENV={SENTINEL_CLIENT_ID:'fixture-private-client',SENTINEL_CLIENT_SECRET:'fixture-private-sentinel-secret',SUPABASE_URL:'https://supabase.test',SUPABASE_PUBLISHABLE_KEY:'fixture-public-key'};
+const FREE_ENV={...ENV,SATELLITE_FREE_LAUNCH:'true'};
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 const request=(body={field_id:FIELD},{path='/',headers={},url}={})=>new Request(url||'https://worker.test'+path,{method:'POST',headers:{Origin:ORIGIN,Authorization:'Bearer fixture-owner-session','Content-Type':'application/json',...headers},body:JSON.stringify(body)});
 const paidStatus=()=>({field_id:FIELD,active:true,expires_at:new Date(Date.now()+86400000).toISOString(),order_id:ORDER});
@@ -34,6 +35,12 @@ async function fixture(run,{access=paidStatus(),order=paidResearch(),owner=OWNER
 }
 const providers=calls=>calls.filter(c=>c.url.includes('/openid-connect/token')||c.url.endsWith('/statistics/v1')||c.url.endsWith('/process/v1'));
 const entitlements=calls=>calls.filter(c=>c.url.endsWith('/rpc/satellite_access_status'));
+
+test('satellite status reports the temporary free launch without exposing secrets',async()=>{
+ const response=await worker.fetch(new Request('https://worker.test/satellite/status',{headers:{Origin:ORIGIN}}),FREE_ENV),body=await response.json();
+ assert.equal(response.status,200);assert.equal(body.available,true);assert.equal(body.paid_service,false);assert.equal(body.free_launch,true);assert.equal(body.manual_admin_approval_required,false);assert.equal(body.quote_required,false);assert.equal(body.customer_acceptance_required,false);assert.equal(body.field_specific,true);assert.equal(body.authenticated_owner_required,true);
+ for(const secret of [FREE_ENV.SENTINEL_CLIENT_ID,FREE_ENV.SENTINEL_CLIENT_SECRET])assert.ok(!JSON.stringify(body).includes(secret));
+});
 
 test('paid satellite status and allowed preflight are public, secret-free and do not query accounts',async()=>{
  await fixture(async calls=>{
@@ -91,6 +98,19 @@ test('a valid paid owned-field entitlement precedes both actual provider branche
   assert.equal(entitlements(calls)[0].options.headers.Authorization,'Bearer fixture-owner-session');assert.equal(entitlements(calls)[0].options.headers.apikey,ENV.SUPABASE_PUBLISHABLE_KEY);
   assert.ok(!JSON.stringify(result).includes(ENV.SENTINEL_CLIENT_SECRET));assert.ok(!JSON.stringify(result).includes('fixture-private-upstream-token'));
  });
+});
+
+
+test('free launch serves owned-field statistics and imagery without querying paid entitlements',async()=>{
+ for(const body of [{field_id:FIELD},{field_id:FIELD,action:'imagery',map_date:TODAY,map_index:'NDRE'}])await fixture(async calls=>{
+  const response=await worker.fetch(request(body),FREE_ENV),result=await response.json();
+  assert.equal(response.status,200);assert.equal(result.field_id,FIELD);assert.equal(entitlements(calls).length,0);assert.ok(providers(calls).length>=2);
+  assert.ok(!JSON.stringify(result).includes(FREE_ENV.SENTINEL_CLIENT_SECRET));assert.ok(!JSON.stringify(result).includes('fixture-private-upstream-token'));
+ });
+});
+
+test('free launch still rejects another owner before any satellite provider is contacted',async()=>{
+ await fixture(async calls=>{const response=await worker.fetch(request(),FREE_ENV);assert.equal(response.status,404);assert.deepEqual(entitlements(calls),[]);assert.deepEqual(providers(calls),[]);},{boundaryOwner:OTHER});
 });
 
 test('another-owner boundary is rejected before entitlement or provider access',async()=>{
