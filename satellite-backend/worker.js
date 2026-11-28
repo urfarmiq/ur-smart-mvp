@@ -14,7 +14,7 @@ const SH='https://sh.dataspace.copernicus.eu';
 const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 function reply(body,status=200,origin=''){return new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','access-control-allow-origin':origin||'https://urfarmiq.github.io','vary':'Origin','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}})}
 const EVALSCRIPT=`//VERSION=3
-function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:[{id:"indices",bands:16,sampleType:"FLOAT32"},{id:"dataMask",bands:["indices"]}]};}
+function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:[{id:"indices",bands:19,sampleType:"FLOAT32"},{id:"dataMask",bands:["indices"]}]};}
 function evaluatePixel(s){
  const good=Number(s.dataMask)>0&&Number.isFinite(Number(s.SCL))&&![0,1,3,8,9,10,11].includes(Number(s.SCL));
  const r=(a,b)=>Math.abs(b)>1e-8?a/b:0;
@@ -25,8 +25,12 @@ function evaluatePixel(s){
  const ndre=r(s.B08-s.B05,s.B08+s.B05),mndwi=r(s.B03-s.B11,s.B03+s.B11);
  const nbr=r(s.B08-s.B12,s.B08+s.B12),msi=r(s.B11,s.B08),cigreen=r(s.B08,s.B03)-1;
  const ndre2=r(s.B8A-s.B06,s.B8A+s.B06),ndre3=r(s.B8A-s.B07,s.B8A+s.B07),ciredge=r(s.B8A,s.B05)-1,nirv=ndvi*s.B08;
- if(!good)return {indices:Array(16).fill(0),dataMask:[0]};
- return {indices:[ndvi,ndmi,savi,osavi,msavi2,evi,gndvi,ndre,mndwi,nbr,msi,cigreen,ndre2,ndre3,ciredge,nirv],dataMask:[1]};
+ const mtci=Math.abs(s.B05-s.B04)>1e-8?(s.B06-s.B05)/(s.B05-s.B04):NaN;
+ const ireci=s.B05>1e-8?((s.B07-s.B04)*s.B06)/s.B05:NaN;
+ // Sentinel-2 four-band interpolation; approximate REIP, not a field spectrometer measurement.
+ const reip=Math.abs(s.B06-s.B05)>1e-8?705+35*(((s.B04+s.B07)/2-s.B05)/(s.B06-s.B05)):NaN;
+ if(!good)return {indices:Array(19).fill(0),dataMask:[0]};
+ return {indices:[ndvi,ndmi,savi,osavi,msavi2,evi,gndvi,ndre,mndwi,nbr,msi,cigreen,ndre2,ndre3,ciredge,nirv,mtci,ireci,reip],dataMask:[1]};
 }
 `;
 function toUtm(lon,lat,zone){
@@ -99,15 +103,15 @@ async function handleSatellite(req,env,allowed,includedInPaidReport=false){
    const bounds=coords.reduce((b,p)=>({minLon:Math.min(b.minLon,p[0]),minLat:Math.min(b.minLat,p[1]),maxLon:Math.max(b.maxLon,p[0]),maxLat:Math.max(b.maxLat,p[1])}),{minLon:Infinity,minLat:Infinity,maxLon:-Infinity,maxLat:-Infinity});
    const imageRing=geometry.coordinates[0],imageCenter=imageRing.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,imageRing.length-1)),imageZone=Math.floor((imageCenter[0]+180)/6)+1,imageProjected={type:"Polygon",coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,imageZone)))};
    const projectedCoords=imageProjected.coordinates.flat();const projectedBounds=projectedCoords.reduce((b,p)=>({minX:Math.min(b.minX,p[0]),minY:Math.min(b.minY,p[1]),maxX:Math.max(b.maxX,p[0]),maxY:Math.max(b.maxY,p[1])}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});const wide=Math.max(1,projectedBounds.maxX-projectedBounds.minX),high=Math.max(1,projectedBounds.maxY-projectedBounds.minY);
-   const resolution=mapIndex?(["NDMI","NDRE","MNDWI","NBR","MSI","NDRE2","NDRE3","CIrededge"].includes(mapIndex)?20:10):10,maxSide=1024,width=Math.max(1,Math.min(maxSide,Math.ceil(wide/resolution))),height=Math.max(1,Math.min(maxSide,Math.ceil(high/resolution)));
+   const resolution=mapIndex?(["NDMI","NDRE","MNDWI","NBR","MSI","NDRE2","NDRE3","CIrededge","MTCI","IRECI","REIP"].includes(mapIndex)?20:10):10,maxSide=1024,width=Math.max(1,Math.min(maxSide,Math.ceil(wide/resolution))),height=Math.max(1,Math.min(maxSide,Math.ceil(high/resolution)));
    const from=day.toISOString(),to=new Date(day.getTime()+86400000-1).toISOString();
-   const indexExpressions={NDVI:"(s.B08-s.B04)/(s.B08+s.B04)",NDMI:"(s.B08-s.B11)/(s.B08+s.B11)",SAVI:"1.5*(s.B08-s.B04)/(s.B08+s.B04+0.5)",OSAVI:"1.16*(s.B08-s.B04)/(s.B08+s.B04+0.16)",MSAVI2:"(2*s.B08+1-Math.sqrt(Math.max(0,(2*s.B08+1)*(2*s.B08+1)-8*(s.B08-s.B04))))/2",EVI:"2.5*(s.B08-s.B04)/(s.B08+6*s.B04-7.5*s.B02+1)",GNDVI:"(s.B08-s.B03)/(s.B08+s.B03)",NDRE:"(s.B08-s.B05)/(s.B08+s.B05)",MNDWI:"(s.B03-s.B11)/(s.B03+s.B11)",NBR:"(s.B08-s.B12)/(s.B08+s.B12)",MSI:"s.B11/s.B08",CIgreen:"s.B08/s.B03-1",NDRE2:"(s.B8A-s.B06)/(s.B8A+s.B06)",NDRE3:"(s.B8A-s.B07)/(s.B8A+s.B07)",CIrededge:"s.B8A/s.B05-1",NIRv:"((s.B08-s.B04)/(s.B08+s.B04))*s.B08"};
-   const indexRanges={NDVI:[-0.2,0.8],NDMI:[-0.5,0.5],SAVI:[-0.2,0.8],OSAVI:[-0.2,0.8],MSAVI2:[-0.2,0.8],EVI:[-0.2,1],GNDVI:[-0.2,0.8],NDRE:[-0.2,0.8],MNDWI:[-0.8,0.8],NBR:[-1,1],MSI:[0,2],CIgreen:[0,4],NDRE2:[-0.2,0.8],NDRE3:[-0.2,0.8],CIrededge:[0,4],NIRv:[0,0.5]};
+   const indexExpressions={NDVI:"(s.B08-s.B04)/(s.B08+s.B04)",NDMI:"(s.B08-s.B11)/(s.B08+s.B11)",SAVI:"1.5*(s.B08-s.B04)/(s.B08+s.B04+0.5)",OSAVI:"1.16*(s.B08-s.B04)/(s.B08+s.B04+0.16)",MSAVI2:"(2*s.B08+1-Math.sqrt(Math.max(0,(2*s.B08+1)*(2*s.B08+1)-8*(s.B08-s.B04))))/2",EVI:"2.5*(s.B08-s.B04)/(s.B08+6*s.B04-7.5*s.B02+1)",GNDVI:"(s.B08-s.B03)/(s.B08+s.B03)",NDRE:"(s.B08-s.B05)/(s.B08+s.B05)",MNDWI:"(s.B03-s.B11)/(s.B03+s.B11)",NBR:"(s.B08-s.B12)/(s.B08+s.B12)",MSI:"s.B11/s.B08",CIgreen:"s.B08/s.B03-1",NDRE2:"(s.B8A-s.B06)/(s.B8A+s.B06)",NDRE3:"(s.B8A-s.B07)/(s.B8A+s.B07)",CIrededge:"s.B8A/s.B05-1",NIRv:"((s.B08-s.B04)/(s.B08+s.B04))*s.B08",MTCI:"(s.B06-s.B05)/(s.B05-s.B04)",IRECI:"((s.B07-s.B04)*s.B06)/s.B05",REIP:"705+35*(((s.B04+s.B07)/2-s.B05)/(s.B06-s.B05))"};
+   const indexRanges={NDVI:[-0.2,0.8],NDMI:[-0.5,0.5],SAVI:[-0.2,0.8],OSAVI:[-0.2,0.8],MSAVI2:[-0.2,0.8],EVI:[-0.2,1],GNDVI:[-0.2,0.8],NDRE:[-0.2,0.8],MNDWI:[-0.8,0.8],NBR:[-1,1],MSI:[0,2],CIgreen:[0,4],NDRE2:[-0.2,0.8],NDRE3:[-0.2,0.8],CIrededge:[0,4],NIRv:[0,0.5],MTCI:[-1,5],IRECI:[0,0.5],REIP:[700,750]};
    let script;
    if(mapIndex){
      if(!indexExpressions[mapIndex])return reply({error:"Unsupported map indicator"},400,allowed);
      const expression=indexExpressions[mapIndex],range=indexRanges[mapIndex],invert=false,span=range[1]-range[0],scaleExpression=range[0]<0?`(v+${Math.abs(range[0])})/${span}`:`(v-${range[0]})/${span}`;
-     const requiredBands={NDVI:["B08","B04"],NDMI:["B08","B11"],SAVI:["B08","B04"],OSAVI:["B08","B04"],MSAVI2:["B08","B04"],EVI:["B08","B04","B02"],GNDVI:["B08","B03"],NDRE:["B08","B05"],MNDWI:["B03","B11"],NBR:["B08","B12"],MSI:["B11","B08"],CIgreen:["B08","B03"],NDRE2:["B8A","B06"],NDRE3:["B8A","B07"],CIrededge:["B8A","B05"],NIRv:["B08","B04"]}[mapIndex];
+     const requiredBands={NDVI:["B08","B04"],NDMI:["B08","B11"],SAVI:["B08","B04"],OSAVI:["B08","B04"],MSAVI2:["B08","B04"],EVI:["B08","B04","B02"],GNDVI:["B08","B03"],NDRE:["B08","B05"],MNDWI:["B03","B11"],NBR:["B08","B12"],MSI:["B11","B08"],CIgreen:["B08","B03"],NDRE2:["B8A","B06"],NDRE3:["B8A","B07"],CIrededge:["B8A","B05"],NIRv:["B08","B04"],MTCI:["B04","B05","B06"],IRECI:["B04","B05","B06","B07"],REIP:["B04","B05","B06","B07"]}[mapIndex];
      script=`//VERSION=3
 function setup(){return {input:[{bands:["B02","B03","B04","B05","B06","B07","B08","B8A","B11","B12","SCL","dataMask"]}],output:{bands:4,sampleType:"UINT8"}};}
 function evaluatePixel(s){
@@ -138,7 +142,7 @@ function evaluatePixel(s){
    const metresPerDegree=6371008.8*Math.PI/180,geographicWidth=(bounds.maxLon-bounds.minLon)*metresPerDegree*Math.cos((bounds.minLat+bounds.maxLat)/2*Math.PI/180),geographicHeight=(bounds.maxLat-bounds.minLat)*metresPerDegree;
    return reply({field_id,date:mapDate,index:mapIndex||null,image:"data:image/png;base64,"+btoa(binary),bounds:mapBounds,width,height,resolution_m:resolution,native_resolution_m:resolution,resolution_x_m:Math.round(geographicWidth/width*100)/100,resolution_y_m:Math.round(geographicHeight/height*100)/100,pixel_size_is_approximate:true,display_range:mapIndex?indexRanges[mapIndex]:null,encoding:mapIndex?'uint8-grayscale-clamped':'rgb',resampling:'NEAREST',source:mapIndex?"Sentinel-2 L2A per-pixel "+mapIndex+" raster via Copernicus Data Space":"Sentinel-2 L2A true color via Copernicus Data Space"},200,allowed);
  }
- const ring=geometry.coordinates[0];const center=ring.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,ring.length-1));const zone=Math.floor((center[0]+180)/6)+1;const epsg=(center[1]<0?32700:32600)+zone;const projected={type:'Polygon',coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,zone)))};const indexNames=["NDVI","NDMI","SAVI","OSAVI","MSAVI2","EVI","GNDVI","NDRE","MNDWI","NBR","MSI","CIgreen","NDRE2","NDRE3","CIrededge","NIRv"];
+ const ring=geometry.coordinates[0];const center=ring.slice(0,-1).reduce((p,c)=>[p[0]+c[0],p[1]+c[1]],[0,0]).map(v=>v/Math.max(1,ring.length-1));const zone=Math.floor((center[0]+180)/6)+1;const epsg=(center[1]<0?32700:32600)+zone;const projected={type:'Polygon',coordinates:geometry.coordinates.map(r=>r.map(([lon,lat])=>toUtm(lon,lat,zone)))};const indexNames=["NDVI","NDMI","SAVI","OSAVI","MSAVI2","EVI","GNDVI","NDRE","MNDWI","NBR","MSI","CIgreen","NDRE2","NDRE3","CIrededge","NIRv","MTCI","IRECI","REIP"];
  const parseItems=result=>(result.data||[]).map(x=>{const bands=x.outputs?.indices?.bands||{};const indices=Object.fromEntries(indexNames.map((n,i)=>[n,bands["B"+i]?.stats?.mean]));const n=bands.B0?.stats;return {date:x.interval?.from,indices,ndvi:indices.NDVI,ndmi:indices.NDMI,validPixels:n?.sampleCount-n?.noDataCount}}).filter(x=>Number.isFinite(x.ndvi)&&Number.isFinite(x.ndmi)&&x.validPixels>0).sort((a,b)=>b.validPixels-a.validPixels||b.date.localeCompare(a.date));
  const runStats=async(days)=>{const rangeStart=new Date(today.getTime()-days*86400000);const statsRequest={input:{bounds:{geometry:projected,properties:{crs:'http://www.opengis.net/def/crs/EPSG/0/'+epsg}},data:[{type:'sentinel-2-l2a',dataFilter:{mosaickingOrder:'leastCC',maxCloudCoverage:100}}]},aggregation:{timeRange:{from:rangeStart.toISOString(),to:now.toISOString()},aggregationInterval:{of:'P1D',lastIntervalBehavior:'SHORTEN'},evalscript:EVALSCRIPT,resx:20,resy:20}};const response=await satelliteFetch(SH+'/statistics/v1',{method:'POST',headers:{'Authorization':'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(statsRequest)},60000);if(!response.ok)throw new SatelliteRequestError(502,'Satellite processing failed');return response.json()};
  let searchedDays=65,result=await runStats(65),items=parseItems(result);
