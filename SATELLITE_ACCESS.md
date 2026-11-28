@@ -12,9 +12,10 @@ The temporary flag bypasses only the per-field paid entitlement lookup for direc
 
 When UR is ready to monetize direct analysis:
 1. Remove `--var SATELLITE_FREE_LAUNCH:true` from `.github/workflows/deploy-satellite-worker.yml`.
-2. Deploy the Worker. Without the exact server-side value `true`, the existing owner-bound `satellite_access_status` RPC is required again.
-3. Restore the paid access request link and pricing/quote language in the public pages.
-4. Confirm the production status endpoint reports `paid_service=true` and that unpaid/expired/wrong-field access fails closed before any Copernicus request.
+2. Remove `satellite-access-legacy.html` from the `EXCLUDED_FILES` set in `scripts/build-public-site.mjs`, then restore the paid request link to that page.
+3. Deploy the Worker. Without the exact server-side value `true`, the existing owner-bound `satellite_access_status` RPC is required again.
+4. Restore the paid access request link and pricing/quote language in the public pages.
+5. Confirm the production status endpoint reports `paid_service=true` and that unpaid/expired/wrong-field access fails closed before any Copernicus request.
 
 The existing `satellite_access_orders` table, owner/MFA-admin RLS, quote acceptance, payment verification and expiry logic remain available. Client-entered payment references never activate access. Super Qi may be considered later only after its official payment/verification workflow is confirmed; this release does not claim an automatic Super Qi integration.
 
