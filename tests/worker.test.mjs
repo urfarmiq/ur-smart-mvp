@@ -26,7 +26,7 @@ test('statistics use UTC calendar days matching image requests',async()=>{
   if(url.endsWith('/rpc/satellite_access_status'))return json({field_id:'11111111-1111-4111-8111-111111111111',active:true,expires_at:new Date(Date.now()+86400000).toISOString(),order_id:'33333333-3333-4333-8333-333333333333'});
   if(url.includes('/rest/v1/field_boundaries'))return json([{owner_id:'owner',area_m2:10000,geometry:{type:'Polygon',coordinates:[[[44,33],[44.001,33],[44.001,33.001],[44,33.001],[44,33]]]}}]);
   if(url.includes('/openid-connect/token'))return json({access_token:'test-token'});
-  if(url.endsWith('/statistics/v1')){requests.push(JSON.parse(options.body));return json({data:[{interval:{from:'2026-10-23T00:00:00Z'},outputs:{indices:{bands:{B0:{stats:{mean:.5,sampleCount:10,noDataCount:0}},B1:{stats:{mean:.2}}}}}}],geometryPixelCount:10});}
+  if(url.endsWith('/statistics/v1')){requests.push(JSON.parse(options.body));return json({data:[{interval:{from:'2026-10-23T00:00:00Z'},outputs:{indices:{bands:{B0:{stats:{mean:.5,sampleCount:10,noDataCount:0}},B1:{stats:{mean:.2}},B16:{stats:{mean:1.1}},B17:{stats:{mean:.12}},B18:{stats:{mean:723}}}}}}],geometryPixelCount:10});}
   throw Error('Unexpected upstream request');
  };
  try{
@@ -34,6 +34,8 @@ test('statistics use UTC calendar days matching image requests',async()=>{
   assert.equal(r.status,200);const result=await r.json();assert.equal(result.date,'2026-10-23T00:00:00Z');
   assert.match(requests[0].aggregation.timeRange.from,/T00:00:00\.000Z$/);
   assert.equal(requests[0].aggregation.aggregationInterval.lastIntervalBehavior,'SHORTEN');
+  const evalscript=requests[0].aggregation.evalscript;assert.match(evalscript,/bands:19/);assert.match(evalscript,/const mtci=/);assert.match(evalscript,/const ireci=/);assert.match(evalscript,/const reip=/);
+  assert.equal(result.indices.MTCI,1.1);assert.equal(result.indices.IRECI,.12);assert.equal(result.indices.REIP,723);
  }finally{globalThis.fetch=originalFetch;}
 });
 
