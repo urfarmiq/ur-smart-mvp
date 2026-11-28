@@ -118,6 +118,6 @@ test('release verification requires the new researcher files and actual payment-
    if(bad==='satellite_gate'&&String(url).endsWith('/satellite/status'))return new Response(JSON.stringify({paid_service:false,free_launch:false,manual_admin_approval_required:false,quote_required:false,customer_acceptance_required:false,field_specific:true,authenticated_owner_required:true,automatic_renewal:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    if(bad==='field_gate'&&String(url).endsWith('/field-service/status'))return new Response(JSON.stringify({available:true,manual_admin_approval_required:false}),{headers:{'content-type':'application/json','access-control-allow-origin':origin}});
    return fetchImpl(url,options);
-  }}),/required public page|payment gate|free-tier|PWA|Monetization|Terrain/);
+  }}),/required public page|payment gate|free launch|free-tier|PWA|Monetization|Terrain/);
  }
 });
