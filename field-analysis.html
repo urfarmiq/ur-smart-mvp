@@ -129,7 +129,7 @@ body{background:white}main{width:100%;margin:0}
 <div id="fieldContextStatus" class="result" aria-live="polite">اختر حقلًا محفوظًا ثم حدّد رطوبة التربة في الموقع.</div>
 <div class="grid">
 <div class="result"><strong>الطقس حول الحقل</strong><div id="weatherContext">لم تُحمّل البيانات بعد.</div></div>
-<div class="result"><strong>آخر تحليل فضائي</strong><p class="muted">التحليل الفضائي الجديد خدمة مدفوعة حسب مدة التفعيل. <a id="satelliteAccessLink" href="./satellite-access.html">طلب أو تجديد التفعيل</a></p><div id="satelliteContext">لم تُحمّل البيانات بعد.</div></div>
+<div class="result"><strong>آخر تحليل فضائي</strong><p class="muted">التحليل الفضائي متاح مجانًا خلال مرحلة الإطلاق. <a id="satelliteAccessLink" href="./satellite-analysis.html">افتح التحليل الفضائي والمؤشرات المتقدمة</a></p><div id="satelliteContext">لم تُحمّل البيانات بعد.</div></div>
 </div>
 <h3>إضافة سجل ري</h3>
 <div class="grid">
@@ -192,7 +192,7 @@ body{background:white}main{width:100%;margin:0}
 <footer class="muted" style="text-align:center;padding:20px">© 2026 UR Smart — أور الزراعية الذكية<p><small>نحصي مشاهدات الصفحات إجمالياً دون حفظ بيانات تعريف الزائر. هذه المشاهدات ليست عدد الأشخاص.</small></p></footer>
 
 <script type="module">
-import {satelliteResponseError,isSatellitePaymentRequired,showSatellitePayment,updateSatelliteAccessLink} from './satellite-payment.mjs';
+import {satelliteResponseError,isSatellitePaymentRequired,showSatellitePayment} from './satellite-payment.mjs';
 import {createAdvisorHandoff} from './advisor-handoff.mjs';
 import {createGeminiAdvisor} from './gemini-advisor-ui.mjs';
 import {buildWeatherUrl,WEATHER_SOURCE,WEATHER_SOURCE_URL,WEATHER_SOURCE_LICENSE,WEATHER_SOURCE_LICENSE_URL,WEATHER_TIMEZONE} from './weather-core.mjs';
