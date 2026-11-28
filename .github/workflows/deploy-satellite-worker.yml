@@ -65,7 +65,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: satellite-backend
           wranglerVersion: "4"
-          command: deploy worker.js --name ur-smart-satellite --compatibility-date 2026-10-22 --keep-vars
+          command: deploy worker.js --name ur-smart-satellite --compatibility-date 2026-10-22 --keep-vars --var SATELLITE_FREE_LAUNCH:true
 
       - name: Ensure the free static Pages project
         env:
